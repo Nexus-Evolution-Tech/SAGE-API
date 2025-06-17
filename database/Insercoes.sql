@@ -10,7 +10,7 @@ INSERT INTO Aluno (id, rm) VALUES (1, "20232930077");
 INSERT INTO Professor (id) VALUES (2); -- preciso criar uma tabela professor para referenciar em pessoa - essa logica sera garantida pela api
 
 -- ESCOLA --
-INSERT INTO UnidadeEscolar (login, senha, nome_unidade) VALUES ("etc", "293", "ETEC Taboão da Serra");
+INSERT INTO UnidadeEscolar (login, senha, nome_unidade, cnpj) VALUES ("etc", "293", "ETEC Taboão da Serra", "25920685000115");
 
 -- TURMA --
 INSERT INTO Turma (nome, turno, curso_id) VALUES ("1ºB", "DIURNO", 1);

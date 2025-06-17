@@ -4,6 +4,7 @@ CREATE TABLE UnidadeEscolar (
     senha VARCHAR(255) COMMENT 'Senha da unidade para autenticação com a catraca',
     cnpj VARCHAR(18),
     nome_unidade VARCHAR(255),
+    n_unidade INT(3),
     endereco VARCHAR(255),
     logo VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -48,7 +49,6 @@ CREATE TABLE Dispositivo (
 CREATE TABLE Curso (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100),
-    turno VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -56,7 +56,7 @@ CREATE TABLE Curso (
 CREATE TABLE Turma (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(50),
-    turno ENUM ('DIURNO', 'NOTURNO', 'INTEGRAL'),
+    turno ENUM ('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL'),
     curso_id INT,
     unidade_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -1,8 +1,10 @@
-// app.js
 const express = require('express');
 const cors = require('cors'); // Importe o módulo cors
 const deviceRoutes = require('./routes/deviceRoutes');
-const pessoaRoutes = require('./routes/peopleRoutes');
+const peopleRoutes = require('./routes/peopleRoutes');
+const courseRoutes = require('./routes/courseRoutes');
+const schoolRoutes = require('./routes/schoolRoutes');
+const classRoutes = require('./routes/classRoutes');
 
 const app = express();
 
@@ -22,6 +24,9 @@ app.use(express.json());
 
 // Monta as rotas
 app.use('/', deviceRoutes);
-app.use('/', pessoaRoutes);
+app.use('/', peopleRoutes);
+app.use('/', courseRoutes);
+app.use('/', schoolRoutes);
+app.use('/', classRoutes);
 
 module.exports = app;
