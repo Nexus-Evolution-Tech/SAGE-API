@@ -1,6 +1,6 @@
 // controllers/statusController.js
 const deviceService = require('../services/deviceService');
-const { buscarTodosDispositivos, criarNovoDispositivo, atualizarDispositivo, removerDispositivo } = require('../config/db-utils');
+const { buscarTodosDispositivos, criarNovoDispositivo, atualizarDispositivo, removerDispositivo } = require('../config/device-db-utils');
 
 const getDispositivos = async (req, res) => {
   const dadosDispositivos = [];

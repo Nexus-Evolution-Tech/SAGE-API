@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const dispositivosController = require('../controllers/dispositivosController');
+const dispositivosController = require('../controllers/deviceController');
 
 router.get('/dispositivos', dispositivosController.getDispositivos);
 router.get('/dispositivos/status', dispositivosController.getStatus);

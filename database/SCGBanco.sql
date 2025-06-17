@@ -6,8 +6,8 @@ CREATE TABLE UnidadeEscolar (
     nome_unidade VARCHAR(255),
     endereco VARCHAR(255),
     logo VARCHAR(255),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE UnidadeFoto (
@@ -16,21 +16,21 @@ CREATE TABLE UnidadeFoto (
     tipo VARCHAR(50) COMMENT 'Ex: Fachada, Planta',
     caminho VARCHAR(255) COMMENT 'Caminho da imagem local ou nuvem',
     descricao VARCHAR(255),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id)
 );
 
-CREATE TABLE Areas (
+CREATE TABLE Area (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100),
     unidade_id INT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id)
 );
 
-CREATE TABLE Dispositivos (
+CREATE TABLE Dispositivo (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(50),
     modelo VARCHAR(50) COMMENT 'Ex: IDBlock, IDAcess',
@@ -40,31 +40,32 @@ CREATE TABLE Dispositivos (
     senha VARCHAR(255),
     area_id INT,
     numero_serial VARCHAR(255),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (area_id) REFERENCES Areas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (area_id) REFERENCES Area(id)
 );
 
-CREATE TABLE Cursos (
+CREATE TABLE Curso (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    turno VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Turmas (
+CREATE TABLE Turma (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(50),
     turno ENUM ('DIURNO', 'NOTURNO', 'INTEGRAL'),
     curso_id INT,
     unidade_id INT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (curso_id) REFERENCES Cursos(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (curso_id) REFERENCES Curso(id),
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id)
 );
 
-CREATE TABLE Pessoas (
+CREATE TABLE Pessoa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100),
     foto VARCHAR(255),
@@ -74,58 +75,59 @@ CREATE TABLE Pessoas (
     qr_code VARCHAR(255),
     cartao_rfid VARCHAR(255),
     senha_acesso VARCHAR(255),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    tipo ENUM ("ALUNO", "PROFESSOR", "ADMINISTRADOR", "TERCEIRIZADO", "PROFADM"),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id)
 );
 
-CREATE TABLE Alunos (
+CREATE TABLE Aluno (
     id INT PRIMARY KEY,
     turma_id INT,
     rm VARCHAR(12),
     email_responsavel VARCHAR(100),
     tel_responsavel VARCHAR(20),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (id) REFERENCES Pessoas(id),
-    FOREIGN KEY (turma_id) REFERENCES Turmas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id) REFERENCES Pessoa(id),
+    FOREIGN KEY (turma_id) REFERENCES Turma(id)
 );
 
-CREATE TABLE Professores (
+CREATE TABLE Professor (
     id INT PRIMARY KEY,
     siape VARCHAR(20),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (id) REFERENCES Pessoas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id) REFERENCES Pessoa(id)
 );
 
-CREATE TABLE Administradores (
+CREATE TABLE Administrador (
     id INT PRIMARY KEY,
     funcao VARCHAR(50),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (id) REFERENCES Pessoas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id) REFERENCES Pessoa(id)
 );
 
-CREATE TABLE Terceirizados (
+CREATE TABLE Terceirizado (
     id INT PRIMARY KEY,
     nome_empresa VARCHAR(100),
     cnpj VARCHAR(14),
     funcao VARCHAR(50),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (id) REFERENCES Pessoas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id) REFERENCES Pessoa(id)
 );
 
-CREATE TABLE Visitantes (
+/* CREATE TABLE Visitante (
     id INT PRIMARY KEY,
     documento_identidade VARCHAR(50) COMMENT 'Número do documento de identidade, opcional',
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (id) REFERENCES Pessoas(id)
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id) REFERENCES Pessoa(id)
+); */
 
-CREATE TABLE Aulas (
+CREATE TABLE Aula (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(50),
     professor_id INT,
@@ -133,10 +135,10 @@ CREATE TABLE Aulas (
     inicio TIME,
     fim TIME,
     dia_semana VARCHAR(10) COMMENT 'Ex: Segunda, Terça',
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (professor_id) REFERENCES Professores(id),
-    FOREIGN KEY (turma_id) REFERENCES Turmas(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (professor_id) REFERENCES Professor(id),
+    FOREIGN KEY (turma_id) REFERENCES Turma(id)
 );
 
 CREATE TABLE Acesso (
@@ -148,12 +150,12 @@ CREATE TABLE Acesso (
     inicio_acesso TIME COMMENT 'Hora inicial permitida (opcional)',
     fim_acesso TIME COMMENT 'Hora final permitida (opcional)',
     dias_semana VARCHAR(50) COMMENT 'Dias permitidos, exemplo: Segunda, Terça',
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by INT,
-    FOREIGN KEY (pessoa_id) REFERENCES Pessoas(id),
-    FOREIGN KEY (dispositivo_id) REFERENCES Dispositivos(id),
-    FOREIGN KEY (updated_by) REFERENCES Pessoas(id)
+    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id),
+    FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id),
+    FOREIGN KEY (updated_by) REFERENCES Pessoa(id)
 );
 
 CREATE TABLE EventoCatraca (
@@ -163,10 +165,10 @@ CREATE TABLE EventoCatraca (
     timestamp DATETIME,
     estado ENUM ('ENTRADA', 'SAIDA', 'NEGADO'),
     metodo_auth ENUM ('QRCODE', 'RFID', 'SENHA'),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (pessoa_id) REFERENCES Pessoas(id),
-    FOREIGN KEY (dispositivo_id) REFERENCES Dispositivos(id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id),
+    FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id)
 );
 
 CREATE TABLE LogSincronizacao (
@@ -177,6 +179,6 @@ CREATE TABLE LogSincronizacao (
     timestamp DATETIME
 );
 
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE dispositivos;
-SET FOREIGN_KEY_CHECKS = 1;
+-- SET FOREIGN_KEY_CHECKS = 0;
+-- DROP TABLE dispositivos;
+-- SET FOREIGN_KEY_CHECKS = 1;

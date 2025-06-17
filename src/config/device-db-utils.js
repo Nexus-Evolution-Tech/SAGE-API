@@ -1,10 +1,10 @@
 // src/db-utils.js
-const db = require('../config/database'); // Ajuste o caminho se necessário
+const db = require('./database'); // Ajuste o caminho se necessário
 
 async function buscarTodosDispositivos() {
     try {
         const [dispositivos] = await db.query(
-            'SELECT id, nome, modelo, endereco, porta, usuario, senha FROM dispositivos'
+            'SELECT id, nome, modelo, endereco, porta, usuario, senha FROM Dispositivo'
         );
         console.log(dispositivos);
         return dispositivos;
@@ -17,7 +17,7 @@ async function buscarTodosDispositivos() {
 async function criarNovoDispositivo(nome, modelo, endereco, porta, usuario, senha) {
     try {
         const [dispositivos] = await db.query(
-            'INSERT INTO Dispositivos (nome, modelo, endereco, porta, usuario, senha) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha) VALUES (?, ?, ?, ?, ?, ?)',
             [nome, modelo, endereco, porta, usuario, senha]
         );
     } catch (error) {
@@ -60,7 +60,7 @@ async function atualizarDispositivo(id, updates) {
             return; // Nada para atualizar
         }
 
-        const query = `UPDATE Dispositivos SET ${setClauses.join(', ')} WHERE id = ?`;
+        const query = `UPDATE Dispositivo SET ${setClauses.join(', ')} WHERE id = ?`;
         values.push(id);
 
         const [result] = await db.query(query, values);
@@ -75,7 +75,7 @@ async function atualizarDispositivo(id, updates) {
 async function removerDispositivo(id) {
     try {
         const [dispositivos] = await db.query(
-            'DELETE FROM Dispositivos WHERE id = (?)',
+            'DELETE FROM Dispositivo WHERE id = (?)',
             [id]
         );
     } catch (error) {

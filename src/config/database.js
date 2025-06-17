@@ -3,7 +3,7 @@ const mysql = require('mysql2');
 const pool = mysql.createPool({
   host: 'localhost', // Ou o endereço IP do seu servidor MySQL
   user: 'root',
-  password: 'etec',
+  password: 'root',
   database: 'sgc',
   waitForConnections: true,
   connectionLimit: 10, // Número máximo de conexões no pool
