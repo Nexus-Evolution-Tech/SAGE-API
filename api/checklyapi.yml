@@ -1,0 +1,691 @@
+openapi: 3.0.0
+info:
+  title: Checkly API
+  version: 1.0.0
+  description: API para gerenciamento de turmas, cursos, dispositivos, pessoas e escolas
+
+servers:
+  - url: http://localhost:3000
+
+tags:
+  - name: Turmas
+    description: Operações relacionadas às turmas
+  - name: Cursos
+    description: Operações relacionadas aos cursos
+  - name: Dispositivos
+    description: Operações relacionadas aos dispositivos
+  - name: Pessoas
+    description: Operações relacionadas às pessoas
+  - name: Escolas
+    description: Operações relacionadas às escolas
+
+paths:
+  /turmas:
+    get:
+      tags:
+        - Turmas
+      summary: Lista todas as turmas
+      responses:
+        '200':
+          description: Lista de turmas retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Turma'
+    post:
+      tags:
+        - Turmas
+      summary: Cria uma nova turma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TurmaInput'
+      responses:
+        '201':
+          description: Turma criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+
+  /turmas/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: ID da turma
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Turmas
+      summary: Retorna uma turma pelo ID
+      responses:
+        '200':
+          description: Turma encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+        '404':
+          description: Turma não encontrada
+    patch:
+      tags:
+        - Turmas
+      summary: Atualiza os dados de uma turma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TurmaUpdate'
+      responses:
+        '200':
+          description: Turma atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+        '404':
+          description: Turma não encontrada
+    delete:
+      tags:
+        - Turmas
+      summary: Remove uma turma
+      responses:
+        '204':
+          description: Turma deletada com sucesso
+        '404':
+          description: Turma não encontrada
+
+  /cursos:
+    get:
+      tags:
+        - Cursos
+      summary: Lista todos os cursos
+      responses:
+        '200':
+          description: Lista de cursos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Curso'
+    post:
+      tags:
+        - Cursos
+      summary: Cria um novo curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoInput'
+      responses:
+        '201':
+          description: Curso criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+
+  /cursos/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: ID do curso
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Cursos
+      summary: Retorna um curso pelo ID
+      responses:
+        '200':
+          description: Curso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '404':
+          description: Curso não encontrado
+    patch:
+      tags:
+        - Cursos
+      summary: Atualiza os dados de um curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoUpdate'
+      responses:
+        '200':
+          description: Curso atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '404':
+          description: Curso não encontrado
+    delete:
+      tags:
+        - Cursos
+      summary: Remove um curso
+      responses:
+        '204':
+          description: Curso deletado com sucesso
+        '404':
+          description: Curso não encontrado
+
+  /dispositivos:
+    get:
+      tags:
+        - Dispositivos
+      summary: Lista todos os dispositivos
+      responses:
+        '200':
+          description: Lista de dispositivos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dispositivo'
+    post:
+      tags:
+        - Dispositivos
+      summary: Cria um novo dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispositivoInput'
+      responses:
+        '201':
+          description: Dispositivo criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+
+  /dispositivos/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: ID do dispositivo
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Dispositivos
+      summary: Retorna um dispositivo pelo ID
+      responses:
+        '200':
+          description: Dispositivo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+        '404':
+          description: Dispositivo não encontrado
+    patch:
+      tags:
+        - Dispositivos
+      summary: Atualiza os dados de um dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispositivoUpdate'
+      responses:
+        '200':
+          description: Dispositivo atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+        '404':
+          description: Dispositivo não encontrado
+    delete:
+      tags:
+        - Dispositivos
+      summary: Remove um dispositivo
+      responses:
+        '204':
+          description: Dispositivo deletado com sucesso
+        '404':
+          description: Dispositivo não encontrado
+
+  /pessoas:
+    get:
+      tags:
+        - Pessoas
+      summary: Lista todas as pessoas
+      responses:
+        '200':
+          description: Lista de pessoas retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pessoa'
+    post:
+      tags:
+        - Pessoas
+      summary: Cria uma nova pessoa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PessoaInput'
+      responses:
+        '201':
+          description: Pessoa criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+
+  /pessoas/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: ID da pessoa
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Pessoas
+      summary: Retorna uma pessoa pelo ID
+      responses:
+        '200':
+          description: Pessoa encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+        '404':
+          description: Pessoa não encontrada
+    patch:
+      tags:
+        - Pessoas
+      summary: Atualiza os dados de uma pessoa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PessoaUpdate'
+      responses:
+        '200':
+          description: Pessoa atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+        '404':
+          description: Pessoa não encontrada
+    delete:
+      tags:
+        - Pessoas
+      summary: Remove uma pessoa
+      responses:
+        '204':
+          description: Pessoa deletada com sucesso
+        '404':
+          description: Pessoa não encontrada
+
+  /escolas:
+    get:
+      tags:
+        - Escolas
+      summary: Lista todas as escolas
+      responses:
+        '200':
+          description: Lista de escolas retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Escola'
+    post:
+      tags:
+        - Escolas
+      summary: Cria uma nova escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscolaInput'
+      responses:
+        '201':
+          description: Escola criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+
+  /escolas/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: ID da escola
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Escolas
+      summary: Retorna uma escola pelo ID
+      responses:
+        '200':
+          description: Escola encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+        '404':
+          description: Escola não encontrada
+    patch:
+      tags:
+        - Escolas
+      summary: Atualiza os dados de uma escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscolaUpdate'
+      responses:
+        '200':
+          description: Escola atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+        '404':
+          description: Escola não encontrada
+    delete:
+      tags:
+        - Escolas
+      summary: Remove uma escola
+      responses:
+        '204':
+          description: Escola deletada com sucesso
+        '404':
+          description: Escola não encontrada
+
+components:
+  schemas:
+
+    Turma:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        turno:
+          type: string
+          enum:
+            - MATUTINO
+            - VESPERTINO
+            - NOTURNO
+            - INTEGRAL
+        curso_id:
+          type: string
+          format: uuid
+        unidade_id:
+          type: string
+          format: uuid
+
+    TurmaInput:
+      type: object
+      required:
+        - nome
+        - turno
+        - curso_id
+        - unidade_id
+      properties:
+        nome:
+          type: string
+        turno:
+          type: string
+          enum:
+            - MATUTINO
+            - VESPERTINO
+            - NOTURNO
+            - INTEGRAL
+        curso_id:
+          type: string
+          format: uuid
+        unidade_id:
+          type: string
+          format: uuid
+
+    TurmaUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        turno:
+          type: string
+          enum:
+            - MATUTINO
+            - VESPERTINO
+            - NOTURNO
+            - INTEGRAL
+
+    Curso:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+
+    CursoInput:
+      type: object
+      required:
+        - nome
+      properties:
+        nome:
+          type: string
+
+    CursoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+
+    Dispositivo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        modelo:
+          type: string
+        endereco:
+          type: string
+          format: ipv4
+        porta:
+          type: integer
+        usuario:
+          type: string
+        senha:
+          type: string
+
+    DispositivoInput:
+      type: object
+      required:
+        - nome
+        - modelo
+        - endereco
+        - porta
+        - usuario
+        - senha
+      properties:
+        nome:
+          type: string
+        modelo:
+          type: string
+        endereco:
+          type: string
+          format: ipv4
+        porta:
+          type: integer
+        usuario:
+          type: string
+        senha:
+          type: string
+
+    DispositivoUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        modelo:
+          type: string
+
+    Pessoa:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        telefone:
+          type: string
+        foto:
+          type: string
+        unidade_id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        turma_id:
+          type: string
+          format: uuid
+        rm:
+          type: string
+        email_responsavel:
+          type: string
+          format: email
+        tel_responsavel:
+          type: string
+
+    PessoaInput:
+      type: object
+      required:
+        - nome
+        - email
+        - telefone
+        - unidade_id
+        - tipo
+      properties:
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        telefone:
+          type: string
+        foto:
+          type: string
+        unidade_id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        turma_id:
+          type: string
+          format: uuid
+        rm:
+          type: string
+        email_responsavel:
+          type: string
+          format: email
+        tel_responsavel:
+          type: string
+
+    PessoaUpdate:
+      type: object
+      properties:
+        nome:
+          type: string
+        rm:
+          type: string
+
+    Escola:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome_unidade:
+          type: string
+        n_unidade:
+          type: string
+        cnpj:
+          type: string
+        login:
+          type: string
+        senha:
+          type: string
+        endereco:
+          type: string
+
+    EscolaInput:
+      type: object
+      required:
+        - nome_unidade
+        - n_unidade
+        - cnpj
+        - login
+        - senha
+        - endereco
+      properties:
+        nome_unidade:
+          type: string
+        n_unidade:
+          type: string
+        cnpj:
+          type: string
+        login:
+          type: string
+        senha:
+          type: string
+        endereco:
+          type: string
+
+    EscolaUpdate:
+      type: object
+      properties:
+        nome_unidade:
+          type: string
+        senha:
+          type: string

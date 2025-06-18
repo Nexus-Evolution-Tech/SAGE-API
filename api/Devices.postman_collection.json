@@ -8,26 +8,6 @@
 	},
 	"item": [
 		{
-			"name": "/dispositivos/status",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:3000/dispositivos/status",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "3000",
-					"path": [
-						"dispositivos",
-						"status"
-					]
-				}
-			},
-			"response": []
-		},
-		{
 			"name": "/dispositivos",
 			"request": {
 				"method": "GET",
@@ -47,12 +27,12 @@
 			"response": []
 		},
 		{
-			"name": "/dispositivos",
+			"name": "/dispositivos/status",
 			"request": {
-				"method": "DELETE",
+				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/dispositivos/12",
+					"raw": "http://localhost:3000/dispositivos/status",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -60,7 +40,7 @@
 					"port": "3000",
 					"path": [
 						"dispositivos",
-						"12"
+						"status"
 					]
 				}
 			},
@@ -95,7 +75,7 @@
 			"response": []
 		},
 		{
-			"name": "/dispositivos",
+			"name": "/dispositivos/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
@@ -118,6 +98,26 @@
 					"path": [
 						"dispositivos",
 						"13"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/dispositivos/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/dispositivos/12",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"dispositivos",
+						"12"
 					]
 				}
 			},

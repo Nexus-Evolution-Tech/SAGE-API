@@ -1,4 +1,4 @@
-const db = require('./database');
+const db = require('../config/database');
 
 // 📌 Criar Pessoa base
 async function criarPessoaBase(dados) {
@@ -80,6 +80,11 @@ async function criarProfAdm(pessoaId, dados) {
 async function buscarTodasPessoas() {
   const [pessoas] = await db.query('SELECT * FROM Pessoa');
   return pessoas;
+}
+
+async function buscarPorId(id) {
+  const [pessoa] = await db.query(`SELECT * FROM Pessoa WHERE id = ${id}`);
+  return pessoa;
 }
 
 // 🔎 Buscar o tipo da pessoa
@@ -183,6 +188,7 @@ module.exports = {
   criarTerceirizado,
   criarProfAdm,
   buscarTodasPessoas,
+  buscarPorId,
   atualizarPessoaCompleta,
   removerPessoa
 };

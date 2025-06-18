@@ -4,11 +4,8 @@ const {
   criarProfessor,
   criarAdministrador,
   criarTerceirizado,
-  criarProfAdm,
-  buscarTodasPessoas,
-  atualizarPessoaCompleta,
-  removerPessoa
-} = require('../config/people-db-utils');
+  criarProfAdm
+} = require('../utils/people-db-utils');
 
 async function criarPessoaCompleta(dados) {
   const { nome, email, telefone, foto, tipo, ...camposExtras } = dados;
@@ -49,21 +46,6 @@ async function criarPessoaCompleta(dados) {
   return { idPessoa, tipoCriado: tipo };
 }
 
-async function listarPessoas() {
-  return await buscarTodasPessoas();
-}
-
-async function editarPessoa(id, updates) {
-  await atualizarPessoaCompleta(id, updates);
-}
-
-async function deletarPessoa(id) {
-  await removerPessoa(id);
-}
-
 module.exports = {
   criarPessoaCompleta,
-  listarPessoas,
-  editarPessoa,
-  deletarPessoa
 };

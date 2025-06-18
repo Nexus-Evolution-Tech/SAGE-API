@@ -1,8 +1,10 @@
+// PESSOA N TEM COMO GENERALIZAR, ELA TEM FUNCOES MTO ESPECIFICAS EM SEU CRUD
 const peopleService = require('../services/peopleService');
+const { buscarTodasPessoas, buscarPorId, atualizarPessoaCompleta, removerPessoa } = require('../utils/people-db-utils');
 
-const getPessoas = async (req, res) => {
+const listar = async (req, res) => {
   try {
-    const pessoas = await peopleService.listarPessoas();
+    const pessoas = await buscarTodasPessoas();
     res.json(pessoas);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
@@ -10,7 +12,7 @@ const getPessoas = async (req, res) => {
   }
 };
 
-const postPessoa = async (req, res) => {
+const criar = async (req, res) => {
   try {
     const novaPessoa = await peopleService.criarPessoaCompleta(req.body);
     res.status(201).json({ message: 'Pessoa criada com sucesso', pessoa: novaPessoa });
@@ -20,10 +22,21 @@ const postPessoa = async (req, res) => {
   }
 };
 
-const patchPessoa = async (req, res) => {
+const listarPorId = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const pessoas = await buscarPorId(id);
+    res.json(pessoas);
+  } catch (error) {
+    console.error('Erro ao listar pessoas:', error);
+    res.status(500).json({ message: 'Erro ao listar pessoas' });
+  }
+};
+
+const editar = async (req, res) => {
   try {
     const id = req.params.id;
-    await peopleService.editarPessoa(id, req.body);
+    await atualizarPessoaCompleta(id, req.body);
     res.json({ message: 'Pessoa atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
@@ -31,10 +44,10 @@ const patchPessoa = async (req, res) => {
   }
 };
 
-const deletePessoa = async (req, res) => {
+const deletar = async (req, res) => {
   try {
     const id = req.params.id;
-    await peopleService.deletarPessoa(id);
+    await removerPessoa(id);
     res.json({ message: 'Pessoa removida com sucesso' });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
@@ -43,8 +56,9 @@ const deletePessoa = async (req, res) => {
 };
 
 module.exports = {
-  getPessoas,
-  postPessoa,
-  patchPessoa,
-  deletePessoa
+  listar,
+  criar,
+  listarPorId,
+  editar,
+  deletar
 };

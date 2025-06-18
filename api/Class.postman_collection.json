@@ -4,7 +4,7 @@
 		"name": "Class",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-4f9c286b-0812-448b-89b4-6ecdadb6e774?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-4f9c286b-0812-448b-89b4-6ecdadb6e774?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
@@ -33,7 +33,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"1°B\",\r\n    \"turno\": \"MATUTINO\",\r\n    \"curso_id\": 1,\r\n    \"unidade_id\": 1\r\n}",
+					"raw": "{\r\n    \"nome\": \"1°B\",\r\n    \"turno\": \"MATUTINO\",\r\n    \"curso_id\": 2,\r\n    \"unidade_id\": 2\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -55,7 +55,7 @@
 			"response": []
 		},
 		{
-			"name": "/turmas",
+			"name": "/turmas/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
@@ -69,7 +69,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas/1",
+					"raw": "http://localhost:3000/turmas/3",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -77,14 +77,14 @@
 					"port": "3000",
 					"path": [
 						"turmas",
-						"1"
+						"3"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas",
+			"name": "/turmas/:id",
 			"request": {
 				"method": "DELETE",
 				"header": [],

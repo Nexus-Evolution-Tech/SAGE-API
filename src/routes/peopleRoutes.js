@@ -1,10 +1,6 @@
-const express = require('express');
-const router = express.Router();
+const gerarRotas = require('./genericRoutesFactory');
 const peopleController = require('../controllers/peopleController');
 
-router.get('/pessoas', peopleController.getPessoas);
-router.post('/pessoas', peopleController.postPessoa);
-router.patch('/pessoas/:id', peopleController.patchPessoa);
-router.delete('/pessoas/:id', peopleController.deletePessoa);
-
+const router = gerarRotas(peopleController, 'pessoas');
 module.exports = router;
+

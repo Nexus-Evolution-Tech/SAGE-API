@@ -27,32 +27,13 @@
 			"response": []
 		},
 		{
-			"name": "/pessoas Copy",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:3000/pessoas",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "3000",
-					"path": [
-						"pessoas"
-					]
-				}
-			},
-			"response": []
-		},
-		{
 			"name": "/pessoas - ALUNO",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"nome\": \"João da Silva\",\r\n  \"email\": \"joao.silva@escola.com\",\r\n  \"telefone\": \"11999999999\",\r\n  \"foto\": \"foto_joao.png\",\r\n  \"unidade_id\": 1,\r\n  \"tipo\": \"ALUNO\",\r\n  \"turma_id\": 1,\r\n  \"rm\": \"20252930001\",\r\n  \"email_responsavel\": \"responsavel.joao@gmail.com\",\r\n  \"tel_responsavel\": \"11988888888\"\r\n}\r\n",
+					"raw": "{\r\n  \"nome\": \"João da Silva\",\r\n  \"email\": \"joao.silva@escola.com\",\r\n  \"telefone\": \"11999999999\",\r\n  \"foto\": \"foto_joao.png\",\r\n  \"unidade_id\": 2,\r\n  \"tipo\": \"ALUNO\",\r\n  \"turma_id\": 6,\r\n  \"rm\": \"20252930001\",\r\n  \"email_responsavel\": \"responsavel.joao@gmail.com\",\r\n  \"tel_responsavel\": \"11988888888\"\r\n}\r\n",
 					"options": {
 						"raw": {
 							"language": "json"

@@ -4,7 +4,7 @@
 		"name": "Course",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-d4350b47-df93-4bdd-9967-952e157007f7?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-d4350b47-df93-4bdd-9967-952e157007f7?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
@@ -55,7 +55,7 @@
 			"response": []
 		},
 		{
-			"name": "/cursos",
+			"name": "/cursos/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
@@ -84,13 +84,13 @@
 			"response": []
 		},
 		{
-			"name": "/cursos",
+			"name": "/cursos/:id",
 			"request": {
 				"method": "DELETE",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"turno\": \"DIURNO\"\r\n}",
+					"raw": "",
 					"options": {
 						"raw": {
 							"language": "json"

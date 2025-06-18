@@ -1,10 +1,5 @@
-const express = require('express');
-const router = express.Router();
+const gerarRotas = require('./genericRoutesFactory');
 const schoolController = require('../controllers/schoolController');
 
-router.get('/escolas', schoolController.getEscolas);
-router.post('/escolas', schoolController.postEscola);
-router.patch('/escolas/:id', schoolController.patchEscola);
-router.delete('/escolas/:id', schoolController.deleteEscola);
-
+const router = gerarRotas(schoolController, 'escolas');
 module.exports = router;
