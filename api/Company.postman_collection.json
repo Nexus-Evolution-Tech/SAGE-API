@@ -1,39 +1,39 @@
 {
 	"info": {
-		"_postman_id": "4f9c286b-0812-448b-89b4-6ecdadb6e774",
-		"name": "Class",
+		"_postman_id": "50ad2af9-d8b7-4e72-b773-01b726303286",
+		"name": "Company",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-4f9c286b-0812-448b-89b4-6ecdadb6e774?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-50ad2af9-d8b7-4e72-b773-01b726303286?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
-			"name": "/turmas",
+			"name": "/empresas",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/turmas",
+					"raw": "http://localhost:3000/empresas",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas"
+						"empresas"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas",
+			"name": "/empresa",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"1°B\",\r\n    \"turno\": \"MATUTINO\",\r\n    \"curso_id\": 1,\r\n    \"unidade_id\": 1\r\n}",
+					"raw": "{\r\n    \"nome\": \"Informática Aplicada à Internet\",\r\n    \"cnpj\": \"97.890.172/0001-10\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -41,33 +41,33 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas",
+					"raw": "http://localhost:3000/empresa",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas"
+						"empresa"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/empresa/:id",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/turmas/1",
+					"raw": "http://localhost:3000/empresa/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
+						"empresa",
 						"1"
 					]
 				}
@@ -75,13 +75,13 @@
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/empresa/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"3°B\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Desenvolvimento de Sistemas\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -89,22 +89,22 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas/3",
+					"raw": "http://localhost:3000/empresa/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
-						"3"
+						"empresa",
+						"1"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/empresa/:id",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -118,14 +118,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas/1",
+					"raw": "http://localhost:3000/empresa/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
+						"empresa",
 						"1"
 					]
 				}

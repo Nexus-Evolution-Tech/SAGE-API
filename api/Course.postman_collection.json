@@ -57,6 +57,26 @@
 		{
 			"name": "/cursos/:id",
 			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/cursos/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"cursos",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/cursos/:id",
+			"request": {
 				"method": "PATCH",
 				"header": [],
 				"body": {

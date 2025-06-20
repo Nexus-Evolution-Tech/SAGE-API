@@ -4,7 +4,7 @@ const pool = mysql.createPool({
   host: 'localhost', // Ou o endereço IP do seu servidor MySQL
   user: 'root',
   password: 'root',
-  database: 'sgc',
+  database: 'checkly',
   waitForConnections: true,
   connectionLimit: 10, // Número máximo de conexões no pool
   queueLimit: 0

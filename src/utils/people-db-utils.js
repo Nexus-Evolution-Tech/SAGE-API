@@ -24,15 +24,14 @@ async function criarPessoaBase(dados) {
 // 📌 Criar Aluno
 async function criarAluno(pessoaId, dados) {
   const query = `
-    INSERT INTO Aluno (id, turma_id, rm, email_responsavel, tel_responsavel)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO Aluno (id, turma_id, rm, responsavel_id)
+    VALUES (?, ?, ?, ?)
   `;
   const values = [
     pessoaId,
     dados.turma_id,
     dados.rm,
-    dados.email_responsavel,
-    dados.tel_responsavel
+    dados.responsavel_id
   ];
   await db.query(query, values);
 }
@@ -58,13 +57,12 @@ async function criarAdministrador(pessoaId, dados) {
 // 📌 Criar Terceirizado
 async function criarTerceirizado(pessoaId, dados) {
   const query = `
-    INSERT INTO Terceirizado (id, nome_empresa, cnpj, funcao)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO Terceirizado (id, empresa_id, funcao)
+    VALUES (?, ?, ?)
   `;
   const values = [
     pessoaId,
-    dados.nome_empresa,
-    dados.cnpj,
+    dados.empresa_id,
     dados.funcao
   ];
   await db.query(query, values);

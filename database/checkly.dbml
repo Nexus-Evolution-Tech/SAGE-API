@@ -1,0 +1,163 @@
+Enum MetodoAuth {
+  QRCODE
+  RFID
+  SENHA
+}
+
+Enum EstadoEvento {
+  ENTRADA
+  SAIDA
+}
+
+Enum Turno {
+  MATUTINO
+  VESPERTINO
+  NOTURNO
+  INTEGRAL
+}
+
+Enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+}
+
+Table UnidadeEscolar {
+  id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
+  login varchar(100) [note: "Login da unidade para autenticação com a catraca"]
+  senha varchar(255) [note: "Senha da unidade para autenticação com a catraca"]
+  cnpj varchar(18)
+  nome varchar(255)
+  numero varchar(3)
+  endereco varchar(255)
+  logo varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table UnidadeFoto {
+  id int [pk, increment]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  tipo varchar(50) [note: "Ex: Fachada, Planta"]
+  caminho varchar(255) [note: "Caminho da imagem local ou nuvem"]
+  descricao varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Area {
+  id int [pk, increment]
+  nome varchar(100)
+  unidade_id int [ref: > UnidadeEscolar.id]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Dispositivo {
+  id int [pk, increment]
+  modelo varchar(50) [note: "Ex: IDBlock, IDAccess"]
+  endereco varchar(50)
+  porta int
+  area_id int [ref: > Area.id]
+  usuario varchar(255)
+  senha varchar(255)
+  serial varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Curso {
+  id int [pk, increment]
+  nome varchar(100)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Turma {
+  id int [pk, increment]
+  nome varchar(50)
+  turno Turno
+  curso_id int [ref: > Curso.id]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Pessoa {
+  id int [pk, increment]
+  nome varchar(100)
+  foto varchar(255)
+  unidade_id int [ref: > UnidadeEscolar.id]
+  email varchar(100) [note: "Email de contato, em caso de alunos é o institucional"]
+  telefone varchar(20)
+  qr_code varchar(255)
+  cartao_rfid varchar(255)
+  senha_acesso varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Professor {
+  id int [pk, ref: > Pessoa.id]
+  siape varchar(20)
+}
+
+Table Administrador {
+  id int [pk, ref: > Pessoa.id]
+  funcao varchar(50)
+}
+
+Table Empresa {
+  id int [pk, increment]
+  nome varchar(100)
+  cnpj varchar(14)
+}
+
+Table Terceirizado {
+  id int [pk, ref: > Pessoa.id]
+  empresa_id int [ref: > Empresa.id]
+  funcao varchar(50)
+}
+
+Table Aluno {
+  id int [pk, ref: > Pessoa.id]
+  rm int(12) [note: "20232930077 -> yyyy<n_unidade><n_aluno>"]
+  turma_id int [ref: > Turma.id]
+  responsavel_id int [ref: > Responsavel.id]
+}
+
+Table Responsavel {
+  id int [pk, increment]
+  nome varchar(100)
+  rg int(9)
+  cpf int(14)
+  telefone varchar(20)
+  email varchar(100)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Aula {
+  id int [pk, increment]
+  nome varchar(50)
+  professor_id int [ref: > Professor.id]
+  turma_id int [ref: > Turma.id]
+  inicio time
+  fim time
+  dia_semana DiaSemana
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Acesso {
+  id int [pk, increment]
+  pessoa_id int [ref: > Pessoa.id]
+  dispositivo_id int [ref: > Dispositivo.id]
+  status EstadoEvento
+  permitido boolean
+  data_hora timestamp
+  metodo_auth MetodoAuth
+  updated_at timestamp
+}

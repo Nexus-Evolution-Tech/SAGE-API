@@ -1,39 +1,39 @@
 {
 	"info": {
-		"_postman_id": "4f9c286b-0812-448b-89b4-6ecdadb6e774",
-		"name": "Class",
+		"_postman_id": "e3121e77-8afc-457e-a3b1-473029613db3",
+		"name": "Guardian",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-4f9c286b-0812-448b-89b4-6ecdadb6e774?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-e3121e77-8afc-457e-a3b1-473029613db3?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
-			"name": "/turmas",
+			"name": "/responsaveis",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/turmas",
+					"raw": "http://localhost:3000/responsaveis",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas"
+						"responsaveis"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas",
+			"name": "/responsavel",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"1°B\",\r\n    \"turno\": \"MATUTINO\",\r\n    \"curso_id\": 1,\r\n    \"unidade_id\": 1\r\n}",
+					"raw": "{\r\n  \"nome\": \"Igor\",\r\n  \"rg\": \"634150467\",\r\n  \"cpf\": \"45328562801\",\r\n  \"email\": \"igor@gmail.com\",\r\n  \"telefone\": \"11987232615\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -41,33 +41,33 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas",
+					"raw": "http://localhost:3000/responsaveis",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas"
+						"responsaveis"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/responsavel/:id",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/turmas/1",
+					"raw": "http://localhost:3000/responsavel/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
+						"responsavel",
 						"1"
 					]
 				}
@@ -75,13 +75,13 @@
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/responsavel",
 			"request": {
 				"method": "PATCH",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"3°B\"\r\n}",
+					"raw": "{\r\n    \"nome_unidade\": \"ETEC Taboão da Serra\",\r\n    \"senha\": \"nossaetec\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -89,22 +89,22 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas/3",
+					"raw": "http://localhost:3000/responsavel/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
-						"3"
+						"responsavel",
+						"1"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/turmas/:id",
+			"name": "/responsavel",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -118,14 +118,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/turmas/1",
+					"raw": "http://localhost:3000/responsavel/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"turmas",
+						"responsavel",
 						"1"
 					]
 				}
