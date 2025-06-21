@@ -24,140 +24,152 @@ Enum DiaSemana {
   SEXTA
 }
 
+Enum TipoPessoa {
+  ALUNO
+  PROFESSOR
+  ADMINISTRADOR
+  TERCEIRIZADO
+  PROFADM
+}
+
 Table UnidadeEscolar {
   id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
-  login varchar(100) [note: "Login da unidade para autenticação com a catraca"]
-  senha varchar(255) [note: "Senha da unidade para autenticação com a catraca"]
-  cnpj varchar(18)
-  nome varchar(255)
-  numero varchar(3)
-  endereco varchar(255)
-  logo varchar(255)
+  login varchar(100) [not null, note: "Login da unidade para autenticação com a catraca"]
+  senha varchar(255) [not null, note: "Senha da unidade para autenticação com a catraca"]
+  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
+  nome varchar(255) [not null]
+  numero char(3) [not null]
+  endereco varchar(255) [not null]
+  logo varchar(255) [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table UnidadeFoto {
   id int [pk, increment]
-  unidade_id int [ref: > UnidadeEscolar.id]
-  tipo varchar(50) [note: "Ex: Fachada, Planta"]
-  caminho varchar(255) [note: "Caminho da imagem local ou nuvem"]
-  descricao varchar(255)
+  unidade_id int [ref: > UnidadeEscolar.id, not null]
+  tipo varchar(50) [not null, note: "Ex: Fachada, Planta"]
+  caminho varchar(255) [not null, note: "Caminho da imagem local ou nuvem"]
+  descricao varchar(255) [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Area {
   id int [pk, increment]
-  nome varchar(100)
-  unidade_id int [ref: > UnidadeEscolar.id]
+  nome varchar(100) [not null]
+  unidade_id int [ref: > UnidadeEscolar.id, not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Dispositivo {
   id int [pk, increment]
-  modelo varchar(50) [note: "Ex: IDBlock, IDAccess"]
-  endereco varchar(50)
-  porta int
-  area_id int [ref: > Area.id]
-  usuario varchar(255)
-  senha varchar(255)
-  serial varchar(255)
+  nome varchar(50) [not null]
+  modelo varchar(50) [not null, note: "Ex: IDBlock, IDAccess"]
+  endereco varchar(50) [not null]
+  porta int [not null]
+  usuario varchar(255) [not null]
+  senha varchar(255) [not null]
+  area_id int [ref: > Area.id, not null]
+  numero_serial varchar(255) [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Curso {
   id int [pk, increment]
-  nome varchar(100)
+  nome varchar(100) [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Turma {
   id int [pk, increment]
-  nome varchar(50)
-  turno Turno
-  curso_id int [ref: > Curso.id]
-  unidade_id int [ref: > UnidadeEscolar.id]
+  nome varchar(50) [not null]
+  turno Turno [not null]
+  curso_id int [ref: > Curso.id, not null]
+  unidade_id int [ref: > UnidadeEscolar.id, not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Pessoa {
   id int [pk, increment]
-  nome varchar(100)
-  foto varchar(255)
-  unidade_id int [ref: > UnidadeEscolar.id]
-  email varchar(100) [note: "Email de contato, em caso de alunos é o institucional"]
-  telefone varchar(20)
-  qr_code varchar(255)
-  cartao_rfid varchar(255)
-  senha_acesso varchar(255)
+  nome varchar(100) [not null]
+  foto varchar(255) [not null]
+  rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
+  cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
+  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
+  unidade_id int [ref: > UnidadeEscolar.id, not null]
+  qr_code varchar(255) [not null]
+  cartao_rfid varchar(255) [not null]
+  senha_acesso varchar(255) [not null]
+  tipo TipoPessoa [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Professor {
   id int [pk, ref: > Pessoa.id]
-  siape varchar(20)
+  siape varchar(20) [not null]
 }
 
 Table Administrador {
   id int [pk, ref: > Pessoa.id]
-  funcao varchar(50)
+  funcao varchar(50) [not null]
 }
 
 Table Empresa {
   id int [pk, increment]
-  nome varchar(100)
-  cnpj varchar(14)
+  nome varchar(100) [not null]
+  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
 }
 
 Table Terceirizado {
   id int [pk, ref: > Pessoa.id]
-  empresa_id int [ref: > Empresa.id]
-  funcao varchar(50)
-}
-
-Table Aluno {
-  id int [pk, ref: > Pessoa.id]
-  rm int(12) [note: "20232930077 -> yyyy<n_unidade><n_aluno>"]
-  turma_id int [ref: > Turma.id]
-  responsavel_id int [ref: > Responsavel.id]
+  empresa_id int [not null]
+  funcao varchar(50) [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
 }
 
 Table Responsavel {
   id int [pk, increment]
-  nome varchar(100)
-  rg int(9)
-  cpf int(14)
-  telefone varchar(20)
-  email varchar(100)
+  nome varchar(100) [not null]
+  rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
+  cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
+  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
   created_at timestamp
   updated_at timestamp
 }
 
+Table Aluno {
+  id int [pk, ref: > Pessoa.id]
+  rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
+  turma_id int [ref: > Turma.id, not null]
+  responsavel_id int [ref: > Responsavel.id, not null]
+}
+
 Table Aula {
   id int [pk, increment]
-  nome varchar(50)
-  professor_id int [ref: > Professor.id]
-  turma_id int [ref: > Turma.id]
-  inicio time
-  fim time
-  dia_semana DiaSemana
+  nome varchar(50) [not null]
+  professor_id int [ref: > Professor.id, not null]
+  turma_id int [ref: > Turma.id, not null]
+  inicio time [not null]
+  fim time [not null]
+  dia_semana DiaSemana [not null]
   created_at timestamp
   updated_at timestamp
 }
 
 Table Acesso {
   id int [pk, increment]
-  pessoa_id int [ref: > Pessoa.id]
-  dispositivo_id int [ref: > Dispositivo.id]
-  status EstadoEvento
-  permitido boolean
+  pessoa_id int [ref: > Pessoa.id, not null]
+  dispositivo_id int [ref: > Dispositivo.id, not null]
+  status EstadoEvento [not null]
+  permitido boolean [not null]
   data_hora timestamp
-  metodo_auth MetodoAuth
+  metodo_auth MetodoAuth [not null]
   updated_at timestamp
 }

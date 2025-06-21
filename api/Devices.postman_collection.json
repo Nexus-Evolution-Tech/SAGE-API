@@ -47,13 +47,33 @@
 			"response": []
 		},
 		{
+			"name": "/dispositivos/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/dispositivos/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"dispositivos",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "/dispositivos",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome\": \"Catraca 03\",\r\n    \"modelo\": \"iDBlock\",\r\n    \"endereco\": \"192.168.0.120\",\r\n    \"porta\": 89,\r\n    \"usuario\": \"etec\",\r\n    \"senha\": \"etec\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Catraca 03\",\r\n    \"modelo\": \"iDBlock\",\r\n    \"endereco\": \"192.168.0.120\",\r\n    \"porta\": 89,\r\n    \"usuario\": \"etec\",\r\n    \"senha\": \"etec\",\r\n    \"unidade_id\": 1,\r\n    \"numero_serial\": \"12341234\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -89,7 +109,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/dispositivos/13",
+					"raw": "http://localhost:3000/dispositivos/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -97,7 +117,7 @@
 					"port": "3000",
 					"path": [
 						"dispositivos",
-						"13"
+						"1"
 					]
 				}
 			},

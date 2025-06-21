@@ -3,7 +3,7 @@ const gerarController = require('./genericControllerFactory');
 const { buscarTodos } = require('../utils/generic-db-utils');
 
 const tabela = 'Dispositivo';
-const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha'];
+const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'area_id', 'numero_serial'];
 
 const getStatus = async (req, res) => {
     const statusDispositivos = [];

@@ -8,7 +8,7 @@ const listar = async (req, res) => {
     res.json(pessoas);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas' });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error });
   }
 };
 
@@ -18,7 +18,7 @@ const criar = async (req, res) => {
     res.status(201).json({ message: 'Pessoa criada com sucesso', pessoa: novaPessoa });
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao criar pessoa' });
+    res.status(500).json({ message: 'Erro ao criar pessoa:', error });
   }
 };
 
@@ -29,7 +29,7 @@ const listarPorId = async (req, res) => {
     res.json(pessoas);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas' });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error });
   }
 };
 
@@ -40,7 +40,7 @@ const editar = async (req, res) => {
     res.json({ message: 'Pessoa atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao atualizar pessoa' });
+    res.status(500).json({ message: 'Erro ao atualizar pessoa', error });
   }
 };
 
@@ -51,7 +51,7 @@ const deletar = async (req, res) => {
     res.json({ message: 'Pessoa removida com sucesso' });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
-    res.status(500).json({ message: 'Erro ao remover pessoa' });
+    res.status(500).json({ message: 'Erro ao remover pessoa', error });
   }
 };
 

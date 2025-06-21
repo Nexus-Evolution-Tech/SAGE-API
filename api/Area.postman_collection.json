@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "7153f1a0-aa14-4802-9f3f-2321a6c3994f",
+		"name": "Area",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45944265",
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-7153f1a0-aa14-4802-9f3f-2321a6c3994f?action=share&source=collection_link&creator=45944265"
+	},
+	"item": [
+		{
+			"name": "/areas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/areas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"areas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/areas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Portaria\",\r\n  \"unidade_id\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/areas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"areas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/areas/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/areas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"areas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/areas/:id",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Pátio\",\r\n  \"unidade_id\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/turmas/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/areas/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/areas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"areas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

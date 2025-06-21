@@ -14,6 +14,8 @@ tags:
     description: Operações relacionadas às escolas
   - name: Turmas
     description: Operações relacionadas às turmas
+  - name: Areas
+    description: Operações relacionadas às áreas
   - name: Dispositivos
     description: Operações relacionadas aos dispositivos
   - name: Empresas
@@ -133,7 +135,7 @@ paths:
               login: "escola123"
               senha: "senha123"
               endereco: "Rua Exemplo, 123, Centro"
-              logo: null
+              logo: "logo_etec.png"
       responses:
         '201':
           description: Escola criada
@@ -173,11 +175,11 @@ paths:
             example:
               nome: "ETEC Taboão da Serra"
               numero: "293"
-              cnpj: "44.591.997/0001-77"
+              cnpj: "44591997000177"
               login: "etec"
               senha: "etec"
               endereco: "Praça Miguel Ortega, 135 - Parque Assuncao, Taboão da Serra - SP, 06754-160"
-              logo: null
+              logo: "logo_etec2.png"
       responses:
         '200':
           description: Escola atualizada
@@ -282,6 +284,88 @@ paths:
         '404':
           description: Turma não encontrada
 
+  /areas:
+    get:
+      tags: [Areas]
+      summary: Lista todas as areas
+      responses:
+        '200':
+          description: Lista de areas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Area'
+    post:
+      tags: [Areas]
+      summary: Cria uma nova Area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Area'
+            example:
+              nome: "Portaria"
+              unidade_id: 1
+      responses:
+        '201':
+          description: Area criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+
+  /areas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Areas]
+      summary: Retorna uma Area pelo ID
+      responses:
+        '200':
+          description: Area encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+        '404':
+          description: Area não encontrada
+    patch:
+      tags: [Areas]
+      summary: Atualiza uma Area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Area'
+            example:
+              nome: "Pátio"
+              unidade_id: 1 
+      responses:
+        '200':
+          description: Area atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+        '404':
+          description: Area não encontrada
+    delete:
+      tags: [Areas]
+      summary: Remove uma turma
+      responses:
+        '204':
+          description: Turma deletada
+        '404':
+          description: Turma não encontrada
+
   /dispositivos:
     get:
       tags: [Dispositivos]
@@ -311,6 +395,8 @@ paths:
               porta: 8080
               usuario: "admin"
               senha: "1234"
+              area_id: 1
+              numero_serial: "1234567"
       responses:
         '201':
           description: Dispositivo criado
@@ -354,6 +440,8 @@ paths:
               porta: 8000
               usuario: "cid"
               senha: "cid1234"
+              area_id: 1
+              numero_serial: "5674839"
       responses:
         '200':
           description: Dispositivo atualizado
@@ -396,7 +484,7 @@ paths:
               $ref: '#/components/schemas/Empresa'
             example:
               nome: "Empresa XYZ"
-              cnpj: "65.297.682/0001-91"
+              cnpj: "65297682000191"
       responses:
         '201':
           description: Empresa criada
@@ -435,7 +523,7 @@ paths:
               $ref: '#/components/schemas/Empresa'
             example:
               nome: "Limpezas X"
-              cnpj: "80.453.991/0001-05"
+              cnpj: "80453991000105"
       responses:
         '200':
           description: Empresa atualizado
@@ -478,7 +566,7 @@ paths:
               $ref: '#/components/schemas/Responsavel'
             example:
               nome: "Carlos Souza"
-              rg: "12345678-9"
+              rg: "123456789"
               cpf: "12345678900"
               email: "carlos.souza@exemplo.com"
               telefone: "11988887777"
@@ -520,8 +608,8 @@ paths:
               $ref: '#/components/schemas/Responsavel'
             example:
               nome: "João Silva"
-              rg: "12345678-9"
-              cpf: "435.041.470-32"
+              rg: "123456789"
+              cpf: "43504147032"
               email: "joao.silva@gmail.com"
               telefone: "11904352678"
       responses:
@@ -569,42 +657,62 @@ paths:
                 summary: Exemplo de Aluno
                 value:
                   nome: "João da Silva"
-                  email: "joao.silva@escola.com"
-                  telefone: "11999999999"
                   foto: "foto_joao.png"
+                  rg: "123456789"
+                  cpf: "12345678901"
+                  telefone: "11999999999"
+                  email: "joao.silva@escola.com"
                   unidade_id: 1
+                  qr_code: "123408987569asfasdf87290843"
+                  cartao_rfid: "24350987asdfadsf23592345987"
+                  senha_acesso: "joao123"
                   tipo: "ALUNO"
-                  turma_id: 1
                   rm: "20252930001"
+                  turma_id: 1
                   responsavel_id: 1
               Professor:
                 summary: Exemplo de Professor
                 value:
                   nome: "Maria Souza"
-                  email: "maria.souza@escola.com"
-                  telefone: "11988888888"
                   foto: "foto_maria.png"
+                  rg: "123446758"
+                  cpf: "12346537819"
+                  telefone: "11988888888"
+                  email: "maria.souza@escola.com"
                   unidade_id: 1
+                  qr_code: "11243567289asdfuj881209438"
+                  cartao_rfid: "11243567289asdfhud08912347"
+                  senha_acesso: "maria123"
                   tipo: "PROFESSOR"
                   siape: "123456"
               Administrador:
                 summary: Exemplo de Administrador
                 value:
                   nome: "Carlos Pereira"
-                  email: "carlos.pereira@escola.com"
-                  telefone: "11977777777"
                   foto: "foto_carlos.png"
+                  rg: "123647589"
+                  cpf: "12386795043"
+                  telefone: "11977777777"
+                  email: "carlos.pereira@escola.com"
                   unidade_id: 1
+                  qr_code: "11243567289asfdiuh1234079281"
+                  cartao_rfid: "11243567289asdf129487329"
+                  senha_acesso: "carlos123"
                   tipo: "ADMINISTRADOR"
                   funcao: "Coordenador"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
                   nome: "Ana Lima"
-                  email: "ana.lima@escola.com"
-                  telefone: "11966666666"
                   foto: "foto_ana.png"
+                  rg: "284570934"
+                  cpf: "2409875678"
+                  telefone: "11966666666"
+                  email: "ana.lima@escola.com"
                   unidade_id: 1
+                  qr_code: "11243512341234asdf8127349867289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "ana123"
                   tipo: "PROFADM"
                   siape: "789123"
                   funcao: "Diretor"
@@ -612,10 +720,15 @@ paths:
                 summary: Exemplo de Terceirizado
                 value:
                   nome: "Roberto Alves"
-                  email: "roberto.alves@empresa.com"
-                  telefone: "11955555555"
                   foto: "foto_roberto.png"
+                  rg: "11327654891"
+                  cpf: "12345687609"
+                  telefone: "11955555555"
+                  email: "roberto.alves@empresa.com"
                   unidade_id: 1
+                  qr_code: "11241234asdf12343567289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "roberto123"
                   tipo: "TERCEIRIZADO"
                   empresa_id: 1
                   funcao: "Limpeza"
@@ -659,57 +772,77 @@ paths:
               Aluno:
                 summary: Exemplo de Aluno
                 value:
-                  nome: "João da Silva"
-                  email: "joao.silva@escola.com"
-                  telefone: "11999999999"
-                  foto: "foto_joao.png"
+                  nome: "Pedro Silva"
+                  foto: "foto_pedro.png"
+                  rg: "113276549"
+                  cpf: "12345687609"
+                  telefone: "11887795699"
+                  email: "pedro.silva@escola.com"
                   unidade_id: 2
-                  tipo: "ALUNO"
-                  turma_id: 6
+                  qr_code: "11241234asdf12343567289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "pedro123"
                   rm: "20252930001"
+                  turma_id: 6
                   responsavel_id: 1
               Professor:
                 summary: Exemplo de Professor
                 value:
-                  nome: "Maria Souza"
-                  email: "maria.souza@escola.com"
-                  telefone: "11988888888"
-                  foto: "foto_maria.png"
+                  nome: "Marcelo Souza"
+                  foto: "foto_marcelo.png"
+                  rg: "284570934"
+                  cpf: "2409875678"
+                  telefone: "11957234801"
+                  email: "marcelo.souza@escola.com"
                   unidade_id: 3
-                  tipo: "PROFESSOR"
-                  siape: "123456"
+                  qr_code: "11243512341234asdf8127349867289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "marcelo123"
+                  siape: "1234875"
               Administrador:
                 summary: Exemplo de Administrador
                 value:
-                  nome: "Carlos Pereira"
-                  email: "carlos.pereira@escola.com"
+                  nome: "Luan Pereira"
+                  foto: "foto_luan.png"
+                  rg: "123647589"
+                  cpf: "12386795043"
                   telefone: "11977777777"
-                  foto: "foto_carlos.png"
+                  email: "luan.pereira@escola.com"
                   unidade_id: 1
-                  tipo: "ADMINISTRADOR"
-                  funcao: "Coordenador"
+                  qr_code: "11243567289asfdiuh1234079281"
+                  cartao_rfid: "11243567289asdf129487329"
+                  senha_acesso: "luan123"
+                  funcao: "Vice-diretor"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
-                  nome: "Ana Lima"
-                  email: "ana.lima@escola.com"
-                  telefone: "11966666666"
-                  foto: "foto_ana.png"
+                  nome: "Gusttavo Lima"
+                  rg: "123446758"
+                  cpf: "12346537819"
+                  telefone: "11243567289"
+                  email: "gusttavo.lima@escola.com"
+                  foto: "foto_gusttavo.png"
                   unidade_id: 4
-                  tipo: "PROFADM"
-                  siape: "789123"
+                  qr_code: "11243567289asdfuj881209438"
+                  cartao_rfid: "11243567289asdfhud08912347"
+                  senha_acesso: "gusttavo123"
+                  siape: "567348"
                   funcao: "Diretor"
               Terceirizado:
                 summary: Exemplo de Terceirizado
                 value:
-                  nome: "Roberto Alves"
-                  email: "roberto.alves@empresa.com"
+                  nome: "Manoel Gomes"
+                  foto: "foto_manoel.png"
+                  rg: "11243567289"
+                  cpf: "11243567289"
                   telefone: "11955555555"
-                  foto: "foto_roberto.png"
+                  email: "manoel.gomes@empresa.com"
                   unidade_id: 5
-                  tipo: "TERCEIRIZADO"
+                  qr_code: "123408987569asfasdf87290843"
+                  cartao_rfid: "24350987asdfadsf23592345987"
+                  senha_acesso: "manoel123"
                   empresa_id: 2
-                  funcao: "Limpeza"
+                  funcao: "Técnico de TI"
       responses:
         '200':
           description: Pessoa atualizada
@@ -769,6 +902,14 @@ components:
           type: string
           format: integer
 
+    Area:
+      type: object
+      properties:
+        nome:
+          type: string
+        unidade_id:
+          type: integer
+
     Dispositivo:
       type: object
       properties:
@@ -793,6 +934,9 @@ components:
           type: string
         cnpj:
           type: string
+          description: "CNPJ com exatamente 14 dígitos numéricos"
+          example: "12345678901234"
+          pattern: "^[0-9]{14}$"    
           
     Responsavel:
       type: object
@@ -801,13 +945,22 @@ components:
           type: string
         rg:
           type: string
+          description: "RG com exatamente 7 ou 9 dígitos numéricos"
+          example: "1234567 ou 123456789"
+          pattern: "^[0-9]{7}$|^[0-9]{9}$"
         cpf:
           type: string
+          description: "CPF com exatamente 11 dígitos numéricos"
+          example: "12345678901"
+          pattern: "^[0-9]{11}$"
+        telefone:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
         email:
           type: string
           format: email
-        telefone:
-          type: string
 
     # Modelo base genérico com todos os campos possíveis
     Pessoa:
@@ -815,30 +968,37 @@ components:
       properties:
         nome:
           type: string
+        foto:
+          type: string
+        rg:
+          type: string
+          description: "RG com exatamente 7 ou 9 dígitos numéricos"
+          example: "1234567 ou 123456789"
+          pattern: "^[0-9]{7}$|^[0-9]{9}$"
+        cpf:
+          type: string
+          description: "CPF com exatamente 11 dígitos numéricos"
+          example: "12345678901"
+          pattern: "^[0-9]{11}$"
+        telefone:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
         email:
           type: string
           format: email
-        telefone:
-          type: string
-        foto:
-          type: string
         unidade_id:
           type: integer
+        qr_code:
+          type: string
+        cartao_rfid:
+          type: string
+        senha_acesso:
+          type: string
         tipo:
           type: string
           enum: [ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
-        turma_id:
-          type: integer
-        rm:
-          type: string
-        responsavel_id:
-          type: integer
-        siape:
-          type: string
-        funcao:
-          type: string
-        empresa_id:
-          type: integer
 
     # Exemplos de especializações via herança `allOf`
     Aluno:

@@ -6,18 +6,21 @@ const {
   criarTerceirizado,
   criarProfAdm
 } = require('../utils/people-db-utils');
+const { hashSenha } = require('../utils/criptografia');
 
 async function criarPessoaCompleta(dados) {
-  const { nome, email, telefone, foto, tipo, ...camposExtras } = dados;
+  const { nome, foto, rg, cpf, telefone, email, tipo, ...camposExtras } = dados;
   const pessoa = await criarPessoaBase({
     nome,
-    email,
-    telefone,
     foto,
+    rg,
+    cpf,
+    telefone,
+    email,
     unidade_id: camposExtras.unidade_id || null,
     qr_code: camposExtras.qr_code || null,
     cartao_rfid: camposExtras.cartao_rfid || null,
-    senha_acesso: camposExtras.senha_acesso || null,
+    senha_acesso: camposExtras.senha_acesso ? await hashSenha(camposExtras.senha_acesso) : null,
     tipo
   });
 

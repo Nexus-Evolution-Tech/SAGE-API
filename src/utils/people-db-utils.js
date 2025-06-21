@@ -3,15 +3,17 @@ const db = require('../config/database');
 // 📌 Criar Pessoa base
 async function criarPessoaBase(dados) {
   const query = `
-    INSERT INTO Pessoa (nome, foto, unidade_id, email, telefone, qr_code, cartao_rfid, senha_acesso, tipo)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, tipo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const values = [
     dados.nome,
     dados.foto,
-    dados.unidade_id,
-    dados.email,
+    dados.rg,
+    dados.cpf,
     dados.telefone,
+    dados.email,
+    dados.unidade_id,
     dados.qr_code,
     dados.cartao_rfid,
     dados.senha_acesso,
@@ -24,13 +26,13 @@ async function criarPessoaBase(dados) {
 // 📌 Criar Aluno
 async function criarAluno(pessoaId, dados) {
   const query = `
-    INSERT INTO Aluno (id, turma_id, rm, responsavel_id)
+    INSERT INTO Aluno (id, rm, turma_id, responsavel_id)
     VALUES (?, ?, ?, ?)
   `;
   const values = [
     pessoaId,
-    dados.turma_id,
     dados.rm,
+    dados.turma_id,
     dados.responsavel_id
   ];
   await db.query(query, values);
@@ -71,7 +73,7 @@ async function criarTerceirizado(pessoaId, dados) {
 // 📌 Criar Professor Administrador
 async function criarProfAdm(pessoaId, dados) {
   criarProfessor(pessoaId, dados);
-  criarAdministrador(pessoaId,dados);
+  criarAdministrador(pessoaId, dados);
 }
 
 // 📌 Buscar todas as pessoas
@@ -126,11 +128,14 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
 
 // 🚀 Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
-  const pessoaFields = ['nome', 'email', 'telefone', 'foto', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso'];
-  const alunoFields = ['turma_id', 'rm', 'email_responsavel', 'tel_responsavel'];
+  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso'];
+  const alunoFields = ['rm', 'turma_id', 'responsavel_id'];
   const professorFields = ['siape'];
   const administradorFields = ['funcao'];
-  const terceirizadoFields = ['nome_empresa', 'cnpj', 'funcao'];
+  const terceirizadoFields = ['empresa_id', 'funcao'];
+  
+  // 🚫 Impedir alteração do campo "tipo"
+  delete updates.tipo;
 
   // 1. Buscar tipo da pessoa
   const tipo = await buscarTipoPessoa(id);
