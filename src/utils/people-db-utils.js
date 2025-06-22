@@ -1,5 +1,42 @@
 const db = require('../config/database');
 
+// 🔎 Buscar dados base da Pessoa
+async function buscarPessoaBase(id) {
+  const [result] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
+  return result.length ? result[0] : null;
+}
+
+// 🔎 Buscar Aluno
+async function buscarAluno(id) {
+  const [result] = await db.query('SELECT * FROM Aluno WHERE id = ?', [id]);
+  return result.length ? result[0] : {};
+}
+
+// 🔎 Buscar Professor
+async function buscarProfessor(id) {
+  const [result] = await db.query('SELECT * FROM Professor WHERE id = ?', [id]);
+  return result.length ? result[0] : {};
+}
+
+// 🔎 Buscar Administrador
+async function buscarAdministrador(id) {
+  const [result] = await db.query('SELECT * FROM Administrador WHERE id = ?', [id]);
+  return result.length ? result[0] : {};
+}
+
+// 🔎 Buscar Terceirizado
+async function buscarTerceirizado(id) {
+  const [result] = await db.query('SELECT * FROM Terceirizado WHERE id = ?', [id]);
+  return result.length ? result[0] : {};
+}
+
+// 🔎 Buscar ProfAdm (Professor + Administrador)
+async function buscarProfAdm(id) {
+  const professor = await buscarProfessor(id);
+  const administrador = await buscarAdministrador(id);
+  return { ...professor, ...administrador };
+}
+
 // 📌 Criar Pessoa base
 async function criarPessoaBase(dados) {
   const query = `
@@ -79,8 +116,42 @@ async function criarProfAdm(pessoaId, dados) {
 // 📌 Buscar todas as pessoas
 async function buscarTodasPessoas() {
   const [pessoas] = await db.query('SELECT * FROM Pessoa');
-  return pessoas;
+
+  const resultado = [];
+
+  for (const pessoa of pessoas) {
+    let dadosEspecificos = {};
+
+    switch (pessoa.tipo) {
+      case 'ALUNO':
+        dadosEspecificos = await buscarAluno(pessoa.id);
+        break;
+      case 'PROFESSOR':
+        dadosEspecificos = await buscarProfessor(pessoa.id);
+        break;
+      case 'ADMINISTRADOR':
+        dadosEspecificos = await buscarAdministrador(pessoa.id);
+        break;
+      case 'PROFADM':
+        dadosEspecificos = await buscarProfAdm(pessoa.id);
+        break;
+      case 'TERCEIRIZADO':
+        dadosEspecificos = await buscarTerceirizado(pessoa.id);
+        break;
+      default:
+        // Tipo inválido ou desconhecido, pode logar ou apenas ignorar os extras
+        break;
+    }
+
+    resultado.push({
+      ...pessoa,
+      ...dadosEspecificos
+    });
+  }
+
+  return resultado;
 }
+
 
 async function buscarPorId(id) {
   const [pessoa] = await db.query(`SELECT * FROM Pessoa WHERE id = ${id}`);
@@ -184,6 +255,12 @@ async function removerPessoa(id) {
 }
 
 module.exports = {
+  buscarPessoaBase,
+  buscarAluno,
+  buscarProfessor,
+  buscarAdministrador,
+  buscarProfAdm,
+  buscarTerceirizado,
   criarPessoaBase,
   criarAluno,
   criarProfessor,

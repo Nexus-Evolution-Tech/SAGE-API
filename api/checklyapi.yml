@@ -706,7 +706,7 @@ paths:
                   nome: "Ana Lima"
                   foto: "foto_ana.png"
                   rg: "284570934"
-                  cpf: "2409875678"
+                  cpf: "12345678901"
                   telefone: "11966666666"
                   email: "ana.lima@escola.com"
                   unidade_id: 1
@@ -721,7 +721,7 @@ paths:
                 value:
                   nome: "Roberto Alves"
                   foto: "foto_roberto.png"
-                  rg: "11327654891"
+                  rg: "123456789"
                   cpf: "12345687609"
                   telefone: "11955555555"
                   email: "roberto.alves@empresa.com"
@@ -817,7 +817,7 @@ paths:
                 summary: Exemplo de ProfAdm
                 value:
                   nome: "Gusttavo Lima"
-                  rg: "123446758"
+                  rg: "1234467589"
                   cpf: "12346537819"
                   telefone: "11243567289"
                   email: "gusttavo.lima@escola.com"
