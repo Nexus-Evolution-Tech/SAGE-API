@@ -405,6 +405,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dispositivo'
 
+  /dispositivos/status:
+    get:
+      tags: [Dispositivos]
+      summary: Lista o status de todos os dispositivos
+      responses:
+        '200':
+          description: Lista de status dos dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    status:
+                      type: string
+                      enum: [ONLINE, OFFLINE, ERRO]
+
   /dispositivos/{id}:
     parameters:
       - name: id
