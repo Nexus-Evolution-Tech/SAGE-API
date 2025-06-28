@@ -1,39 +1,39 @@
 {
 	"info": {
-		"_postman_id": "e3121e77-8afc-457e-a3b1-473029613db3",
-		"name": "Guardian",
+		"_postman_id": "1ee49e7f-fecf-499c-b5f4-79d4d690f5b3",
+		"name": "Subject",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-e3121e77-8afc-457e-a3b1-473029613db3?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-1ee49e7f-fecf-499c-b5f4-79d4d690f5b3?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
-			"name": "/responsaveis",
+			"name": "/materias",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/responsaveis",
+					"raw": "http://localhost:3000/materias",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis"
+						"materias"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsavel",
+			"name": "/materias",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"nome\": \"Igor\",\r\n  \"rg\": \"634150467\",\r\n  \"cpf\": \"45328562801\",\r\n  \"email\": \"igor@gmail.com\",\r\n  \"telefone\": \"11987232615\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Criação de APIs\",\r\n    \"sigla\": \"CA\",\r\n    \"professor_id\": null,\r\n    \"curso_id\": null\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -41,33 +41,33 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis",
+					"raw": "http://localhost:3000/materias",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis"
+						"materias"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsaveis/:id",
+			"name": "/materias/:id",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/materias/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
+						"materias",
 						"1"
 					]
 				}
@@ -75,13 +75,13 @@
 			"response": []
 		},
 		{
-			"name": "/responsaveis",
+			"name": "/materias/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome_unidade\": \"ETEC Taboão da Serra\",\r\n    \"senha\": \"nossaetec\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Ethinical Hacking\",\r\n    \"sigla\": \"EH\",\r\n    \"professor_id\": null,\r\n    \"curso_id\": null\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -89,22 +89,22 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/materias/3",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
-						"1"
+						"materias",
+						"3"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsaveis",
+			"name": "/materias/:id",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -118,14 +118,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/materias/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
+						"materias",
 						"1"
 					]
 				}

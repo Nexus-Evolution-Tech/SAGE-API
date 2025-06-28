@@ -24,6 +24,10 @@ tags:
     description: Operações relacionadas aos responsáveis
   - name: Pessoas
     description: Operações relacionadas às pessoas
+  - name: Materias
+    description: Operações relacionadas às pessoas
+  - name: Aulas
+    description: Operações relacionadas às pessoas
 
 paths:
   /cursos:
@@ -50,6 +54,7 @@ paths:
               $ref: '#/components/schemas/Curso'
             example:
               nome: "Curso de Informática"
+              duracao: 400
       responses:
         '201':
           description: Curso criado
@@ -88,6 +93,7 @@ paths:
               $ref: '#/components/schemas/Curso'
             example:
               nome: "Desenvolvimento de Sistemas"
+              duracao: 500
       responses:
         '200':
           description: Curso atualizado
@@ -223,8 +229,8 @@ paths:
             example:
               nome: "Turma A"
               turno: "MATUTINO"
-              curso_id: 1
-              unidade_id: 1
+              curso_id: null
+              unidade_id: null
       responses:
         '201':
           description: Turma criada
@@ -308,7 +314,7 @@ paths:
               $ref: '#/components/schemas/Area'
             example:
               nome: "Portaria"
-              unidade_id: 1
+              unidade_id: null
       responses:
         '201':
           description: Area criada
@@ -395,7 +401,7 @@ paths:
               porta: 8080
               usuario: "admin"
               senha: "1234"
-              area_id: 1
+              area_id: null
               numero_serial: "1234567"
       responses:
         '201':
@@ -684,14 +690,14 @@ paths:
                   cpf: "12345678901"
                   telefone: "11999999999"
                   email: "joao.silva@escola.com"
-                  unidade_id: 1
+                  unidade_id: null
                   qr_code: "123408987569asfasdf87290843"
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "joao123"
                   tipo: "ALUNO"
                   rm: "20252930001"
-                  turma_id: 1
-                  responsavel_id: 1
+                  turma_id: null
+                  responsavel_id: null
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -701,7 +707,7 @@ paths:
                   cpf: "12346537819"
                   telefone: "11988888888"
                   email: "maria.souza@escola.com"
-                  unidade_id: 1
+                  unidade_id: null
                   qr_code: "11243567289asdfuj881209438"
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "maria123"
@@ -716,7 +722,7 @@ paths:
                   cpf: "12386795043"
                   telefone: "11977777777"
                   email: "carlos.pereira@escola.com"
-                  unidade_id: 1
+                  unidade_id: null
                   qr_code: "11243567289asfdiuh1234079281"
                   cartao_rfid: "11243567289asdf129487329"
                   senha_acesso: "carlos123"
@@ -731,7 +737,7 @@ paths:
                   cpf: "12345678901"
                   telefone: "11966666666"
                   email: "ana.lima@escola.com"
-                  unidade_id: 1
+                  unidade_id: null
                   qr_code: "11243512341234asdf8127349867289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "ana123"
@@ -747,12 +753,12 @@ paths:
                   cpf: "12345687609"
                   telefone: "11955555555"
                   email: "roberto.alves@empresa.com"
-                  unidade_id: 1
+                  unidade_id: null
                   qr_code: "11241234asdf12343567289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "roberto123"
                   tipo: "TERCEIRIZADO"
-                  empresa_id: 1
+                  empresa_id: null
                   funcao: "Limpeza"
       responses:
         '201':
@@ -800,12 +806,12 @@ paths:
                   cpf: "12345687609"
                   telefone: "11887795699"
                   email: "pedro.silva@escola.com"
-                  unidade_id: 2
+                  unidade_id: 1
                   qr_code: "11241234asdf12343567289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "pedro123"
                   rm: "20252930001"
-                  turma_id: 6
+                  turma_id: 1
                   responsavel_id: 1
               Professor:
                 summary: Exemplo de Professor
@@ -816,7 +822,7 @@ paths:
                   cpf: "2409875678"
                   telefone: "11957234801"
                   email: "marcelo.souza@escola.com"
-                  unidade_id: 3
+                  unidade_id: 1
                   qr_code: "11243512341234asdf8127349867289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "marcelo123"
@@ -844,7 +850,7 @@ paths:
                   telefone: "11243567289"
                   email: "gusttavo.lima@escola.com"
                   foto: "foto_gusttavo.png"
-                  unidade_id: 4
+                  unidade_id: 1
                   qr_code: "11243567289asdfuj881209438"
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "gusttavo123"
@@ -859,11 +865,11 @@ paths:
                   cpf: "11243567289"
                   telefone: "11955555555"
                   email: "manoel.gomes@empresa.com"
-                  unidade_id: 5
+                  unidade_id: 1
                   qr_code: "123408987569asfasdf87290843"
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "manoel123"
-                  empresa_id: 2
+                  empresa_id: 1
                   funcao: "Técnico de TI"
       responses:
         '200':
@@ -882,6 +888,184 @@ paths:
           description: Pessoa deletada
         '404':
           description: Pessoa não encontrada
+  
+  /materias:
+    get:
+      tags: [Materias]
+      summary: Lista todos as materias
+      responses:
+        '200':
+          description: Lista de materias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Materia'
+    post:
+      tags: [Materias]
+      summary: Cria uma nova materia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Materia'
+            example:
+              nome: "Criação de APIs"
+              sigla: "CA"
+              curso_id: null
+              professor_id: null
+      responses:
+        '201':
+          description: Materia criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+
+  /materias/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Materias]
+      summary: Retorna um Materia pelo ID
+      responses:
+        '200':
+          description: Materia encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+        '404':
+          description: Materia não encontrada
+    patch:
+      tags: [Materias]
+      summary: Atualizar um materia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Materia'
+            example:
+              nome: "Ethinical Hacking"
+              sigla: "EH"
+              curso_id: 1
+              professor_id: 1
+      responses:
+        '200':
+          description: Materia atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+        '404':
+          description: Materia não encontrada
+    delete:
+      tags: [Materias]
+      summary: Remove uma materia
+      responses:
+        '204':
+          description: Materia deletada
+        '404':
+          description: Materia não encontrada
+  
+  /Aulas:
+    get:
+      tags: [Aulas]
+      summary: Lista todos as aulas
+      responses:
+        '200':
+          description: Lista de aulas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Aula'
+    post:
+      tags: [Aulas]
+      summary: Cria uma nova aula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Aula'
+            example:
+              nome: "Português - 1º Ano"
+              professor_id: null
+              turma_id: null
+              materia_id: null
+              inicio: "08:00"
+              fim: "09:30"
+              dia_semana: "SEGUNDA"
+      responses:
+        '201':
+          description: Aula criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+
+  /Aulas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Aulas]
+      summary: Retorna um Aula pelo ID
+      responses:
+        '200':
+          description: Aula encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+        '404':
+          description: Aula não encontrada
+    patch:
+      tags: [Aulas]
+      summary: Atualizar um aula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Aula'
+            example:
+              nome: "Matemática - 2º Ano"
+              professor_id: 1
+              turma_id: 1
+              materia_id: 1
+              inicio: "10:20"
+              fim: "11:10"
+              dia_semana: "TERCA"
+      responses:
+        '200':
+          description: Aula atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+        '404':
+          description: Aula não encontrada
+    delete:
+      tags: [Aulas]
+      summary: Remove uma aula
+      responses:
+        '204':
+          description: Aula deletada
+        '404':
+          description: Aula não encontrada
 
 components:
   schemas:
@@ -890,6 +1074,8 @@ components:
       properties:
         nome:
           type: string
+        duracao:
+          type: integer
     
     Escola:
       type: object
@@ -1125,6 +1311,31 @@ components:
         funcao:
           type: string
 
-
+    Materia:
+      type: object
+      properties:
+        nome:
+          type: string
+        professor_id:
+          type: integer
+        curso_id:
+          type: integer
     
-
+    Aula:
+      type: object
+      properties:
+        nome:
+          type: string
+        professor_id:
+          type: integer
+        turma_id:
+          type: integer
+        materia_id:
+          type: integer
+        inicio:
+          type: string
+        fim:
+          type: string
+        dia_semana:
+          type: string
+          enum: [DOMINGO, SEGUNDA, TERCA, QUARTA, QUINTA, SEXTA, SABADO]

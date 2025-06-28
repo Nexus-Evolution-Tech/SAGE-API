@@ -1,0 +1,43 @@
+INSERT INTO checkly.curso (nome, duracao) VALUES ("Desenvolvimento de Sistemas", 100);
+
+INSERT INTO checkly.materia (nome, sigla, curso_id) VALUES 
+('Português', 'POR', 1),
+('Matemática', 'MAT', 1),
+('Física', 'FIS', 1),
+('Biologia', 'BIO', 1),
+('Química', 'QUI', 1),
+('História', 'HIS', 1),
+('Geografia', 'GEO', 1),
+('Filosofia', 'FILO', 1),
+('Sociologia', 'SOC', 1),
+('Inglês', 'ING', 1),
+('Espanhol', 'ESP', 1),
+('Artes', 'ART', 1),
+('Educação Física', 'ED. FIS', 1),
+('Estudos Avançados de Ciências', 'EAC', 1),
+('Estudos Avançados de Matemática', 'EAM', 1),
+('Empreendedorismo', 'EMP', 1),
+('Ética', 'ET', 1),
+('Laboratório de Investigação Científica', 'LIC', 1),
+('Laboratório de Mediação e Interação Social', 'LMIS', 1),
+('Laboratório de Projetos Criativos', 'LPC', 1),
+('Técnicas de Programação e Algoritmos', 'TPA', 1),
+('Análise e Projeto de Sistemas', 'APS', 1),
+('Banco de Dados', 'BD', 1),
+('Fundamentos da Informação', 'FI', 1),
+('Programação Web', 'PW', 1),
+('Programação de Aplicativos Mobile', 'PAM', 1),
+('Design Digital', 'DD', 1),
+('Desenvolvimento de Sistemas', 'DS', 1),
+('Internet Protocol e Segurança de Informação', 'IPSSI', 1),
+('Sistemas Embarcados', 'SE', 1),
+('Qualidade e Teste de Software', 'QTS', 1),
+('Projeto de Trabalho de Conclusão de Curso', 'PDTCC', 1);
+
+INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana) VALUES 
+('Português - 1º Ano', 1, 1, 1, '08:00:00', '09:30:00', 'SEGUNDA'),
+('Matemática - 1º Ano', 2, 1, 2, '09:45:00', '11:15:00', 'SEGUNDA'),
+('Física - 1º Ano', 3, 1, 3, '11:30:00', '13:00:00', 'TERÇA'),
+('Biologia - 1º Ano', 4, 1, 4, '08:00:00', '09:30:00', 'QUARTA'),
+('Química - 1º Ano', 5, 1, 5, '09:45:00', '11:15:00', 'QUINTA'),
+('História - 1º Ano', 6, 1, 6, '11:30:00', '13:00:00', 'SEXTA');

@@ -1,39 +1,39 @@
 {
 	"info": {
-		"_postman_id": "e3121e77-8afc-457e-a3b1-473029613db3",
-		"name": "Guardian",
+		"_postman_id": "15b34595-55e5-4ab8-ae8a-ae9966eec434",
+		"name": "Lesson",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "45944265",
-		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-e3121e77-8afc-457e-a3b1-473029613db3?action=share&source=collection_link&creator=45944265"
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-15b34595-55e5-4ab8-ae8a-ae9966eec434?action=share&source=collection_link&creator=45944265"
 	},
 	"item": [
 		{
-			"name": "/responsaveis",
+			"name": "/aulas",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/responsaveis",
+					"raw": "http://localhost:3000/aulas",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis"
+						"aulas"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsavel",
+			"name": "/aulas",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"nome\": \"Igor\",\r\n  \"rg\": \"634150467\",\r\n  \"cpf\": \"45328562801\",\r\n  \"email\": \"igor@gmail.com\",\r\n  \"telefone\": \"11987232615\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Português - 1º Ano\",\r\n    \"professor_id\": null,\r\n    \"turma_id\": null,\r\n    \"materia_id\": null,\r\n    \"inicio\": \"08:00:00\",\r\n    \"fim\": \"09:30:00\",\r\n    \"dia_semana\": \"SEGUNDA\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -41,33 +41,33 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis",
+					"raw": "http://localhost:3000/aulas",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis"
+						"aulas"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsaveis/:id",
+			"name": "/aulas/:id",
 			"request": {
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/aulas/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
+						"aulas",
 						"1"
 					]
 				}
@@ -75,13 +75,13 @@
 			"response": []
 		},
 		{
-			"name": "/responsaveis",
+			"name": "/aulas/:id",
 			"request": {
 				"method": "PATCH",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"nome_unidade\": \"ETEC Taboão da Serra\",\r\n    \"senha\": \"nossaetec\"\r\n}",
+					"raw": "{\r\n    \"nome\": \"Matemática - 2º Ano\",\r\n    \"professor_id\": 1,\r\n    \"turma_id\": 1,\r\n    \"materia_id\": 1,\r\n    \"inicio\": \"10:20:00\",\r\n    \"fim\": \"11:10:00\",\r\n    \"dia_semana\": \"TERCA\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -89,22 +89,22 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/aulas/3",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
-						"1"
+						"aulas",
+						"3"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "/responsaveis",
+			"name": "/aulas/:id",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -118,14 +118,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:3000/responsaveis/1",
+					"raw": "http://localhost:3000/aulas/1",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"responsaveis",
+						"aulas",
 						"1"
 					]
 				}
