@@ -69,6 +69,8 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 │   ├── 📁 controllers/             # Lógica de negócio
 │   │   ├── 📄 genericControllerFactory.js  # Factory pattern
 │   │   └── 📄 *Controller.js       # Controllers específicos
+│   ├── 📁 docs/                     # Documentação
+│   │   ├── 📄 swagger.yml          # Documentação Swagger da API
 │   ├── 📁 routes/                  # Definição de rotas
 │   │   ├── 📄 genericRoutesFactory.js      # Factory para rotas CRUD
 │   │   └── 📄 *Routes.js           # Rotas por entidade
@@ -147,7 +149,7 @@ npm start
 | `GET` | `/turmas` | Lista de turmas |
 
 ### 📖 Swagger UI
-Acesse a documentação interativa em: `http://localhost:3000/docs` *(em desenvolvimento)*
+Acesse a documentação interativa em: `http://localhost:3000/docs`
 
 ### 📋 Collections Postman
 12 coleções organizadas na pasta `api/` para testes completos:

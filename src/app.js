@@ -1,34 +1,47 @@
 const express = require('express');
-const cors = require('cors'); // Importe o módulo cors
+const cors = require('cors');
 const loadRoutes = require('./config/loadRoutes');
 global.db = require('./config/knex');
 
+// 👉 Adicione essas duas linhas:
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('./src/docs/swagger.yml'); // Certifique-se do caminho
+
 const app = express();
 
+// Configuração de CORS
 const allowedOrigins = [
-    'http://172.19.0.1:3001',  // seu frontend local
-    'https://editor.swagger.io', // Swagger Editor online
-    'http://localhost:18512'
+    'http://localhost:3000',
+    'http://172.19.0.1:3001',
+    'https://editor.swagger.io',
+    'http://localhost:18512',
 ];
-  
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true); // Permite Postman, curl, etc.
 
-        if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-        } else {
-        callback(new Error('CORS policy: Origin not allowed'));
-        }
-    },
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-    credentials: true
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requisições sem origin (Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`🔒 CORS bloqueado para origem: ${origin}`);
+      callback(new Error(`CORS policy: Origin not allowed: ${origin}`));
+    }
+  },
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  credentials: true
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Monta as rotas
+// 👉 Rota para Swagger:
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+console.log('Acesse a documentação Swagger em: http://localhost:3000/docs');
+
+// Rotas da aplicação
 loadRoutes(app);
 
 module.exports = app;
