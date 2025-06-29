@@ -289,6 +289,7 @@ Sistema automatizado que:
 - [x] Documentação OpenAPI/Swagger
 - [x] Arquitetura modular e escalável
 - [x] Collections Postman organizadas
+- [x] Correção de fuso horário
 
 ### � Em Desenvolvimento  
 - [ ] Sistema de autenticação JWT
@@ -296,7 +297,6 @@ Sistema automatizado que:
 - [ ] Validações lógicas (CPF, CNPJ válidos)
 - [ ] Sistema de logs completo
 - [ ] Testes automatizados
-- [ ] Correção de fuso horário
 
 ### 🎯 Roadmap Futuro
 - [ ] API Rate Limiting

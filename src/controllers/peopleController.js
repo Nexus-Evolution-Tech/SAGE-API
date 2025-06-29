@@ -1,11 +1,12 @@
 // PESSOA N TEM COMO GENERALIZAR, ELA TEM FUNCOES MTO ESPECIFICAS EM SEU CRUD
 const peopleService = require('../services/peopleService');
 const { buscarTodasPessoas, buscarPorId, atualizarPessoaCompleta, removerPessoa } = require('../utils/people-db-utils');
+const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 
 const listar = async (req, res) => {
   try {
     const pessoas = await buscarTodasPessoas();
-    res.json(pessoas);
+    res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
     res.status(500).json({ message: 'Erro ao listar pessoas', error });
@@ -47,7 +48,7 @@ const listarPorId = async (req, res) => {
   const id = req.params.id;
   try {
     const pessoas = await buscarPorId(id);
-    res.json(pessoas);
+    res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
     res.status(500).json({ message: 'Erro ao listar pessoas', error });
