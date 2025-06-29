@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     qr_code VARCHAR(255) NOT NULL COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
     cartao_rfid VARCHAR(255) NOT NULL COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será um hexadecimal ou numérico com 8 a 16 caracteres',
     senha_acesso VARCHAR(255) NOT NULL COMMENT 'Precisa de criptografia na aplicação Node.js',
+    data_nascimento DATE NOT NULL,
+    genero ENUM ('MASCULINO', 'FEMININO', 'OUTRO') NOT NULL,
     tipo ENUM ('ALUNO', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -179,8 +181,8 @@ CREATE TABLE IF NOT EXISTS Acesso (
     dispositivo_id INT,
     status ENUM ('ENTRADA', 'SAIDA') NOT NULL,
     permitido BOOLEAN NOT NULL,
+    metodo_auth ENUM ('QR_CODE', 'CARTAO_RFID', 'SENHA', 'BIOMETRIA') NOT NULL,
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    metodo_auth ENUM ('QRCODE', 'RFID', 'SENHA') NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE SET NULL,
     FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id) ON DELETE SET NULL

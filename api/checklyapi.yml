@@ -25,9 +25,11 @@ tags:
   - name: Pessoas
     description: Operações relacionadas às pessoas
   - name: Materias
-    description: Operações relacionadas às pessoas
+    description: Operações relacionadas às matérias
   - name: Aulas
-    description: Operações relacionadas às pessoas
+    description: Operações relacionadas às aulas
+  - name: Acessos
+    description: Operações relacionadas aos acessos
 
 paths:
   /cursos:
@@ -431,7 +433,35 @@ paths:
                       type: string
                     status:
                       type: string
-                      enum: [ONLINE, OFFLINE, ERRO]
+                      enum: [ONLINE, OFFLINE]
+  
+  /dispositivos/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Dispositivos]
+      summary: Lista o status de todos os dispositivos
+      responses:
+        '200':
+          description: Lista de status dos dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    status:
+                      type: string
+                      enum: [ONLINE, OFFLINE]
 
   /dispositivos/{id}:
     parameters:
@@ -694,6 +724,8 @@ paths:
                   qr_code: "123408987569asfasdf87290843"
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "joao123"
+                  data_nascimento: "2005-05-15"
+                  genero: "MASCULINO"
                   tipo: "ALUNO"
                   rm: "20252930001"
                   turma_id: null
@@ -711,6 +743,8 @@ paths:
                   qr_code: "11243567289asdfuj881209438"
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "maria123"
+                  data_nascimento: "2000-01-01"
+                  genero: "FEMININO"
                   tipo: "PROFESSOR"
                   siape: "123456"
               Administrador:
@@ -726,6 +760,8 @@ paths:
                   qr_code: "11243567289asfdiuh1234079281"
                   cartao_rfid: "11243567289asdf129487329"
                   senha_acesso: "carlos123"
+                  data_nascimento: "1995-03-20"
+                  genero: "MASCULINO"
                   tipo: "ADMINISTRADOR"
                   funcao: "Coordenador"
               ProfAdm:
@@ -741,6 +777,8 @@ paths:
                   qr_code: "11243512341234asdf8127349867289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "ana123"
+                  data_nascimento: "1988-07-30"
+                  genero: "FEMININO"
                   tipo: "PROFADM"
                   siape: "789123"
                   funcao: "Diretor"
@@ -757,6 +795,8 @@ paths:
                   qr_code: "11241234asdf12343567289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "roberto123"
+                  data_nascimento: "1990-12-25"
+                  genero: "MASCULINO"
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
                   funcao: "Limpeza"
@@ -767,6 +807,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Pessoa'
+
+  /pessoas/status:
+    get:
+      tags: [Pessoas]
+      summary: Retorna o status de presença de todas as pessoas
+      responses:
+        '200':
+          description: Status da presença da pessoa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  status:
+                    type: string
+                    enum: [PRESENTE, AUSENTE]
+
+  /pessoas/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Pessoas]
+      summary: Verifica se uma pessoa está presente
+      responses:
+        '200':
+          description: Status da presença da pessoa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  status:
+                    type: string
+                    enum: [PRESENTE, AUSENTE]
 
   /pessoas/{id}:
     parameters:
@@ -810,6 +896,8 @@ paths:
                   qr_code: "11241234asdf12343567289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "pedro123"
+                  data_nascimento: "2004-02-20"
+                  genero: "MASCULINO"
                   rm: "20252930001"
                   turma_id: 1
                   responsavel_id: 1
@@ -826,6 +914,8 @@ paths:
                   qr_code: "11243512341234asdf8127349867289"
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "marcelo123"
+                  data_nascimento: "1985-08-15"
+                  genero: "MASCULINO"
                   siape: "1234875"
               Administrador:
                 summary: Exemplo de Administrador
@@ -840,6 +930,8 @@ paths:
                   qr_code: "11243567289asfdiuh1234079281"
                   cartao_rfid: "11243567289asdf129487329"
                   senha_acesso: "luan123"
+                  data_nascimento: "1992-04-10"
+                  genero: "MASCULINO"
                   funcao: "Vice-diretor"
               ProfAdm:
                 summary: Exemplo de ProfAdm
@@ -854,6 +946,8 @@ paths:
                   qr_code: "11243567289asdfuj881209438"
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "gusttavo123"
+                  data_nascimento: "1987-09-05"
+                  genero: "MASCULINO"
                   siape: "567348"
                   funcao: "Diretor"
               Terceirizado:
@@ -869,6 +963,8 @@ paths:
                   qr_code: "123408987569asfasdf87290843"
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "manoel123"
+                  data_nascimento: "1990-12-25"
+                  genero: "MASCULINO"
                   empresa_id: 1
                   funcao: "Técnico de TI"
       responses:
@@ -975,7 +1071,7 @@ paths:
         '404':
           description: Materia não encontrada
   
-  /Aulas:
+  /aulas:
     get:
       tags: [Aulas]
       summary: Lista todos as aulas
@@ -1013,7 +1109,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Aula'
 
-  /Aulas/{id}:
+  /aulas/{id}:
     parameters:
       - name: id
         in: path
@@ -1066,7 +1162,94 @@ paths:
           description: Aula deletada
         '404':
           description: Aula não encontrada
+  
+  /acessos:
+    get:
+      tags: [Acessos]
+      summary: Lista todos os acessos
+      responses:
+        '200':
+          description: Lista de acessos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Acesso'
+    post:
+      tags: [Acessos]
+      summary: Cria uma nova acesso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Acesso'
+            example:
+              pessoa_id: 1
+              dispositivo_id: 1
+              status: "ENTRADA"
+              permitido: true
+              metodo_auth: "CARTAO_RFID"
+      responses:
+        '201':
+          description: Acesso criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
 
+  /acessos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Acessos]
+      summary: Retorna um acesso pelo ID
+      responses:
+        '200':
+          description: Acesso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
+        '404':
+          description: Acesso não encontrado
+    patch:
+      tags: [Acessos]
+      summary: Atualizar um acesso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Acesso'
+            example:
+              pessoa_id: 1
+              dispositivo_id: 1
+              status: "SAIDA"
+              permitido: false
+              metodo_auth: "BIOMETRIA"
+      responses:
+        '200':
+          description: Acesso atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
+        '404':
+          description: Acesso não encontrado
+    delete:
+      tags: [Acessos]
+      summary: Remove uma acesso
+      responses:
+        '204':
+          description: Acesso deletado
+        '404':
+          description: Acesso não encontrado
 components:
   schemas:
     Curso:
@@ -1339,3 +1522,23 @@ components:
         dia_semana:
           type: string
           enum: [DOMINGO, SEGUNDA, TERCA, QUARTA, QUINTA, SEXTA, SABADO]
+
+    Acesso:
+      type: object
+      properties:
+        nome:
+          type: string
+        pessoa_id:
+          type: integer
+        dispositivo_id:
+          type: integer
+        status:
+          type: string
+          enum: [ENTRADA, SAIDA]
+        permitido:
+          type: boolean
+        data_hora:
+          type: string
+        metodo_auth:
+          type: string
+          enum: [QR_CODE, CARTAO_RFID, SENHA, BIOMETRIA]

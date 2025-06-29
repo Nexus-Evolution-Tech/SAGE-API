@@ -22,6 +22,27 @@ const criar = async (req, res) => {
   }
 };
 
+const getStatus = async (req, res) => {
+  try {
+    const estaPresente = await peopleService.verificarTodasPessoasPresentes();
+    res.json(estaPresente);
+  } catch (error) {
+    console.error('Erro ao listar pessoas:', error);
+    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+  }
+};
+
+const getStatusId = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const estaPresente = await peopleService.verificarPessoaPresente(id);
+    res.json(estaPresente);
+  } catch (error) {
+    console.error('Erro ao listar pessoas:', error);
+    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+  }
+};
+
 const listarPorId = async (req, res) => {
   const id = req.params.id;
   try {
@@ -58,6 +79,8 @@ const deletar = async (req, res) => {
 module.exports = {
   listar,
   criar,
+  getStatus,
+  getStatusId,
   listarPorId,
   editar,
   deletar

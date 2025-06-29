@@ -1,7 +1,8 @@
 Enum MetodoAuth {
-  QRCODE
-  RFID
+  QR_CODE
+  CARTAO_RFID
   SENHA
+  BIOMETRIA
 }
 
 Enum EstadoEvento {
@@ -30,6 +31,12 @@ Enum TipoPessoa {
   ADMINISTRADOR
   TERCEIRIZADO
   PROFADM
+}
+
+Enum Genero {
+  MASCULINO
+  FEMININO
+  OUTRO
 }
 
 Table UnidadeEscolar {
@@ -107,6 +114,8 @@ Table Pessoa {
   qr_code varchar(255) [not null]
   cartao_rfid varchar(255) [not null]
   senha_acesso varchar(255) [not null]
+  data_nascimento date [not null, note: "Data de nascimento deve ser menor ou igual a data atual"]
+  genero Genero [not null, note: "Gênero da pessoa, ex: Masculino, Feminino, Outro"]
   tipo TipoPessoa [not null]
   created_at timestamp
   updated_at timestamp

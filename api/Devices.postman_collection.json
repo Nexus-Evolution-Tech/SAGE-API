@@ -47,6 +47,27 @@
 			"response": []
 		},
 		{
+			"name": "/dispositivos/:id/status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/dispositivos/1/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"dispositivos",
+						"1",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "/dispositivos/:id",
 			"request": {
 				"method": "GET",

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors'); // Importe o módulo cors
 const loadRoutes = require('./config/loadRoutes');
+global.db = require('./config/knex');
 
 const app = express();
 

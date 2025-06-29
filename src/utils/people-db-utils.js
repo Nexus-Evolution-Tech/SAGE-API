@@ -40,8 +40,8 @@ async function buscarProfAdm(id) {
 // 📌 Criar Pessoa base
 async function criarPessoaBase(dados) {
   const query = `
-    INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, tipo)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, genero, tipo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const values = [
     dados.nome,
@@ -54,6 +54,8 @@ async function criarPessoaBase(dados) {
     dados.qr_code,
     dados.cartao_rfid,
     dados.senha_acesso,
+    dados.data_nascimento,
+    dados.genero,
     dados.tipo
   ];
   const [result] = await db.query(query, values);
@@ -199,7 +201,7 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
 
 // 🚀 Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
-  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso'];
+  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'genero'];
   const alunoFields = ['rm', 'turma_id', 'responsavel_id'];
   const professorFields = ['siape'];
   const administradorFields = ['funcao'];
