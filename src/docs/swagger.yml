@@ -1124,6 +1124,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/Aula'
 
+  /aulas/horarios/{turma_id}/{divisao}:
+    parameters:
+      - name: turma_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: divisao
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Aulas]
+      summary: Lista todas as aulas de uma turma e divisão específica
+      responses:
+        '200':
+          description: Lista de aulas da turma e divisão
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Aula'
+
   /aulas/{id}:
     parameters:
       - name: id
