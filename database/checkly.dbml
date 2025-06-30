@@ -39,14 +39,26 @@ Enum Genero {
   OUTRO
 }
 
+Enum DivisaoTurma {
+  DIV_A_B
+  DIV_A
+  DIV_B
+}
+
 Table UnidadeEscolar {
   id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
+  nome varchar(255) [not null]
+  numero_unidade char(3) [not null]
+  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
   login varchar(100) [not null, note: "Login da unidade para autenticação com a catraca"]
   senha varchar(255) [not null, note: "Senha da unidade para autenticação com a catraca"]
-  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
-  nome varchar(255) [not null]
-  numero char(3) [not null]
-  endereco varchar(255) [not null]
+  logradouro varchar(255) [not null]
+  numero varchar(255) [not null, note: "Número do endereço da unidade escolar"]
+  complemento varchar(255)
+  cidade varchar(255) [not null]
+  estado char(2) [not null, note: "Sigla do estado, ex: SP, RJ"]
+  cep char(8) [not null, note: "Aplicar REGEX para definir o limite como 8 digitos, nada mais, nada menos"]
+  telefone_contato varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
   logo varchar(255) [not null]
   created_at timestamp
   updated_at timestamp
@@ -180,6 +192,7 @@ Table Aula {
   inicio time [not null]
   fim time [not null]
   dia_semana DiaSemana [not null]
+  divisao DivisaoTurma [not null, note: "Divisão da turma para aulas, ex: DIV A/B, DIV A, DIV B"]
   created_at timestamp
   updated_at timestamp
 }

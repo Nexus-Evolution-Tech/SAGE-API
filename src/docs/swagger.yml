@@ -137,12 +137,19 @@ paths:
             schema:
               $ref: '#/components/schemas/Escola'
             example:
-              nome: "Escola Modelo"
-              numero: "123"
-              cnpj: "98765432000100"
-              login: "escola123"
-              senha: "senha123"
-              endereco: "Rua Exemplo, 123, Centro"
+              nome: "ETEC Taboão da Serra"
+              numero_unidade: "293"
+              cnpj: "62823257029344"
+              login: "etec"
+              senha: "etec123"
+              logradouro: "Praça Miguel Ortega"
+              numero: "135"
+              complemento: "Prédio Principal"
+              bairro: "Parque Assunção"
+              cidade: "Taboão da Serra"
+              estado: "SP"
+              cep: "06754160"
+              telefone_contato: "1147011856"
               logo: "logo_etec.png"
       responses:
         '201':
@@ -181,13 +188,20 @@ paths:
             schema:
               $ref: '#/components/schemas/Escola'
             example:
-              nome: "ETEC Taboão da Serra"
-              numero: "293"
+              nome: "Escola Modelo"
+              numero_unidade: "001"
               cnpj: "44591997000177"
-              login: "etec"
-              senha: "etec"
-              endereco: "Praça Miguel Ortega, 135 - Parque Assuncao, Taboão da Serra - SP, 06754-160"
-              logo: "logo_etec2.png"
+              login: "login"
+              senha: "senha123"
+              logradouro: "Rua Exemplo"
+              numero: "001"
+              complemento: "Casa"
+              bairro: "Centro"
+              cidade: "São Paulo"
+              estado: "SP"
+              cep: "01234567"
+              telefone_contato: "1123456789"
+              logo: "logo.png"
       responses:
         '200':
           description: Escola atualizada
@@ -1101,6 +1115,7 @@ paths:
               inicio: "08:00"
               fim: "09:30"
               dia_semana: "SEGUNDA"
+              divisao: "DIV A/B"
       responses:
         '201':
           description: Aula criada
@@ -1145,6 +1160,7 @@ paths:
               inicio: "10:20"
               fim: "11:10"
               dia_semana: "TERCA"
+              divisao: "DIV A"
       responses:
         '200':
           description: Aula atualizada
@@ -1265,7 +1281,7 @@ components:
       properties:
         nome:
           type: string
-        numero:
+        numero_unidade:
           type: string
         cnpj:
           type: string
@@ -1273,8 +1289,28 @@ components:
           type: string
         senha:
           type: string
-        endereco:
+        logradouro:
           type: string
+        numero:
+          type: string
+        complemento:
+          type: string
+        bairro:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        cep:
+          type: string
+          description: "CEP com exatamente 8 dígitos numéricos"
+          example: "12345678"
+          pattern: "^[0-9]{8}$"
+        telefone_contato:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
         logo:
           type: string
 
@@ -1522,6 +1558,9 @@ components:
         dia_semana:
           type: string
           enum: [DOMINGO, SEGUNDA, TERCA, QUARTA, QUINTA, SEXTA, SABADO]
+        divisao:
+          type: string
+          enum: [DIV_A/B, DIV_A, DIV_B]
 
     Acesso:
       type: object
