@@ -28,8 +28,21 @@ async function verificarSessao(session, linkCatraca) {
     }
 }
 
+async function obterLogsCatraca(session, linkCatraca) {
+  try {
+    const response = await axios.post(`http://${linkCatraca}/load_objects.fcgi?session=${session}`, {
+      object: 'access_logs'
+    });
+    return response.data.objects || [];
+  } catch (error) {
+    console.error('Erro ao obter logs da catraca:', error.message);
+    return [];
+  }
+}
+
 module.exports = {
   linkCatraca,
   obterSessao,
-  verificarSessao
+  verificarSessao,
+  obterLogsCatraca
 };

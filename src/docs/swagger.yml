@@ -1219,7 +1219,7 @@ paths:
                   $ref: '#/components/schemas/Acesso'
     post:
       tags: [Acessos]
-      summary: Cria uma nova acesso
+      summary: Cria um novo acesso
       requestBody:
         required: true
         content:
@@ -1239,6 +1239,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Acesso'
+
+  /acessos/sincronizar/{dispositivo_id}:
+    post:
+      summary: Sincronizar acessos de um dispositivo específico
+      description: Obtém os logs de acesso da catraca especificada e insere no banco de dados local.
+      tags: [Acessos]
+      parameters:
+        - in: path
+          name: dispositivo_id
+          required: true
+          schema:
+            type: integer
+          description: ID do dispositivo (catraca) a ser sincronizado.
+      responses:
+        '200':
+          description: Sincronização concluída com sucesso
+          content:
+            application/json:
+              example:
+                dispositivo_id: 1
+                nome: Catraca Entrada 1
+                sucesso: true
+                acessosSincronizados: 8
+        '404':
+          description: Dispositivo não encontrado
+        '500':
+          description: Erro interno ao sincronizar o dispositivo
+
+  /acessos/sincronizar-todos:
+    post:
+      summary: Sincronizar acessos de todos os dispositivos
+      description: Percorre todos os dispositivos cadastrados no banco de dados e sincroniza os eventos de acesso.
+      tags: [Acessos]
+      responses:
+        '200':
+          description: Sincronização de todos os dispositivos concluída
+          content:
+            application/json:
+              example:
+                message: "Sincronização concluída"
+                resultados:
+                  - dispositivo_id: 1
+                    nome: Catraca Entrada 1
+                    sucesso: true
+                    acessosSincronizados: 5
+                  - dispositivo_id: 2
+                    nome: Catraca Saída 2
+                    sucesso: false
+                    message: "Erro ao obter sessão"
+        '500':
+          description: Erro interno ao sincronizar todos os dispositivos
 
   /acessos/{id}:
     parameters:
