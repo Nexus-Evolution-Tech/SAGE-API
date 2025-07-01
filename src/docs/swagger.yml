@@ -777,7 +777,7 @@ paths:
                   data_nascimento: "1995-03-20"
                   genero: "MASCULINO"
                   tipo: "ADMINISTRADOR"
-                  funcao: "Coordenador"
+                  cargo: "COORDENADOR_PEDAGOGICO"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
@@ -795,7 +795,7 @@ paths:
                   genero: "FEMININO"
                   tipo: "PROFADM"
                   siape: "789123"
-                  funcao: "Diretor"
+                  cargo: "DIRETOR"
               Terceirizado:
                 summary: Exemplo de Terceirizado
                 value:
@@ -813,7 +813,7 @@ paths:
                   genero: "MASCULINO"
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
-                  funcao: "Limpeza"
+                  funcao: "FAXINEIRO"
       responses:
         '201':
           description: Pessoa criada com sucesso
@@ -868,6 +868,27 @@ paths:
                     type: string
                     enum: [PRESENTE, AUSENTE]
 
+  /pessoas/{tipo}:
+    parameters:
+      - name: tipo
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
+    get:
+      tags: [Pessoas]
+      summary: Lista pessoas por tipo (ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM ou TERCEIRIZADO)
+      responses:
+        '200':
+          description: Lista de pessoas do tipo especificado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pessoa'
+
   /pessoas/{id}:
     parameters:
       - name: id
@@ -915,6 +936,7 @@ paths:
                   rm: "20252930001"
                   turma_id: 1
                   responsavel_id: 1
+                  status: "TRANSFERIDO"
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -946,7 +968,7 @@ paths:
                   senha_acesso: "luan123"
                   data_nascimento: "1992-04-10"
                   genero: "MASCULINO"
-                  funcao: "Vice-diretor"
+                  cargo: "VICE_DIRETOR"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
@@ -963,7 +985,7 @@ paths:
                   data_nascimento: "1987-09-05"
                   genero: "MASCULINO"
                   siape: "567348"
-                  funcao: "Diretor"
+                  funcao: "DIRETOR"
               Terceirizado:
                 summary: Exemplo de Terceirizado
                 value:
@@ -980,7 +1002,7 @@ paths:
                   data_nascimento: "1990-12-25"
                   genero: "MASCULINO"
                   empresa_id: 1
-                  funcao: "Técnico de TI"
+                  funcao: "TECNICO_MANUTENCAO"
       responses:
         '200':
           description: Pessoa atualizada
@@ -1461,6 +1483,7 @@ components:
             - tipo
             - turma_id
             - rm
+            - status
           properties:
             tipo:
               type: string
@@ -1471,6 +1494,9 @@ components:
               type: string
             responsavel_id:
               type: integer
+            status:
+              type: string
+              enum: [ATIVO, INATIVO, TRANSFERIDO, DESLIGADO]
 
     Professor:
       allOf:
@@ -1492,13 +1518,14 @@ components:
         - type: object
           required:
             - tipo
-            - funcao
+            - cargo
           properties:
             tipo:
               type: string
               enum: [ADMINISTRADOR]
-            funcao:
+            cargo:
               type: string
+              enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
 
     ProfAdm:
       allOf:
@@ -1507,15 +1534,16 @@ components:
           required:
             - tipo
             - siape
-            - funcao
+            - cargo
           properties:
             tipo:
               type: string
               enum: [PROFADM]
             siape:
               type: string
-            funcao:
+            cargo:
               type: string
+              enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
 
     Terceirizado:
       allOf:
@@ -1533,10 +1561,9 @@ components:
               type: integer
             funcao:
               type: string
+              enum: [VIGILANTE, FAXINEIRO, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, OUTRO]
       type: object
       properties:
-        id:
-          type: integer
         nome:
           type: string
         email:

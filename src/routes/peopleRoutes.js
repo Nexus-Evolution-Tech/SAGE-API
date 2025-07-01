@@ -8,6 +8,7 @@ const routerExtra = express.Router();
 
 routerExtra.get('/pessoas/status', peopleController.getStatus);
 routerExtra.get('/pessoas/:id/status', peopleController.getStatusId);
+routerExtra.get('/pessoas/:tipo', peopleController.listarPorTipo);
 
 routerExtra.use(router);
 

@@ -4,9 +4,15 @@ const {
   criarProfessor,
   criarAdministrador,
   criarTerceirizado,
-  criarProfAdm
+  criarProfAdm,
+  buscarAluno,
+  buscarProfessor,
+  buscarAdministrador,
+  buscarProfAdm,
+  buscarTerceirizado,
 } = require('../utils/people-db-utils');
 const { hashSenha } = require('../utils/criptografia');
+const db = require('../config/database');
 
 async function criarPessoaCompleta(dados) {
   const { nome, foto, rg, cpf, telefone, email, data_nascimento, genero, tipo, ...camposExtras } = dados;
@@ -105,8 +111,46 @@ async function verificarTodasPessoasPresentes() {
   }));
 }
 
+async function buscarPessoasPorTipo(tipo) {
+  const [pessoas] = await db.query('SELECT * FROM Pessoa WHERE tipo = ?', [tipo]);
+  
+  const resultado = [];
+
+  for (const pessoa of pessoas) {
+    let dadosEspecificos = {};
+
+    switch (pessoa.tipo) {
+      case 'ALUNO':
+        dadosEspecificos = await buscarAluno(pessoa.id);
+        break;
+      case 'PROFESSOR':
+        dadosEspecificos = await buscarProfessor(pessoa.id);
+        break;
+      case 'ADMINISTRADOR':
+        dadosEspecificos = await buscarAdministrador(pessoa.id);
+        break;
+      case 'PROFADM':
+        dadosEspecificos = await buscarProfAdm(pessoa.id);
+        break;
+      case 'TERCEIRIZADO':
+        dadosEspecificos = await buscarTerceirizado(pessoa.id);
+        break;
+      default:
+        // Tipo inválido ou desconhecido, pode logar ou apenas ignorar os extras
+        break;
+    }
+
+    resultado.push({
+      ...pessoa,
+      ...dadosEspecificos
+    });
+  }
+  return resultado;
+}
+
 module.exports = {
   criarPessoaCompleta,
   verificarPessoaPresente,
-  verificarTodasPessoasPresentes
+  verificarTodasPessoasPresentes,
+  buscarPessoasPorTipo
 };

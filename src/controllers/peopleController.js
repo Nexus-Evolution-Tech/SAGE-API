@@ -55,6 +55,17 @@ const listarPorId = async (req, res) => {
   }
 };
 
+const listarPorTipo = async (req, res) => {
+  const tipo = req.params.tipo;
+  try {
+    const pessoas = await peopleService.buscarPessoasPorTipo(tipo);
+    res.json(ajustarFusoHorarioBrasil(pessoas));
+  } catch (error) {
+    console.error('Erro ao listar pessoas por tipo:', error);
+    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error });
+  }
+}
+
 const editar = async (req, res) => {
   try {
     const id = req.params.id;
@@ -82,6 +93,7 @@ module.exports = {
   criar,
   getStatus,
   getStatusId,
+  listarPorTipo,
   listarPorId,
   editar,
   deletar

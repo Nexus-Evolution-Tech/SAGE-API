@@ -65,8 +65,8 @@ async function criarPessoaBase(dados) {
 // 📌 Criar Aluno
 async function criarAluno(pessoaId, dados) {
   const query = `
-    INSERT INTO Aluno (id, rm, turma_id, responsavel_id)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO Aluno (id, rm, turma_id, responsavel_id, status)
+    VALUES (?, ?, ?, ?, 'ATIVO')
   `;
   const values = [
     pessoaId,
@@ -89,10 +89,10 @@ async function criarProfessor(pessoaId, dados) {
 // 📌 Criar Administrador
 async function criarAdministrador(pessoaId, dados) {
   const query = `
-    INSERT INTO Administrador (id, funcao)
+    INSERT INTO Administrador (id, cargo)
     VALUES (?, ?)
   `;
-  await db.query(query, [pessoaId, dados.funcao]);
+  await db.query(query, [pessoaId, dados.cargo]);
 }
 
 // 📌 Criar Terceirizado
@@ -202,9 +202,9 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
 // 🚀 Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
   const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'genero'];
-  const alunoFields = ['rm', 'turma_id', 'responsavel_id'];
+  const alunoFields = ['rm', 'turma_id', 'responsavel_id', 'status'];
   const professorFields = ['siape'];
-  const administradorFields = ['funcao'];
+  const administradorFields = ['cargo'];
   const terceirizadoFields = ['empresa_id', 'funcao'];
   
   // 🚫 Impedir alteração do campo "tipo"

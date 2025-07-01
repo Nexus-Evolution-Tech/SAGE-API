@@ -45,6 +45,41 @@ Enum DivisaoTurma {
   DIV_B
 }
 
+ENUM CargoAdministrativo {
+  DIRETOR
+  VICE_DIRETOR
+  COORDENADOR_PEDAGOGICO
+  SECRETARIO_ESCOLAR
+  TESOUREIRO
+  SUPERVISOR_ADMINISTRATIVO
+  AUXILIAR_ADMINISTRATIVO
+  TECNICO_ADMINISTRATIVO
+  ORIENTADOR_EDUCACIONAL
+  COORDENADOR_DE_CURSO
+  RESPONSAVEL_FINANCEIRO
+  ALMOXARIFE
+  BIBLIOTECARIO
+  OUTRO
+}
+
+ENUM FuncaoTerceirizado {
+  VIGILANTE
+  FAXINEIRO
+  SEGURANCA
+  SERVICOS_GERAIS
+  TECNICO_MANUTENCAO
+  JARDINEIRO
+  CANTINEIRO
+  OUTRO
+}
+
+Enum StatusAluno {
+  ATIVO
+  SUSPENSO
+  TRANSFERIDO
+  DESLIGADO
+}
+
 Table UnidadeEscolar {
   id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
   nome varchar(255) [not null]
@@ -140,7 +175,7 @@ Table Professor {
 
 Table Administrador {
   id int [pk, ref: > Pessoa.id]
-  funcao varchar(50) [not null]
+  cargo CargoAdministrativo [not null, note: "Cargo do administrador, ex: Diretor, Coordenador, Secretário"]
 }
 
 Table Empresa {
@@ -152,7 +187,7 @@ Table Empresa {
 Table Terceirizado {
   id int [pk, ref: > Pessoa.id]
   empresa_id int [not null]
-  funcao varchar(50) [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
+  funcao FuncaoTerceirizado [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
 }
 
 Table Responsavel {
@@ -171,6 +206,7 @@ Table Aluno {
   rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
   turma_id int [ref: > Turma.id]
   responsavel_id int [ref: > Responsavel.id]
+  status StatusAluno [not null, note: "Status do aluno, ex: Ativo, Suspenso, Transferido, Desligado"]
 }
 
 Table Materia {

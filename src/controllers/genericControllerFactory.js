@@ -1,6 +1,5 @@
 const crud = require('../utils/generic-db-utils');
 const { hashSenha } = require('../utils/criptografia');
-const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 
 function capitalize(text) {
   if (!text) return '';
@@ -33,7 +32,7 @@ function gerarController(tabela, campos, entidadeNome) {
     async listar(req, res) {
       try {
         const registros = await crud.buscarTodos(tabela, campos);
-        res.json(ajustarFusoHorarioBrasil(registros));
+        res.json(registros);
       } catch (error) {
         console.error(`Erro ao listar ${entidadeNome}:`, error);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error });
@@ -44,7 +43,7 @@ function gerarController(tabela, campos, entidadeNome) {
       const id = req.params.id;
       try {
         const registros = await crud.buscarPorId(id, tabela, campos);
-        res.json(ajustarFusoHorarioBrasil(registros));
+        res.json(registros);
       } catch (error) {
         console.error(`Erro ao listar ${entidadeNome}:`, error);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error });
@@ -66,7 +65,7 @@ function gerarController(tabela, campos, entidadeNome) {
         const novoRegistro = await crud.criarRegistro(tabela, dados);
         res.status(201).json({ 
           message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'criad')} com sucesso`, 
-          data: ajustarFusoHorarioBrasil(novoRegistro)
+          data: novoRegistro
         });
       } catch (error) {
         console.error(`Erro ao criar ${entidadeNome}:`, error);
