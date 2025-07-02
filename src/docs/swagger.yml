@@ -236,26 +236,49 @@ paths:
                 items:
                   $ref: '#/components/schemas/FotoEscola'
     post:
+      summary: Upload de foto de escola
+      description: Envia uma imagem e os dados da foto para o servidor
       tags: [FotoEscolas]
-      summary: Cria uma nova escola
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/FotoEscola'
-            example:
-              unidade_id: null
-              tipo: "FACHADA"
-              caminho: "/imagens/fachada.png"
-              descricao: "Foto da fachada da escola"
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: Arquivo da imagem
+                unidade_id:
+                  type: integer
+                  description: ID da unidade escolar
+                tipo:
+                  type: string
+                  description: Tipo da foto (ex: FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTROS)
+                descricao:
+                  type: string
+                  description: Descrição da imagem
+              required:
+                - foto
+                - unidade_id
+                - tipo
       responses:
         '201':
-          description: Escola criada
+          description: Upload realizado com sucesso
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FotoEscola'
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  caminho:
+                    type: string
+        '400':
+          description: Erro na requisição (arquivo ausente ou inválido)
+        '500':
+          description: Erro interno ao salvar
 
   /foto_escolas/url/{id}:
     parameters:
