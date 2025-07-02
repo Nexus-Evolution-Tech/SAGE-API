@@ -257,6 +257,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/FotoEscola'
 
+  /foto_escolas/url/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna a URL da foto de uma escola pelo ID
+      responses:
+        '200':
+          description: URL da foto encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          description: Foto não encontrada
+
   /foto_escolas/{id}:
     parameters:
       - name: id

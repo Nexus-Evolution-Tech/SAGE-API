@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const loadRoutes = require('./config/loadRoutes');
 global.db = require('./config/knex');
+const path = require('path');
 
 // 👉 Adicione essas duas linhas:
 const swaggerUi = require('swagger-ui-express');
@@ -40,6 +41,13 @@ app.use(express.json());
 // 👉 Rota para Swagger:
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 console.log('Acesse a documentação Swagger em: http://localhost:3000/docs');
+
+// Serve arquivos estáticos da pasta "upload"
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+console.log('Arquivos estáticos disponíveis em: http://localhost:3000/uploads');
+
+console.log('Diretório atual:', process.cwd());
+console.log('Server node.js iniciou(__dirname):', __dirname);
 
 // Rotas da aplicação
 loadRoutes(app);
