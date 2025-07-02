@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS UnidadeEscolar (
 CREATE TABLE IF NOT EXISTS UnidadeFoto (
     id INT AUTO_INCREMENT PRIMARY KEY,
     unidade_id INT,
-    tipo VARCHAR(50) NOT NULL COMMENT 'Ex: Fachada, Planta',
+    tipo  ENUM('FACHADA', 'PLANTA', 'EVENTOS', 'INTERNA', 'EXTERNA', 'LOGO', 'OUTRO') DEFAULT 'OUTRO' NOT NULL COMMENT 'Ex: Fachada, Planta',
     caminho VARCHAR(255) NOT NULL COMMENT 'Caminho da imagem local ou nuvem',
     descricao VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -12,6 +12,8 @@ tags:
     description: Operações relacionadas aos cursos
   - name: Escolas
     description: Operações relacionadas às escolas
+  - name: FotoEscolas
+    description: Operações relacionadas às fotos das escolas
   - name: Turmas
     description: Operações relacionadas às turmas
   - name: Areas
@@ -213,6 +215,92 @@ paths:
           description: Escola não encontrada
     delete:
       tags: [Escolas]
+      summary: Remove uma escola
+      responses:
+        '204':
+          description: Escola deletada
+        '404':
+          description: Escola não encontrada
+
+  /foto_escolas:
+    get:
+      tags: [FotoEscolas]
+      summary: Lista todas as foto_escolas
+      responses:
+        '200':
+          description: Lista de foto_escolas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FotoEscola'
+    post:
+      tags: [FotoEscolas]
+      summary: Cria uma nova escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FotoEscola'
+            example:
+              unidade_id: null
+              tipo: "FACHADA"
+              caminho: "/imagens/fachada.png"
+              descricao: "Foto da fachada da escola"
+      responses:
+        '201':
+          description: Escola criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotoEscola'
+
+  /foto_escolas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna uma escola pelo ID
+      responses:
+        '200':
+          description: Escola encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotoEscola'
+        '404':
+          description: Escola não encontrada
+    patch:
+      tags: [FotoEscolas]
+      summary: Atualiza uma escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FotoEscola'
+            example:
+              unidade_id: 1
+              tipo: "PLANTA"
+              caminho: "/imagens/planta.png"
+              descricao: "Foto da planta da escola"
+      responses:
+        '200':
+          description: Escola atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotoEscola'
+        '404':
+          description: Escola não encontrada
+    delete:
+      tags: [FotoEscolas]
       summary: Remove uma escola
       responses:
         '204':
@@ -1359,6 +1447,19 @@ components:
           example: "1234567890 ou 12345678901"
           pattern: "^[0-9]{10,11}$"
         logo:
+          type: string
+
+    FotoEscola:
+      type: object
+      properties:
+        unidade_id:
+          type: integer
+        tipo:
+          type: string
+          enum: [FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTRO]
+        caminho:
+          type: string
+        descricao:
           type: string
 
     Turma:

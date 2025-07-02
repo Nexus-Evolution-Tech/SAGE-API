@@ -80,6 +80,16 @@ Enum StatusAluno {
   DESLIGADO
 }
 
+Enum TipoFoto {
+  FACHADA
+  PLANTA
+  EVENTOS
+  INTERNA
+  EXTERNA
+  LOGO
+  OUTRO
+}
+
 Table UnidadeEscolar {
   id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
   nome varchar(255) [not null]
@@ -102,7 +112,7 @@ Table UnidadeEscolar {
 Table UnidadeFoto {
   id int [pk, increment]
   unidade_id int [ref: > UnidadeEscolar.id]
-  tipo varchar(50) [not null, note: "Ex: Fachada, Planta"]
+  tipo TipoFoto [not null, note: "Ex: Fachada, Planta"]
   caminho varchar(255) [not null, note: "Caminho da imagem local ou nuvem"]
   descricao varchar(255) [not null]
   created_at timestamp
