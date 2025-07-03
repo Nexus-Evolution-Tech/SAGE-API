@@ -1023,7 +1023,7 @@ paths:
                     type: string
                     enum: [PRESENTE, AUSENTE]
 
-  /pessoas/{tipo}:
+  /pessoas/tipo/{tipo}:
     parameters:
       - name: tipo
         in: path

@@ -132,7 +132,6 @@ const uploadFoto = async (req, res) => {
   }
 }
 
-
 module.exports = {
   listar,
   criar,

@@ -95,11 +95,30 @@ async function criarAcesso(dados) {
   const pessoa = await global.db('Pessoa').where('id', pessoa_id).first();
   const idadePessoa = calcularIdade(pessoa.data_nascimento);
 
+  // Busca o último acesso da pessoa
+  const ultimoAcesso = await global.db('Acesso')
+    .where('pessoa_id', pessoa_id)
+    .orderBy('data_hora', 'desc')
+    .first();
+
+  // Regra para evitar múltiplas entradas sem saída e multiplas saídas sem entrada
+  if (status === 'ENTRADA') {
+    if (ultimoAcesso && ultimoAcesso.status === 'ENTRADA') {
+      return { message: "Acesso negado: Usuário já está dentro, não pode entrar novamente sem sair" };
+    }
+  } else if (status === 'SAIDA') {
+    if (!ultimoAcesso || ultimoAcesso.status !== 'ENTRADA') {
+      return { message: "Acesso negado: Usuário não está dentro, não pode sair sem entrar antes" };
+    }
+  }
+
+  let mensagem = '';
   switch(status) {
     case 'ENTRADA':
       if (pessoa.tipo !== 'ALUNO') {
         permitido = true; // Entrada permitida para não-alunos
-        return { message: "Acesso autorizado: Entrada permitida para não-alunos" };
+        mensagem = "Acesso autorizado: Entrada permitida para não-alunos";
+        break;
       } else {
         const aluno = await global.db('Aluno').where('id', pessoa_id).first();
         switch (aluno.status) {
@@ -114,26 +133,32 @@ async function criarAcesso(dados) {
             return { message: "Acesso negado: Aluno desligado" };
           default:
             permitido = true; // Se o aluno está ativo, a entrada é permitida
-            return { message: "Acesso autorizado: Entrada permitida para aluno ativo" };
+            mensagem = "Acesso autorizado: Entrada permitida para aluno ativo";
+            break;
         }
       }
+      break;
     case 'SAIDA':
+      // Não faz sentido verificar se a aula acabou, pois a saída pode ocorrer a qualquer momento, o fator que define é se o aluno tem a permissão do responsável
       if (pessoa.tipo !== 'ALUNO') {
         permitido = true; // Saída permitida para todos os tipos de pessoa, exceto aluno
-        return { message: "Acesso autorizado: Saída permitida para não-alunos" };
+        mensagem = "Acesso autorizado: Saída permitida para não-alunos";
+        break;
       } else {
         if (idadePessoa >= 18) {
           permitido = true; // Saída permitida para aluno maior de idade
-          return { message: "Acesso autorizado: Saída permitida para aluno maior de idade", idade_aluno: `Aluno com ${idadePessoa} anos - MAIOR DE IDADE` };
+          mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - Aluno com ${idadePessoa} anos - MAIOR DE IDADE`;
+          break;
         } else {
           let permissaoResponsavel = false; // Aqui você deve implementar a lógica para verificar se o responsável deu permissão
           if (permissaoResponsavel){
             permitido = true; // Se houver permissão do responsável, a saída é permitida
-            return { message: "Acesso autorizado: Saída permitida com permissão do responsável", idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE` };
+            mensagem = `Acesso autorizado: Saída permitida com permissão do responsável - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+            break;
           } else {
             console.log("Permissão do responsável não encontrada, negando acesso...");
             permitido = false; // Se não houver permissão, a saída é negada
-            return { message: "Acesso negado: Saída sem permissão do responsável", idade_aluno: `Aluno com ${idadePessoa} - MENOR DE IDADE` };
+            return { message: "Acesso negado: Saída sem permissão do responsável", idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE` };
           }
         }
       }
@@ -149,7 +174,7 @@ async function criarAcesso(dados) {
     data_hora: new Date()
   }).returning('*');
 
-  return { message: "Acesso efetuado com sucesso", acesso: acesso[0] };
+  return { message: mensagem, acesso: acesso[0] };
 }
 
 module.exports = {
