@@ -139,29 +139,71 @@ async function criarAcesso(dados) {
       }
       break;
     case 'SAIDA':
-      // Não faz sentido verificar se a aula acabou, pois a saída pode ocorrer a qualquer momento, o fator que define é se o aluno tem a permissão do responsável
+      // Preciso verificar se a aula acabou, se acabou o aluno não precisa de permissão do responsável para sair
+      // Preciso fazer um sistema de atraso também
       if (pessoa.tipo !== 'ALUNO') {
-        permitido = true; // Saída permitida para todos os tipos de pessoa, exceto aluno
+        permitido = true;
         mensagem = "Acesso autorizado: Saída permitida para não-alunos";
         break;
-      } else {
-        if (idadePessoa >= 18) {
-          permitido = true; // Saída permitida para aluno maior de idade
-          mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - Aluno com ${idadePessoa} anos - MAIOR DE IDADE`;
-          break;
-        } else {
-          let permissaoResponsavel = false; // Aqui você deve implementar a lógica para verificar se o responsável deu permissão
-          if (permissaoResponsavel){
-            permitido = true; // Se houver permissão do responsável, a saída é permitida
-            mensagem = `Acesso autorizado: Saída permitida com permissão do responsável - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
-            break;
-          } else {
-            console.log("Permissão do responsável não encontrada, negando acesso...");
-            permitido = false; // Se não houver permissão, a saída é negada
-            return { message: "Acesso negado: Saída sem permissão do responsável", idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE` };
-          }
-        }
       }
+
+      if (idadePessoa >= 18) {
+        permitido = true;
+        mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - ${idadePessoa} anos`;
+        break;
+      }
+
+      // Aluno menor de idade - Verificar horários das aulas
+      const hoje = new Date();
+      const diaSemana = hoje.getDay(); // 0 = domingo, 1 = segunda, etc.
+
+      const aluno = await global.db('Aluno').where('id', pessoa_id).first();
+      const turmaId = aluno.turma_id;
+
+      const aulasHoje = await global.db('Aula')
+        .where({ turma_id: turmaId, dia_semana: diaSemana })
+        .orderBy('inicio', 'asc');
+
+      if (!aulasHoje || aulasHoje.length === 0) {
+        permitido = true;
+        mensagem = "Acesso autorizado: Nenhuma aula cadastrada para hoje";
+        break;
+      }
+
+      const primeiraAula = aulasHoje[0];
+      const ultimaAula = aulasHoje[aulasHoje.length - 1];
+
+      const agora = hoje.toTimeString().split(' ')[0]; // HH:MM:SS
+
+      if (agora < primeiraAula.inicio) {
+        // Antes da primeira aula, pode sair sem problemas
+        permitido = true;
+        mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
+        break;
+      }
+
+      if (agora >= ultimaAula.fim) {
+        // Após o fim da última aula, pode sair sem problemas
+        permitido = true;
+        mensagem = `Acesso autorizado: Aulas encerradas - Última aula terminou às ${ultimaAula.fim}`;
+        break;
+      }
+
+      // Durante o período de aula, precisa de autorização
+      const permissaoResponsavel = false; // Aqui você implementa a lógica real
+
+      if (permissaoResponsavel) {
+        permitido = true;
+        mensagem = `Acesso autorizado: Saída permitida com permissão do responsável - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+        break;
+      }
+
+      // Se não tiver permissão do responsável, nega a saída
+      return {
+        message: `Acesso negado: Aluno ainda está em horário de aula. Horário da aula atual: ${primeiraAula.inicio} até ${ultimaAula.fim}`,
+        idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`,
+        hora_atual: agora
+      };
   }
 
   // Cria o registro de acesso
