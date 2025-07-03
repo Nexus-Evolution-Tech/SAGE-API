@@ -933,6 +933,8 @@ paths:
                   genero: "MASCULINO"
                   tipo: "ADMINISTRADOR"
                   cargo: "COORDENADOR_PEDAGOGICO"
+                  entrada: "08:00:00"
+                  saida: "17:00:00"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
@@ -969,6 +971,8 @@ paths:
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
                   funcao: "FAXINEIRO"
+                  entrada: "08:00:00"
+                  saida: "17:00:00"
       responses:
         '201':
           description: Pessoa criada com sucesso
@@ -1212,6 +1216,8 @@ paths:
                   data_nascimento: "1992-04-10"
                   genero: "MASCULINO"
                   cargo: "VICE_DIRETOR"
+                  entrada: "09:00:00"
+                  saida: "16:00:00"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
@@ -1246,6 +1252,8 @@ paths:
                   genero: "MASCULINO"
                   empresa_id: 1
                   funcao: "TECNICO_MANUTENCAO"
+                  entrada: "09:00:00"
+                  saida: "16:00:00"
       responses:
         '200':
           description: Pessoa atualizada
@@ -1833,7 +1841,10 @@ components:
             cargo:
               type: string
               enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
-
+            entrada:
+              type: string
+            saida:
+              type: string
     ProfAdm:
       allOf:
         - $ref: '#/components/schemas/Pessoa'
@@ -1869,6 +1880,10 @@ components:
             funcao:
               type: string
               enum: [VIGILANTE, FAXINEIRO, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, OUTRO]
+            entrada:
+              type: string
+            saida:
+              type: string
       type: object
       properties:
         nome:

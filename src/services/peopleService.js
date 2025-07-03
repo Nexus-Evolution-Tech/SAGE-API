@@ -59,58 +59,227 @@ async function criarPessoaCompleta(dados) {
   return { idPessoa, tipoCriado: tipo };
 }
 
-async function verificarPessoaPresente(id){
-  // agora preciso ir até a tabela de acesso e verificar se existe algum registro com o idPessoa e data_hora >= dataHoje
-  // Definir o início e o fim do dia atual
+async function verificarPessoaPresenteEAtrasada(id) {
   const inicioDia = new Date();
   inicioDia.setHours(0, 0, 0, 0);
   const fimDia = new Date();
   fimDia.setHours(23, 59, 59, 999);
+
+  const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+  const hoje = new Date();
+  const diaSemana = diasSemanaEnum[hoje.getDay()];
+  const toleranciaMinutos = 15;
+
+  const pessoa = await global.db('Pessoa')
+    .where('id', id)
+    .select('id', 'nome', 'tipo')
+    .first();
+
+  if (!pessoa) {
+    throw new Error(`Pessoa com id ${id} não encontrada`);
+  }
 
   const acesso = await global.db('Acesso')
     .where('pessoa_id', id)
     .andWhere('status', 'ENTRADA')
     .andWhere('data_hora', '>=', inicioDia)
     .andWhere('data_hora', '<=', fimDia)
+    .orderBy('data_hora', 'asc')
     .first();
 
-  const pessoa = await global.db('Pessoa')
-    .where('id', id)
-    .select('nome')
-    .first();
+  if (!acesso) {
+    return {
+      id: pessoa.id,
+      nome: pessoa.nome,
+      tipo: pessoa.tipo,
+      status: 'AUSENTE',
+      atrasado: null,
+      horario_chegada: null
+    };
+  }
+
+  const entrada = acesso.data_hora;
+  let atrasado = false;
+
+  if (pessoa.tipo === 'ALUNO') {
+    const aluno = await global.db('Aluno').where('id', pessoa.id).first('turma_id');
+
+    if (aluno) {
+      const aulaHoje = await global.db('Aula')
+        .where({ turma_id: aluno.turma_id, dia_semana: diaSemana })
+        .orderBy('inicio', 'asc')
+        .first('inicio');
+
+      if (aulaHoje) {
+        const [hora, minuto] = aulaHoje.inicio.split(':').map(Number);
+        const horarioAula = new Date();
+        horarioAula.setHours(hora, minuto, 0, 0);
+
+        const entradaDate = new Date(entrada);
+        const horarioTolerancia = new Date(horarioAula.getTime() + toleranciaMinutos * 60 * 1000);
+
+        if (entradaDate > horarioTolerancia) {
+          atrasado = true;
+        }
+      }
+    }
+
+  } else if (pessoa.tipo === 'PROFESSOR' || pessoa.tipo === 'PROFADM') {
+    const aulaHoje = await global.db('Aula')
+      .where({ professor_id: pessoa.id, dia_semana: diaSemana })
+      .orderBy('inicio', 'asc')
+      .first('inicio');
+
+    if (aulaHoje) {
+      const [hora, minuto] = aulaHoje.inicio.split(':').map(Number);
+      const horarioAula = new Date();
+      horarioAula.setHours(hora, minuto, 0, 0);
+
+      const entradaDate = new Date(entrada);
+      const horarioTolerancia = new Date(horarioAula.getTime() + toleranciaMinutos * 60 * 1000);
+
+      if (entradaDate > horarioTolerancia) {
+        atrasado = true;
+      }
+    }
+
+  } else {
+    const funcionario = await global.db(pessoa.tipo)
+      .where('id', pessoa.id)
+      .first('entrada');
+
+    if (funcionario && funcionario.entrada) {
+      const [hora, minuto] = funcionario.entrada.split(':').map(Number);
+      const horarioEntrada = new Date();
+      horarioEntrada.setHours(hora, minuto, 0, 0);
+
+      const entradaDate = new Date(entrada);
+      const horarioTolerancia = new Date(horarioEntrada.getTime() + toleranciaMinutos * 60 * 1000);
+
+      if (entradaDate > horarioTolerancia) {
+        atrasado = true;
+      }
+    }
+  }
 
   return {
-    id: id,
-    nome: pessoa ? pessoa.nome : null,
+    id: pessoa.id,
+    nome: pessoa.nome,
+    tipo: pessoa.tipo,
     status: acesso ? "PRESENTE" : "AUSENTE",
+    atrasado,
+    horario_chegada: new Date(entrada).toISOString()
   };
 }
 
-async function verificarTodasPessoasPresentes() {
+
+async function verificarTodasPessoasPresentesEAtrasadas() {
   const inicioDia = new Date();
   inicioDia.setHours(0, 0, 0, 0);
   const fimDia = new Date();
   fimDia.setHours(23, 59, 59, 999);
 
-  // Busca todas as pessoas
-  const pessoas = await global.db('Pessoa').select('id', 'nome');
+  const pessoas = await global.db('Pessoa').select('id', 'nome', 'tipo');
 
-  // Busca todos os acessos de entrada do dia
   const acessos = await global.db('Acesso')
     .where('status', 'ENTRADA')
     .andWhere('data_hora', '>=', inicioDia)
     .andWhere('data_hora', '<=', fimDia)
-    .select('pessoa_id');
+    .select('pessoa_id', 'data_hora');
 
-  // Cria um Set com os IDs das pessoas presentes
-  const idsPresentes = new Set(acessos.map(a => a.pessoa_id));
+  const entradasPorPessoa = new Map();
+  acessos.forEach(a => {
+    if (!entradasPorPessoa.has(a.pessoa_id) || entradasPorPessoa.get(a.pessoa_id) > a.data_hora) {
+      entradasPorPessoa.set(a.pessoa_id, a.data_hora); // pega a menor data_hora (primeira entrada)
+    }
+  });
 
-  // Monta o resultado para cada pessoa
-  return pessoas.map(pessoa => ({
-    id: pessoa.id,
-    nome: pessoa.nome,
-    status: idsPresentes.has(pessoa.id) ? "PRESENTE" : "AUSENTE",
-  }));
+  const resultados = [];
+  for (const pessoa of pessoas) {
+    const entrada = entradasPorPessoa.get(pessoa.id);
+    let atrasado = false;
+
+    const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+    const hoje = new Date();
+    const diaSemana = diasSemanaEnum[hoje.getDay()];
+    const toleranciaMinutos = 15;
+
+    if (entrada) {
+      if (pessoa.tipo === 'ALUNO') {
+        const aluno = await global.db('Aluno')
+          .where('id', pessoa.id)
+          .first('turma_id');
+
+        if (aluno) {
+          const aulasHoje = await global.db('Aula')
+            .where({ turma_id: aluno.turma_id, dia_semana: diaSemana })
+            .orderBy('inicio', 'asc')
+            .select('inicio');
+
+          if (aulasHoje.length > 0) {
+            const [hora, minuto] = aulasHoje[0].inicio.split(':').map(Number);
+            const horarioAula = new Date();
+            horarioAula.setHours(hora, minuto, 0, 0);
+
+            const entradaDate = new Date(entrada);
+            const horarioTolerancia = new Date(horarioAula.getTime() + toleranciaMinutos * 60 * 1000);
+
+            if (entradaDate > horarioTolerancia) {
+              atrasado = true;
+            }
+          }
+        }
+      } else if (pessoa.tipo === 'PROFESSOR' || pessoa.tipo === 'PROFADM') {
+        const aulaHoje = await global.db('Aula')
+          .where({ professor_id: pessoa.id, dia_semana: diaSemana })
+          .orderBy('inicio', 'asc')
+          .first('inicio');  // <- Aqui troquei para .first()
+
+        if (aulaHoje) {
+          const [hora, minuto] = aulaHoje.inicio.split(':').map(Number);
+
+          const horarioAula = new Date();
+          horarioAula.setHours(hora, minuto, 0, 0);
+
+          const entradaDate = new Date(entrada);
+          const horarioTolerancia = new Date(horarioAula.getTime() + toleranciaMinutos * 60 * 1000);
+
+          if (entradaDate > horarioTolerancia) {
+            atrasado = true;
+          }
+        }
+      } else {
+        // Busca o horário cadastrado de entrada do funcionário na respectiva tabela
+        const funcionario = await global.db(pessoa.tipo) // tipo pode ser TERCEIRIZADO ou ADMINISTRADOR
+          .where('id', pessoa.id)
+          .first('entrada'); // pega o campo 'entrada'
+
+        if (funcionario && funcionario.entrada) {
+          const [hora, minuto] = funcionario.entrada.split(':').map(Number);
+
+          const horarioEntrada = new Date();
+          horarioEntrada.setHours(hora, minuto, 0, 0);
+
+          const entradaDate = new Date(entrada);
+          const horarioTolerancia = new Date(horarioEntrada.getTime() + toleranciaMinutos * 60 * 1000);
+
+          if (entradaDate > horarioTolerancia) {
+            atrasado = true;
+          }
+        }
+      }
+    }
+    resultados.push({
+      id: pessoa.id,
+      nome: pessoa.nome,
+      tipo: pessoa.tipo,
+      status: entrada ? "PRESENTE" : "AUSENTE",
+      atrasado: entrada ? atrasado : null,
+      horario_chegada: entrada ? new Date(entrada).toISOString() : null
+    });
+  }
+
+  return resultados;
 }
 
 async function buscarPessoasPorTipo(tipo) {
@@ -266,8 +435,8 @@ async function removerFotoPessoa(req, res) {
 
 module.exports = {
   criarPessoaCompleta,
-  verificarPessoaPresente,
-  verificarTodasPessoasPresentes,
+  verificarPessoaPresenteEAtrasada,
+  verificarTodasPessoasPresentesEAtrasadas,
   buscarPessoasPorTipo,
   uploadFotoPessoa,
   removerFotoPessoa

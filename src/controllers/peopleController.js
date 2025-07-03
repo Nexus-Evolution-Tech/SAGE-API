@@ -28,8 +28,8 @@ const criar = async (req, res) => {
 
 const getStatus = async (req, res) => {
   try {
-    const estaPresente = await peopleService.verificarTodasPessoasPresentes();
-    res.json(estaPresente);
+    const estaPresenteAtrasado = await peopleService.verificarTodasPessoasPresentesEAtrasadas();
+    res.json(estaPresenteAtrasado);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
     res.status(500).json({ message: 'Erro ao listar pessoas', error });
@@ -39,7 +39,7 @@ const getStatus = async (req, res) => {
 const getStatusId = async (req, res) => {
   const id = req.params.id;
   try {
-    const estaPresente = await peopleService.verificarPessoaPresente(id);
+    const estaPresente = await peopleService.verificarPessoaPresenteEAtrasada(id);
     res.json(estaPresente);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);

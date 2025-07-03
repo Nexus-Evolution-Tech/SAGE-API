@@ -88,23 +88,37 @@ async function criarProfessor(pessoaId, dados) {
 
 // 📌 Criar Administrador
 async function criarAdministrador(pessoaId, dados) {
+  // Busca o tipo da pessoa
+  const tipo = await buscarTipoPessoa(pessoaId);
+
+  // Validação da regra de negócio
+  if (tipo === 'ADMINISTRADOR') {
+    if (dados.entrada === undefined || dados.entrada === null ||
+        dados.saida === undefined || dados.saida === null) {
+      throw new Error('Campos "entrada" e "saida" são obrigatórios para ADMINISTRADOR.');
+    }
+  }
+
   const query = `
-    INSERT INTO Administrador (id, cargo)
-    VALUES (?, ?)
+    INSERT INTO Administrador (id, cargo, entrada, saida)
+    VALUES (?, ?, ?, ?)
   `;
-  await db.query(query, [pessoaId, dados.cargo]);
+  await db.query(query, [pessoaId, dados.cargo, dados.entrada, dados.saida]);
 }
+
 
 // 📌 Criar Terceirizado
 async function criarTerceirizado(pessoaId, dados) {
   const query = `
-    INSERT INTO Terceirizado (id, empresa_id, funcao)
-    VALUES (?, ?, ?)
+    INSERT INTO Terceirizado (id, empresa_id, funcao, entrada, saida)
+    VALUES (?, ?, ?, ?, ?)
   `;
   const values = [
     pessoaId,
     dados.empresa_id,
-    dados.funcao
+    dados.funcao,
+    dados.entrada,
+    dados.saida
   ];
   await db.query(query, values);
 }
@@ -154,11 +168,44 @@ async function buscarTodasPessoas() {
   return resultado;
 }
 
-
 async function buscarPorId(id) {
-  const [pessoa] = await db.query(`SELECT * FROM Pessoa WHERE id = ${id}`);
-  return pessoa;
+  // Consulta protegida contra SQL Injection
+  const [rows] = await db.query(`SELECT * FROM Pessoa WHERE id = ?`, [id]);
+
+  const pessoa = rows[0]; // Pega o primeiro (e único) resultado
+  if (!pessoa) {
+    throw new Error(`Pessoa com id ${id} não encontrada.`);
+  }
+
+  let dadosEspecificos = {};
+
+  switch (pessoa.tipo) {
+    case 'ALUNO':
+      dadosEspecificos = await buscarAluno(pessoa.id);
+      break;
+    case 'PROFESSOR':
+      dadosEspecificos = await buscarProfessor(pessoa.id);
+      break;
+    case 'ADMINISTRADOR':
+      dadosEspecificos = await buscarAdministrador(pessoa.id);
+      break;
+    case 'PROFADM':
+      dadosEspecificos = await buscarProfAdm(pessoa.id);
+      break;
+    case 'TERCEIRIZADO':
+      dadosEspecificos = await buscarTerceirizado(pessoa.id);
+      break;
+    default:
+      // Tipo desconhecido, pode logar um aviso se quiser
+      break;
+  }
+
+  return {
+    ...pessoa,
+    ...dadosEspecificos
+  };
 }
+
 
 // 🔎 Buscar o tipo da pessoa
 async function buscarTipoPessoa(id) {
@@ -204,14 +251,21 @@ async function atualizarPessoaCompleta(id, updates) {
   const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'genero'];
   const alunoFields = ['rm', 'turma_id', 'responsavel_id', 'status'];
   const professorFields = ['siape'];
-  const administradorFields = ['cargo'];
-  const terceirizadoFields = ['empresa_id', 'funcao'];
+  const administradorFields = ['cargo', 'entrada', 'saida'];
+  const terceirizadoFields = ['empresa_id', 'funcao', 'entrada', 'saida'];
   
   // 🚫 Impedir alteração do campo "tipo"
   delete updates.tipo;
 
   // 1. Buscar tipo da pessoa
   const tipo = await buscarTipoPessoa(id);
+
+  if (tipo === 'ADMINISTRADOR') {
+    if (updates.entrada === undefined || updates.entrada === null ||
+        updates.saida === undefined || updates.saida === null) {
+      throw new Error('Campos "entrada" e "saida" são obrigatórios para ADMINISTRADOR.');
+    }
+  }
 
   // 2. Atualizar campos da tabela Pessoa
   const pessoaUpdates = {};

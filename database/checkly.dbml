@@ -186,6 +186,8 @@ Table Professor {
 Table Administrador {
   id int [pk, ref: > Pessoa.id]
   cargo CargoAdministrativo [not null, note: "Cargo do administrador, ex: Diretor, Coordenador, Secretário"]
+  entrada time [not null, note: "Horário de entrada do administrador"]
+  saida time [not null, note: "Horário de saída do administrador"]
 }
 
 Table Empresa {
@@ -198,6 +200,8 @@ Table Terceirizado {
   id int [pk, ref: > Pessoa.id]
   empresa_id int [not null]
   funcao FuncaoTerceirizado [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
+  entrada time [not null, note: "Horário de entrada do terceirizado"]
+  saida time [not null, note: "Horário de saída do terceirizado"]
 }
 
 Table Responsavel {

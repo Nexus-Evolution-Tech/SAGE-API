@@ -136,6 +136,8 @@ CREATE TABLE IF NOT EXISTS Administrador (
 	  'ALMOXARIFE',
 	  'BIBLIOTECARIO',
 	  'OUTRO') NOT NULL,
+	entrada TIME,
+    saida TIME,
     FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 
@@ -159,6 +161,8 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
 	  'JARDINEIRO',
 	  'CANTINEIRO',
 	  'OUTRO') NOT NULL,
+	entrada TIME NOT NULL,
+    saida TIME NOT NULL,
     FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
     FOREIGN KEY (empresa_id) REFERENCES Empresa(id) ON DELETE SET NULL
 );
@@ -218,3 +222,64 @@ CREATE TABLE IF NOT EXISTS Acesso (
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE SET NULL,
     FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id) ON DELETE SET NULL
 );
+
+DELIMITER $$
+
+CREATE PROCEDURE atualizar_turmas_e_status()
+BEGIN
+    DECLARE v_atualizados INT DEFAULT 0;
+    DECLARE v_desligados INT DEFAULT 0;
+
+    -- Desliga alunos que estão em turmas finais
+    UPDATE Aluno a
+    JOIN Pessoa p ON a.id = p.id
+    SET a.status = 'DESLIGADO', p.updated_at = NOW() -- o SET ocorre depois do WHERE ser avaliado
+    WHERE p.tipo = 'ALUNO'
+      AND a.status = 'ATIVO'
+      AND YEAR(p.updated_at) < YEAR(CURDATE())
+      AND a.turma_id IN (5, 6, 8, 9);
+
+    SET v_desligados = ROW_COUNT(); -- pega quantos foram desligados
+
+    -- Atualiza turma conforme regras definidas
+    UPDATE Aluno a
+    JOIN Pessoa p ON a.id = p.id
+    SET 
+        a.turma_id = CASE 
+                        WHEN a.turma_id = 1 THEN 3
+                        WHEN a.turma_id = 2 THEN 4
+                        WHEN a.turma_id = 3 THEN 5
+                        WHEN a.turma_id = 4 THEN 6
+                        WHEN a.turma_id = 7 THEN 9
+                        ELSE a.turma_id
+                    END,
+        p.updated_at = NOW()
+    WHERE p.tipo = 'ALUNO'
+      AND a.status = 'ATIVO'
+      AND YEAR(p.updated_at) < YEAR(CURDATE())
+      AND a.turma_id IN (1, 2, 3, 4, 7);
+
+    SET v_atualizados = ROW_COUNT(); -- pega quantos foram atualizados   
+
+END$$
+
+DELIMITER ;
+
+
+DELIMITER $$
+
+CREATE EVENT atualizar_ou_desligar_alunos
+-- ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 MINUTE
+ON SCHEDULE
+    EVERY 1 YEAR
+    STARTS TIMESTAMP(CONCAT(YEAR(CURDATE()) + 1, '-01-01 00:00:00'))
+DO
+BEGIN
+    CALL atualizar_turmas_e_status();
+    
+    -- Exibe o número de alunos atualizados e desligados
+    SELECT CONCAT('Alunos atualizados: ', v_atualizados) AS Atualizados,
+           CONCAT('Alunos desligados: ', v_desligados) AS Desligados;
+END$$
+
+DELIMITER ;
