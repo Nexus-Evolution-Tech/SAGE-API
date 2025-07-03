@@ -65,14 +65,15 @@ async function criarPessoaBase(dados) {
 // 📌 Criar Aluno
 async function criarAluno(pessoaId, dados) {
   const query = `
-    INSERT INTO Aluno (id, rm, turma_id, responsavel_id, status)
-    VALUES (?, ?, ?, ?, 'ATIVO')
+    INSERT INTO Aluno (id, rm, responsavel_id, turma_id, divisao, status)
+    VALUES (?, ?, ?, ?, ?, 'ATIVO')
   `;
   const values = [
     pessoaId,
     dados.rm,
+    dados.responsavel_id,
     dados.turma_id,
-    dados.responsavel_id
+    dados.divisao
   ];
   await db.query(query, values);
 }
@@ -249,7 +250,7 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
 // 🚀 Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
   const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'genero'];
-  const alunoFields = ['rm', 'turma_id', 'responsavel_id', 'status'];
+  const alunoFields = ['rm', 'responsavel_id', 'turma_id', 'divisao', 'status'];
   const professorFields = ['siape'];
   const administradorFields = ['cargo', 'entrada', 'saida'];
   const terceirizadoFields = ['empresa_id', 'funcao', 'entrada', 'saida'];

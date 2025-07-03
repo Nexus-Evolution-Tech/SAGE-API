@@ -6,7 +6,8 @@ const config = {
     host: 'localhost',
     user: 'root',
     password: 'root',
-    database: 'checkly'
+    database: 'checkly',
+    timezone: '-03:00'
   }
 };
 

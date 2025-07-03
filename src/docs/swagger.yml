@@ -32,6 +32,8 @@ tags:
     description: Operações relacionadas às aulas
   - name: Acessos
     description: Operações relacionadas aos acessos
+  - name: SolicitacoesAcessos
+    description: Operações relacionadas as solicitações de acessos de saída dos alunos menores de idade
 
 paths:
   /cursos:
@@ -712,6 +714,14 @@ paths:
             example:
               nome: "Empresa XYZ"
               cnpj: "65297682000191"
+              logradouro: "Praça Miguel Ortega"
+              numero: "135"
+              complemento: "Prédio Principal"
+              bairro: "Parque Assunção"
+              cidade: "Taboão da Serra"
+              estado: "SP"
+              cep: "06754160"
+              telefone_contato: "1147011856"
       responses:
         '201':
           description: Empresa criada
@@ -751,6 +761,14 @@ paths:
             example:
               nome: "Limpezas X"
               cnpj: "80453991000105"
+              logradouro: "Rua Exemplo"
+              numero: "001"
+              complemento: "Casa"
+              bairro: "Centro"
+              cidade: "São Paulo"
+              estado: "SP"
+              cep: "01234567"
+              telefone_contato: "1123456789"
       responses:
         '200':
           description: Empresa atualizado
@@ -897,8 +915,9 @@ paths:
                   genero: "MASCULINO"
                   tipo: "ALUNO"
                   rm: "20252930001"
-                  turma_id: null
                   responsavel_id: null
+                  turma_id: null
+                  divisao: null
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -1181,8 +1200,9 @@ paths:
                   data_nascimento: "2004-02-20"
                   genero: "MASCULINO"
                   rm: "20252930001"
-                  turma_id: 1
                   responsavel_id: 1
+                  turma_id: 1
+                  divisao: "DIV A"
                   status: "TRANSFERIDO"
               Professor:
                 summary: Exemplo de Professor
@@ -1501,7 +1521,7 @@ paths:
               $ref: '#/components/schemas/Acesso'
             example:
               pessoa_id: 1
-              dispositivo_id: 1
+              dispositivo_id: null
               status: "ENTRADA"
               permitido: true
               metodo_auth: "CARTAO_RFID"
@@ -1609,12 +1629,98 @@ paths:
           description: Acesso não encontrado
     delete:
       tags: [Acessos]
-      summary: Remove uma acesso
+      summary: Remove um acesso
       responses:
         '204':
           description: Acesso deletado
         '404':
           description: Acesso não encontrado
+
+  /solicitacoes-acessos:
+    get:
+      tags: [SolicitacoesAcessos]
+      summary: Lista todos as solicitações de acessos dos alunos menores de idade
+      responses:
+        '200':
+          description: Lista das solicitações de acessos dos alunos menores de idade
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SolicitacaoAcesso'
+  
+  /solicitacoes-acessos/aprovar/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [SolicitacoesAcessos]
+      summary: Aprovar uma solicitação de acesso de um aluno menor de idade
+      description: Atualiza o status da solicitação de acesso para APROVADA
+      responses:
+        '200':
+          description: Solicitação de acesso do aluno menor de idade aprovada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso do aluno menor de idade não encontrada
+  
+  /solicitacoes-acessos/negar/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [SolicitacoesAcessos]
+      summary: Negar uma solicitação de acesso de um aluno menor de idade
+      description: Atualiza o status da solicitação de acesso para NEGADA
+      responses:
+        '200':
+          description: Solicitação de acesso do aluno menor de idade negada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso do aluno menor de idade não encontrada
+
+  /solicitacoes-acessos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [SolicitacoesAcessos]
+      summary: Retorna uma solicitação de acesso de um aluno menor de idade pelo ID
+      responses:
+        '200':
+          description: Solicitação de acesso encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso não encontrada
+    delete:
+      tags: [SolicitacoesAcessos]
+      summary: Remove uma solicitação de acesso de um aluno menor de idade
+      description: Exclui uma solicitação de acesso de um aluno menor de idade pelo ID
+      responses:
+        '204':
+          description: Solicitação de acesso de um aluno menor de idade deletada
+        '404':
+          description: Solicitação de acesso de um aluno menor de idade não encontrada
+
 components:
   schemas:
     Curso:
@@ -1726,6 +1832,28 @@ components:
           description: "CNPJ com exatamente 14 dígitos numéricos"
           example: "12345678901234"
           pattern: "^[0-9]{14}$"    
+        logradouro:
+          type: string
+        numero:
+          type: string
+        complemento:
+          type: string
+        bairro:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        cep:
+          type: string
+          description: "CEP com exatamente 8 dígitos numéricos"
+          example: "12345678"
+          pattern: "^[0-9]{8}$"
+        telefone_contato:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
           
     Responsavel:
       type: object
@@ -1955,3 +2083,21 @@ components:
         metodo_auth:
           type: string
           enum: [QR_CODE, CARTAO_RFID, SENHA, BIOMETRIA]
+
+    SolicitacaoAcesso:
+      type: object
+      properties:
+        aluno_id:
+          type: integer
+        data_hora_solicitacao:
+          type: string
+        motivo:
+          type: string
+        status:
+          type: string
+          enum: [PENDENTE, APROVADA, NEGADA]
+        data_hora_resposta:
+          type: string
+        observacao_resposta:
+          type: string
+

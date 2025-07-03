@@ -45,6 +45,11 @@ Enum DivisaoTurma {
   DIV_B
 }
 
+Enum DivisaoTurmaAluno {
+  DIV_A
+  DIV_B
+}
+
 ENUM CargoAdministrativo {
   DIRETOR
   VICE_DIRETOR
@@ -88,6 +93,12 @@ Enum TipoFoto {
   EXTERNA
   LOGO
   OUTRO
+}
+
+Enum StatusSolicitacao {
+  PENDENTE
+  APROVADA
+  NEGADA
 }
 
 Table UnidadeEscolar {
@@ -194,6 +205,13 @@ Table Empresa {
   id int [pk, increment]
   nome varchar(100) [not null]
   cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
+  logradouro varchar(255) [not null]
+  numero varchar(255) [not null, note: "Número do endereço da unidade escolar"]
+  complemento varchar(255)
+  cidade varchar(255) [not null]
+  estado char(2) [not null, note: "Sigla do estado, ex: SP, RJ"]
+  cep char(8) [not null, note: "Aplicar REGEX para definir o limite como 8 digitos, nada mais, nada menos"]
+  telefone_contato varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
 }
 
 Table Terceirizado {
@@ -218,8 +236,9 @@ Table Responsavel {
 Table Aluno {
   id int [pk, ref: > Pessoa.id]
   rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
-  turma_id int [ref: > Turma.id]
   responsavel_id int [ref: > Responsavel.id]
+  turma_id int [ref: > Turma.id]
+  divisao DivisaoTurmaAluno [not null, note: "Divisão da turma do aluno, ex: DIV A, DIV B"]
   status StatusAluno [not null, note: "Status do aluno, ex: Ativo, Suspenso, Transferido, Desligado"]
 }
 
@@ -256,4 +275,14 @@ Table Acesso {
   data_hora timestamp
   metodo_auth MetodoAuth [not null]
   updated_at timestamp
+}
+
+Table SolicitacaoAcesso {
+  id int [pk, increment]
+  aluno_id int [not null, ref: > Aluno.id]
+  data_hora_solicitacao timestamp
+  motivo varchar(255) [note: "Motivo da solicitação de acesso"]
+  status StatusSolicitacao [not null, note: "Status da solicitação de acesso, ex: Pendente, Aprovada, Negada"]
+  data_hora_resposta timestamp
+  observacao_resposta varchar(255) [note: "Observação da resposta da solicitação de acesso"]
 }

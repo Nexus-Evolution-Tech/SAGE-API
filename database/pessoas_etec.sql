@@ -88,8 +88,8 @@ INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, c
 VALUES
 ('Igor', 'foto.jpg', '634150467', '45328562801', '11930402308', 'igorfcfs@gmail.com', 1, 'uuid-harry', 'rfid1234A', 'senha123', '2007-08-23', 'MASCULINO', 'ALUNO');
 
-INSERT INTO Aluno (id, rm, turma_id, responsavel_id, status) VALUES
-(38, "20232930077", 6, NULL, 'ATIVO');
+INSERT INTO Aluno (id, rm, responsavel_id, turma_id, divisao, status) VALUES
+(38, "20232930077", NULL, 6, 'DIV A', 'ATIVO');
 
 INSERT INTO Responsavel (nome, rg, cpf, telefone, email) VALUES
 ("Jorge Augusto Oliveira Silva", "286319500", "29843488857", "11972541918", "jorgeaos@gmail.com");

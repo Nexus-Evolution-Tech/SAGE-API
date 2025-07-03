@@ -189,21 +189,57 @@ async function criarAcesso(dados) {
         break;
       }
 
-      // Durante o período de aula, precisa de autorização
-      const permissaoResponsavel = false; // Aqui você implementa a lógica real
+      // Busca a solicitação existente para o aluno
+      const solicitacoes = await global.db('SolicitacaoAcesso')
+        .where('aluno_id', pessoa.id)
+        .orderBy('data_hora_solicitacao', 'desc'); // Pega da mais recente para a mais antiga
 
-      if (permissaoResponsavel) {
-        permitido = true;
-        mensagem = `Acesso autorizado: Saída permitida com permissão do responsável - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+      const solicitacao = solicitacoes.find(s => ['APROVADA', 'NEGADA', 'PENDENTE'].includes(s.status));
+
+      if (!solicitacao) {
+        // Se não existir, cria uma nova solicitação como pendente
+        await global.db('SolicitacaoAcesso').insert({
+          aluno_id: pessoa.id,
+          motivo: 'Saída durante o período de aula',
+          status: 'PENDENTE',
+          observacao_resposta: 'Aguardando autorização da secretaria',
+        });
+
+        permitido = false;
+        return { message: 'Acesso negado: Solicitação de saída criada e aguardando aprovação da secretaria', idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`, hora_atual: agora };
+      } else {
+        switch (solicitacao.status) {
+          case 'APROVADA':
+            const dataAtual = new Date();
+            const hoje = new Date();
+            const dataSolicitacao = new Date(solicitacao.data_hora_solicitacao);
+
+            const mesmaData = (
+              hoje.getFullYear() === dataSolicitacao.getFullYear() &&
+              hoje.getMonth() === dataSolicitacao.getMonth() &&
+              hoje.getDate() === dataSolicitacao.getDate()
+            );
+
+            if (mesmaData) {
+              permitido = true;
+              mensagem = `Acesso autorizado: Solicitação aprovada - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+              break;
+            } else {
+              permitido = false;
+              return { message: 'Acesso negado: Solicitação aprovada, mas tempo de validez expirado', idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`, hora_atual: agora };
+            }
+          case 'NEGADA':
+            permitido = false;
+            return { message: 'Acesso negado: Solicitação de saída foi negada pela secretaria', idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`, hora_atual: agora };
+          case 'PENDENTE':
+            permitido = false;
+            return { message: 'Acesso negado: Solicitação ainda não foi aprovada pela secretaria', idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`, hora_atual: agora };
+          default:
+            permitido = false;
+            return { message: 'Acesso negado: Solicitação de saída com status desconhecido', idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`, hora_atual: agora };
+        }
         break;
       }
-
-      // Se não tiver permissão do responsável, nega a saída
-      return {
-        message: `Acesso negado: Aluno ainda está em horário de aula. Horário da aula atual: ${primeiraAula.inicio} até ${ultimaAula.fim}`,
-        idade_aluno: `Aluno com ${idadePessoa} anos - MENOR DE IDADE`,
-        hora_atual: agora
-      };
   }
 
   // Cria o registro de acesso

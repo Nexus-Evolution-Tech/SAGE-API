@@ -5,6 +5,7 @@ const pool = mysql.createPool({
   user: 'root',
   password: 'root',
   database: 'checkly',
+  timezone: '-03:00',
   waitForConnections: true,
   connectionLimit: 10, // Número máximo de conexões no pool
   queueLimit: 0
