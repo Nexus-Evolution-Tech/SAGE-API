@@ -12,7 +12,7 @@ const listar = async (req, res) => {
     res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
   }
 };
 
@@ -22,7 +22,7 @@ const criar = async (req, res) => {
     res.status(201).json({ message: 'Pessoa criada com sucesso', pessoa: novaPessoa });
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao criar pessoa:', error });
+    res.status(500).json({ message: 'Erro ao criar pessoa:', error: error.message });
   }
 };
 
@@ -32,7 +32,7 @@ const getStatus = async (req, res) => {
     res.json(estaPresenteAtrasado);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
   }
 };
 
@@ -43,7 +43,7 @@ const getStatusId = async (req, res) => {
     res.json(estaPresente);
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
   }
 };
 
@@ -54,7 +54,7 @@ const listarPorId = async (req, res) => {
     res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error });
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
   }
 };
 
@@ -65,7 +65,7 @@ const listarPorTipo = async (req, res) => {
     res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
     console.error('Erro ao listar pessoas por tipo:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error });
+    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error: error.message });
   }
 }
 
@@ -76,7 +76,7 @@ const editar = async (req, res) => {
     res.json({ message: 'Pessoa atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao atualizar pessoa', error });
+    res.status(500).json({ message: 'Erro ao atualizar pessoa', error: error.message });
   }
 };
 
@@ -87,7 +87,7 @@ const deletar = async (req, res) => {
     res.json({ message: 'Pessoa removida com sucesso' });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
-    res.status(500).json({ message: 'Erro ao remover pessoa', error });
+    res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
   }
 };
 
@@ -107,7 +107,7 @@ const getUrls = async (req, res) => {
     res.json(urls);
   } catch (error) {
     console.error('Erro ao buscar URLs das pessoas:', error);
-    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error });
+    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error: error.message });
   }
 }
 
@@ -128,7 +128,7 @@ const uploadFoto = async (req, res) => {
     res.status(201).json({ message: 'Foto enviada com sucesso' });
   } catch (error) {
     console.error('Erro ao enviar foto:', error);
-    res.status(500).json({ message: 'Erro ao enviar foto', error });
+    res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
   }
 }
 

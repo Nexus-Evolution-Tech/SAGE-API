@@ -35,7 +35,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json(registros);
       } catch (error) {
         console.error(`Erro ao listar ${entidadeNome}:`, error);
-        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error });
+        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
       }
     },
 
@@ -46,7 +46,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json(registros);
       } catch (error) {
         console.error(`Erro ao listar ${entidadeNome}:`, error);
-        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error });
+        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
       }
     },
 
@@ -69,7 +69,7 @@ function gerarController(tabela, campos, entidadeNome) {
         });
       } catch (error) {
         console.error(`Erro ao criar ${entidadeNome}:`, error);
-        res.status(500).json({ message: `Erro ao criar ${entidadeNome}`, error });
+        res.status(500).json({ message: `Erro ao criar ${entidadeNome}`, error: error.message });
       }
     },
 
@@ -80,7 +80,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'atualizad')} com sucesso` });
       } catch (error) {
         console.error(`Erro ao atualizar ${entidadeNome}:`, error);
-        res.status(500).json({ message: `Erro ao atualizar ${entidadeNome}`, error });
+        res.status(500).json({ message: `Erro ao atualizar ${entidadeNome}`, error: error.message });
       }
     },
 
@@ -91,7 +91,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'removid')} com sucesso` });
       } catch (error) {
         console.error(`Erro ao remover ${entidadeNome}:`, error);
-        res.status(500).json({ message: `Erro ao remover ${entidadeNome}`, error });
+        res.status(500).json({ message: `Erro ao remover ${entidadeNome}`, error: error.message });
       }
     }
   };
