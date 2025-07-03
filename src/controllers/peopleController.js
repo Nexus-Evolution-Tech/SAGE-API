@@ -2,6 +2,9 @@
 const peopleService = require('../services/peopleService');
 const { buscarTodasPessoas, buscarPorId, atualizarPessoaCompleta, removerPessoa } = require('../utils/people-db-utils');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
+const path = require('path');
+const fs = require('fs');
+const db = require('../config/database');
 
 const listar = async (req, res) => {
   try {
@@ -88,6 +91,48 @@ const deletar = async (req, res) => {
   }
 };
 
+const getUrls = async (req, res) => {
+  try {
+    const pessoas = await buscarTodasPessoas();
+
+    if (!pessoas || pessoas.length === 0) {
+      return res.status(404).json({ message: 'Nenhuma pessoa encontrada para esta unidade' });
+    }
+    
+    const urls = pessoas.map(pessoa => ({
+      id: pessoa.id,
+      url: `http://localhost:3000/uploads/pessoas/${pessoa.foto}`,
+    }));
+
+    res.json(urls);
+  } catch (error) {
+    console.error('Erro ao buscar URLs das pessoas:', error);
+    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error });
+  }
+}
+
+const getUrlById = async (req, res) => {
+  const id = req.params.id;
+  const [pessoa] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
+  if (!pessoa) {
+      return res.status(404).json({ message: 'Pessoa não encontrada' });
+  }
+  const url = `http://localhost:3000/uploads/pessoas/${pessoa[0].foto}`;
+
+  res.json({ url: url });
+};
+
+const uploadFoto = async (req, res) => {
+  try {
+    await peopleService.uploadFotoPessoa(req, res);
+    res.status(201).json({ message: 'Foto enviada com sucesso' });
+  } catch (error) {
+    console.error('Erro ao enviar foto:', error);
+    res.status(500).json({ message: 'Erro ao enviar foto', error });
+  }
+}
+
+
 module.exports = {
   listar,
   criar,
@@ -96,5 +141,8 @@ module.exports = {
   listarPorTipo,
   listarPorId,
   editar,
-  deletar
+  deletar,
+  getUrls,
+  getUrlById,
+  uploadFoto
 };

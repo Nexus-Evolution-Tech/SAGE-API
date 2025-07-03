@@ -6,6 +6,7 @@ const upload = require('../middlewares/uploadFoto');
 const router = gerarRotas(schoolPhotoController, 'foto_escolas');
 
 const routerExtra = express.Router();
+routerExtra.get('/foto_escolas/url/', schoolPhotoController.getUrls);
 routerExtra.get('/foto_escolas/url/:id', schoolPhotoController.getUrlById);
 routerExtra.post('/foto_escolas', upload.single('foto'), schoolPhotoController.uploadFoto);
 

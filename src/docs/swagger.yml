@@ -280,6 +280,26 @@ paths:
         '500':
           description: Erro interno ao salvar
 
+  /foto_escolas/url:
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna todas as URLs das fotos de escolas
+      responses:
+        '200':
+          description: Lista de URLs das fotos encontradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+
   /foto_escolas/url/{id}:
     parameters:
       - name: id
@@ -1023,6 +1043,94 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Pessoa'
+  
+  /pessoas/url:
+    get:
+      tags: [Pessoas]
+      summary: Retorna todas as URLs das fotos de pessoas
+      responses:
+        '200':
+          description: Lista de URLs das fotos encontradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+  
+  /pessoas/url/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Pessoas]
+      summary: Retorna a URL da foto de uma pessoa pelo ID
+      responses:
+        '200':
+          description: URL da foto encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          description: Foto não encontrada
+
+  /pessoas/upload/{id}:
+    post:
+      tags: [Pessoas]
+      summary: Upload de foto de pessoa
+      description: Envia uma imagem para associar a uma pessoa específica
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da pessoa
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: Arquivo da imagem
+              required:
+                - foto
+      responses:
+        '200':
+          description: Upload realizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pessoa_id:
+                    type: integer
+                  foto:
+                    type: string
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Pessoa não encontrada
+        '500':
+          description: Erro interno do servidor
 
   /pessoas/{id}:
     parameters:

@@ -2,9 +2,26 @@ const gerarController = require('./genericControllerFactory');
 const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
+const { get } = require('http');
 
 const tabela = 'UnidadeFoto';
 const campos = ['id', 'unidade_id', 'tipo', 'caminho', 'descricao'];
+
+const getUrls = async (req, res) => {
+  const [fotos] = await db.query('SELECT * FROM UnidadeFoto');
+
+  if (!fotos || fotos.length === 0) {
+    return res.status(404).json({ message: 'Nenhuma foto encontrada para esta unidade' });
+  }
+
+  const urls = fotos.map(foto => ({
+    id: foto.id,
+    url: `http://localhost:3000/uploads/escolas/${foto.caminho}`,
+    descricao: foto.descricao
+  }));
+
+  res.json(urls);
+}
 
 const getUrlById = async (req, res) => {
   const id = req.params.id;
@@ -12,7 +29,7 @@ const getUrlById = async (req, res) => {
   if (!foto) {
       return res.status(404).json({ message: 'Foto não encontrada' });
   }
-  const url = `http://localhost:3000/uploads/${foto[0].caminho}`;
+  const url = `http://localhost:3000/uploads/escolas/${foto[0].caminho}`;
 
   res.json({ url: url, descricao: foto.descricao });
 };
@@ -46,7 +63,7 @@ const uploadFoto = async (req, res) => {
     fs.renameSync(antigoCaminho, novoCaminho);
 
     // Atualiza o caminho no banco para refletir a pasta correta
-    const caminhoRelativo = path.join('escolas', novoNome).replace(/\\/g, '/');
+    const caminhoRelativo = path.join(novoNome).replace(/\\/g, '/');
     await db.query('UPDATE UnidadeFoto SET caminho = ? WHERE id = ?', [caminhoRelativo, result.insertId]);
 
     res.status(201).json({ id: result.insertId, caminho: caminhoRelativo });
@@ -59,6 +76,7 @@ const uploadFoto = async (req, res) => {
 const controllerGenerico = gerarController(tabela, campos, 'foto da escola');
 module.exports = {
   ...controllerGenerico,
+  getUrls,
   getUrlById,
   uploadFoto
 }
