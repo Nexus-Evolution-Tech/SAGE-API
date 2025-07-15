@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "4f9c286b-0812-448b-89b4-6ecdadb6e774",
+		"name": "Class",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45944265",
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-4f9c286b-0812-448b-89b4-6ecdadb6e774?action=share&source=collection_link&creator=45944265"
+	},
+	"item": [
+		{
+			"name": "/turmas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/turmas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/turmas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome\": \"1°B\",\r\n    \"turno\": \"MATUTINO\",\r\n    \"curso_id\": 1,\r\n    \"unidade_id\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/turmas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/turmas/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/turmas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/turmas/:id",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome\": \"3°B\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/turmas/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/turmas/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/turmas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"turmas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

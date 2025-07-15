@@ -1,0 +1,19 @@
+-- Enums
+CREATE TYPE MetodoAuth AS ENUM ('QRCODE', 'RFID', 'SENHA');
+CREATE TYPE EstadoEvento AS ENUM ('ENTRADA', 'SAIDA');
+CREATE TYPE Turno AS ENUM ('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL');
+CREATE TYPE DiaSemana AS ENUM ('SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA');
+
+id UUID PRIMARY KEY...
+
+O que é UUID?
+UUID (Universally Unique Identifier) é um identificador único global, geralmente representado como uma string de 36 caracteres (exemplo: 550e8400-e29b-41d4-a716-446655440000).
+
+Por que alguns projetos usam UUID em vez de INT como chave primária?
+UUID	                                                                                                            INT AUTO_INCREMENT
+Identificadores são globalmente únicos (não há risco de colisão entre diferentes bancos, servidores ou ambientes)	Identificadores são apenas números sequenciais, válidos apenas dentro daquele banco
+Evita "previsibilidade" de IDs (por exemplo, alguém chutando o próximo ID via URL)	                                IDs sequenciais são previsíveis (ID 1, 2, 3...)
+Bom pra sistemas distribuídos, microserviços, replicação, etc	                                                    Mais rápido, menor, simples de trabalhar no banco
+Mais lento em indexação, ocupa mais espaço (16 bytes)	                                                            Mais rápido, ocupa menos espaço (4 bytes em INT padrão)
+
+apesar disso, o UUID nao e usado para criar referencias nas tabelas, mas sim para identificar transacoes, pois ele e via HTTP

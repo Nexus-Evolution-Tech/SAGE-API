@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "5d633ab0-9cfa-44e8-8a3b-736a8f6dff77",
+		"name": "School",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45944265",
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-5d633ab0-9cfa-44e8-8a3b-736a8f6dff77?action=share&source=collection_link&creator=45944265"
+	},
+	"item": [
+		{
+			"name": "/escolas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/escolas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"escolas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/escolas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome\": \"ETEC Embu\",\r\n    \"numero\": \"293\",\r\n    \"cnpj\": \"25920685000115\",\r\n    \"login\": \"etec\",\r\n    \"senha\": \"etec123\",\r\n    \"endereco\": \"Embu das Artes\",\r\n    \"logo\": null\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/escolas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"escolas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/escolas/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/escolas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"escolas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/escolas/:id",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome_unidade\": \"ETEC Taboão da Serra\",\r\n    \"senha\": \"nossaetec\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/escolas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"escolas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/escolas/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/escolas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"escolas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "15b34595-55e5-4ab8-ae8a-ae9966eec434",
+		"name": "Lesson",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45944265",
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-15b34595-55e5-4ab8-ae8a-ae9966eec434?action=share&source=collection_link&creator=45944265"
+	},
+	"item": [
+		{
+			"name": "/aulas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/aulas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aulas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/aulas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome\": \"Português - 1º Ano\",\r\n    \"professor_id\": null,\r\n    \"turma_id\": null,\r\n    \"materia_id\": null,\r\n    \"inicio\": \"08:00:00\",\r\n    \"fim\": \"09:30:00\",\r\n    \"dia_semana\": \"SEGUNDA\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aulas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aulas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/aulas/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/aulas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aulas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/aulas/:id",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nome\": \"Matemática - 2º Ano\",\r\n    \"professor_id\": 1,\r\n    \"turma_id\": 1,\r\n    \"materia_id\": 1,\r\n    \"inicio\": \"10:20:00\",\r\n    \"fim\": \"11:10:00\",\r\n    \"dia_semana\": \"TERCA\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aulas/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aulas",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/aulas/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/aulas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"aulas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

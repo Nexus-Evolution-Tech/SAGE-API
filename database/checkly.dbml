@@ -1,0 +1,288 @@
+Enum MetodoAuth {
+  QR_CODE
+  CARTAO_RFID
+  SENHA
+  BIOMETRIA
+}
+
+Enum EstadoEvento {
+  ENTRADA
+  SAIDA
+}
+
+Enum Turno {
+  MATUTINO
+  VESPERTINO
+  NOTURNO
+  INTEGRAL
+}
+
+Enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+}
+
+Enum TipoPessoa {
+  ALUNO
+  PROFESSOR
+  ADMINISTRADOR
+  TERCEIRIZADO
+  PROFADM
+}
+
+Enum Genero {
+  MASCULINO
+  FEMININO
+  OUTRO
+}
+
+Enum DivisaoTurma {
+  DIV_A_B
+  DIV_A
+  DIV_B
+}
+
+Enum DivisaoTurmaAluno {
+  DIV_A
+  DIV_B
+}
+
+ENUM CargoAdministrativo {
+  DIRETOR
+  VICE_DIRETOR
+  COORDENADOR_PEDAGOGICO
+  SECRETARIO_ESCOLAR
+  TESOUREIRO
+  SUPERVISOR_ADMINISTRATIVO
+  AUXILIAR_ADMINISTRATIVO
+  TECNICO_ADMINISTRATIVO
+  ORIENTADOR_EDUCACIONAL
+  COORDENADOR_DE_CURSO
+  RESPONSAVEL_FINANCEIRO
+  ALMOXARIFE
+  BIBLIOTECARIO
+  OUTRO
+}
+
+ENUM FuncaoTerceirizado {
+  VIGILANTE
+  FAXINEIRO
+  SEGURANCA
+  SERVICOS_GERAIS
+  TECNICO_MANUTENCAO
+  JARDINEIRO
+  CANTINEIRO
+  OUTRO
+}
+
+Enum StatusAluno {
+  ATIVO
+  SUSPENSO
+  TRANSFERIDO
+  DESLIGADO
+}
+
+Enum TipoFoto {
+  FACHADA
+  PLANTA
+  EVENTOS
+  INTERNA
+  EXTERNA
+  LOGO
+  OUTRO
+}
+
+Enum StatusSolicitacao {
+  PENDENTE
+  APROVADA
+  NEGADA
+}
+
+Table UnidadeEscolar {
+  id int [pk, increment, unique, note: "Identificador único da unidade escolar"]
+  nome varchar(255) [not null]
+  numero_unidade char(3) [not null]
+  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
+  login varchar(100) [not null, note: "Login da unidade para autenticação com a catraca"]
+  senha varchar(255) [not null, note: "Senha da unidade para autenticação com a catraca"]
+  logradouro varchar(255) [not null]
+  numero varchar(255) [not null, note: "Número do endereço da unidade escolar"]
+  complemento varchar(255)
+  cidade varchar(255) [not null]
+  estado char(2) [not null, note: "Sigla do estado, ex: SP, RJ"]
+  cep char(8) [not null, note: "Aplicar REGEX para definir o limite como 8 digitos, nada mais, nada menos"]
+  telefone_contato varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  logo varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table UnidadeFoto {
+  id int [pk, increment]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  tipo TipoFoto [not null, note: "Ex: Fachada, Planta"]
+  caminho varchar(255) [not null, note: "Caminho da imagem local ou nuvem"]
+  descricao varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Area {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Dispositivo {
+  id int [pk, increment]
+  nome varchar(50) [not null]
+  modelo varchar(50) [not null, note: "Ex: IDBlock, IDAccess"]
+  endereco varchar(50) [not null]
+  porta int [not null]
+  usuario varchar(255) [not null]
+  senha varchar(255) [not null]
+  area_id int [ref: > Area.id]
+  numero_serial varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Curso {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  duracao int [not null, note: "Duração em horas do curso"]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Turma {
+  id int [pk, increment]
+  nome varchar(50) [not null]
+  turno Turno [not null]
+  curso_id int [ref: > Curso.id]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Pessoa {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  foto varchar(255) [not null]
+  rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
+  cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
+  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
+  unidade_id int [ref: > UnidadeEscolar.id]
+  qr_code varchar(255) [not null]
+  cartao_rfid varchar(255) [not null]
+  senha_acesso varchar(255) [not null]
+  data_nascimento date [not null, note: "Data de nascimento deve ser menor ou igual a data atual"]
+  genero Genero [not null, note: "Gênero da pessoa, ex: Masculino, Feminino, Outro"]
+  tipo TipoPessoa [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Professor {
+  id int [pk, ref: > Pessoa.id]
+  siape varchar(20) [not null]
+}
+
+Table Administrador {
+  id int [pk, ref: > Pessoa.id]
+  cargo CargoAdministrativo [not null, note: "Cargo do administrador, ex: Diretor, Coordenador, Secretário"]
+  entrada time [not null, note: "Horário de entrada do administrador"]
+  saida time [not null, note: "Horário de saída do administrador"]
+}
+
+Table Empresa {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
+  logradouro varchar(255) [not null]
+  numero varchar(255) [not null, note: "Número do endereço da unidade escolar"]
+  complemento varchar(255)
+  cidade varchar(255) [not null]
+  estado char(2) [not null, note: "Sigla do estado, ex: SP, RJ"]
+  cep char(8) [not null, note: "Aplicar REGEX para definir o limite como 8 digitos, nada mais, nada menos"]
+  telefone_contato varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+}
+
+Table Terceirizado {
+  id int [pk, ref: > Pessoa.id]
+  empresa_id int [not null]
+  funcao FuncaoTerceirizado [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
+  entrada time [not null, note: "Horário de entrada do terceirizado"]
+  saida time [not null, note: "Horário de saída do terceirizado"]
+}
+
+Table Responsavel {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
+  cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
+  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Aluno {
+  id int [pk, ref: > Pessoa.id]
+  rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
+  responsavel_id int [ref: > Responsavel.id]
+  turma_id int [ref: > Turma.id]
+  divisao DivisaoTurmaAluno [not null, note: "Divisão da turma do aluno, ex: DIV A, DIV B"]
+  status StatusAluno [not null, note: "Status do aluno, ex: Ativo, Suspenso, Transferido, Desligado"]
+}
+
+Table Materia {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  sigla varchar(10) [not null, note: "Sigla da matéria, ex: Mat, Port, Ing"]
+  professor_id int [ref: > Professor.id]
+  curso_id int [ref: > Curso.id]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Aula {
+  id int [pk, increment]
+  nome varchar(50) [not null]
+  professor_id int [ref: > Professor.id]
+  turma_id int [ref: > Turma.id]
+  materia_id int [ref: > Materia.id]
+  inicio time [not null]
+  fim time [not null]
+  dia_semana DiaSemana [not null]
+  divisao DivisaoTurma [not null, note: "Divisão da turma para aulas, ex: DIV A/B, DIV A, DIV B"]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Acesso {
+  id int [pk, increment]
+  pessoa_id int [ref: > Pessoa.id]
+  dispositivo_id int [ref: > Dispositivo.id]
+  status EstadoEvento [not null]
+  permitido boolean [not null]
+  data_hora timestamp
+  metodo_auth MetodoAuth [not null]
+  updated_at timestamp
+}
+
+Table SolicitacaoAcesso {
+  id int [pk, increment]
+  aluno_id int [not null, ref: > Aluno.id]
+  data_hora_solicitacao timestamp
+  motivo varchar(255) [note: "Motivo da solicitação de acesso"]
+  status StatusSolicitacao [not null, note: "Status da solicitação de acesso, ex: Pendente, Aprovada, Negada"]
+  data_hora_resposta timestamp
+  observacao_resposta varchar(255) [note: "Observação da resposta da solicitação de acesso"]
+}

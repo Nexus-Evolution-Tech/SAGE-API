@@ -1,0 +1,2103 @@
+openapi: 3.0.0
+info:
+  title: Checkly API
+  version: 1.0.0
+  description: API para gerenciamento de turmas, cursos, dispositivos, pessoas e escolas
+
+servers:
+  - url: http://localhost:3000
+
+tags:
+  - name: Cursos
+    description: Operações relacionadas aos cursos
+  - name: Escolas
+    description: Operações relacionadas às escolas
+  - name: FotoEscolas
+    description: Operações relacionadas às fotos das escolas
+  - name: Turmas
+    description: Operações relacionadas às turmas
+  - name: Areas
+    description: Operações relacionadas às áreas
+  - name: Dispositivos
+    description: Operações relacionadas aos dispositivos
+  - name: Empresas
+    description: Operações relacionadas às empresas
+  - name: Responsaveis
+    description: Operações relacionadas aos responsáveis
+  - name: Pessoas
+    description: Operações relacionadas às pessoas
+  - name: Materias
+    description: Operações relacionadas às matérias
+  - name: Aulas
+    description: Operações relacionadas às aulas
+  - name: Acessos
+    description: Operações relacionadas aos acessos
+  - name: SolicitacoesAcessos
+    description: Operações relacionadas as solicitações de acessos de saída dos alunos menores de idade
+
+paths:
+  /cursos:
+    get:
+      tags: [Cursos]
+      summary: Lista todos os cursos
+      responses:
+        '200':
+          description: Lista de cursos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Curso'
+    post:
+      tags: [Cursos]
+      summary: Cria um novo curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Curso'
+            example:
+              nome: "Curso de Informática"
+              duracao: 400
+      responses:
+        '201':
+          description: Curso criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+
+  /cursos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Cursos]
+      summary: Retorna um curso pelo ID
+      responses:
+        '200':
+          description: Curso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '404':
+          description: Curso não encontrado
+    patch:
+      tags: [Cursos]
+      summary: Atualizar um curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Curso'
+            example:
+              nome: "Desenvolvimento de Sistemas"
+              duracao: 500
+      responses:
+        '200':
+          description: Curso atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '404':
+          description: Curso não encontrado
+    delete:
+      tags: [Cursos]
+      summary: Remove um curso
+      responses:
+        '204':
+          description: Curso deletado
+        '404':
+          description: Curso não encontrado
+
+  /escolas:
+    get:
+      tags: [Escolas]
+      summary: Lista todas as escolas
+      responses:
+        '200':
+          description: Lista de escolas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Escola'
+    post:
+      tags: [Escolas]
+      summary: Cria uma nova escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Escola'
+            example:
+              nome: "ETEC Taboão da Serra"
+              numero_unidade: "293"
+              cnpj: "62823257029344"
+              login: "etec"
+              senha: "etec123"
+              logradouro: "Praça Miguel Ortega"
+              numero: "135"
+              complemento: "Prédio Principal"
+              bairro: "Parque Assunção"
+              cidade: "Taboão da Serra"
+              estado: "SP"
+              cep: "06754160"
+              telefone_contato: "1147011856"
+              logo: "logo_etec.png"
+      responses:
+        '201':
+          description: Escola criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+
+  /escolas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Escolas]
+      summary: Retorna uma escola pelo ID
+      responses:
+        '200':
+          description: Escola encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+        '404':
+          description: Escola não encontrada
+    patch:
+      tags: [Escolas]
+      summary: Atualiza uma escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Escola'
+            example:
+              nome: "Escola Modelo"
+              numero_unidade: "001"
+              cnpj: "44591997000177"
+              login: "login"
+              senha: "senha123"
+              logradouro: "Rua Exemplo"
+              numero: "001"
+              complemento: "Casa"
+              bairro: "Centro"
+              cidade: "São Paulo"
+              estado: "SP"
+              cep: "01234567"
+              telefone_contato: "1123456789"
+              logo: "logo.png"
+      responses:
+        '200':
+          description: Escola atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Escola'
+        '404':
+          description: Escola não encontrada
+    delete:
+      tags: [Escolas]
+      summary: Remove uma escola
+      responses:
+        '204':
+          description: Escola deletada
+        '404':
+          description: Escola não encontrada
+
+  /foto_escolas:
+    get:
+      tags: [FotoEscolas]
+      summary: Lista todas as foto_escolas
+      responses:
+        '200':
+          description: Lista de foto_escolas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FotoEscola'
+    post:
+      summary: Upload de foto de escola
+      description: Envia uma imagem e os dados da foto para o servidor
+      tags: [FotoEscolas]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: Arquivo da imagem
+                unidade_id:
+                  type: integer
+                  description: ID da unidade escolar
+                tipo:
+                  type: string
+                  description: Tipo da foto (ex: FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTROS)
+                descricao:
+                  type: string
+                  description: Descrição da imagem
+              required:
+                - foto
+                - unidade_id
+                - tipo
+      responses:
+        '201':
+          description: Upload realizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  caminho:
+                    type: string
+        '400':
+          description: Erro na requisição (arquivo ausente ou inválido)
+        '500':
+          description: Erro interno ao salvar
+
+  /foto_escolas/url:
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna todas as URLs das fotos de escolas
+      responses:
+        '200':
+          description: Lista de URLs das fotos encontradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+
+  /foto_escolas/url/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna a URL da foto de uma escola pelo ID
+      responses:
+        '200':
+          description: URL da foto encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          description: Foto não encontrada
+
+  /foto_escolas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [FotoEscolas]
+      summary: Retorna uma escola pelo ID
+      responses:
+        '200':
+          description: Escola encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotoEscola'
+        '404':
+          description: Escola não encontrada
+    patch:
+      tags: [FotoEscolas]
+      summary: Atualiza uma escola
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FotoEscola'
+            example:
+              unidade_id: 1
+              tipo: "PLANTA"
+              caminho: "/imagens/planta.png"
+              descricao: "Foto da planta da escola"
+      responses:
+        '200':
+          description: Escola atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotoEscola'
+        '404':
+          description: Escola não encontrada
+    delete:
+      tags: [FotoEscolas]
+      summary: Remove uma escola
+      responses:
+        '204':
+          description: Escola deletada
+        '404':
+          description: Escola não encontrada
+
+  /turmas:
+    get:
+      tags: [Turmas]
+      summary: Lista todas as turmas
+      responses:
+        '200':
+          description: Lista de turmas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Turma'
+    post:
+      tags: [Turmas]
+      summary: Cria uma nova turma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Turma'
+            example:
+              nome: "Turma A"
+              turno: "MATUTINO"
+              curso_id: null
+              unidade_id: null
+      responses:
+        '201':
+          description: Turma criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+
+  /turmas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Turmas]
+      summary: Retorna uma turma pelo ID
+      responses:
+        '200':
+          description: Turma encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+        '404':
+          description: Turma não encontrada
+    patch:
+      tags: [Turmas]
+      summary: Atualiza uma turma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Turma'
+            example:
+              nome: "Turma B"
+              turno: "VESPERTINO"
+              curso_id: 1
+              unidade_id: 1
+      responses:
+        '200':
+          description: Turma atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turma'
+        '404':
+          description: Turma não encontrada
+    delete:
+      tags: [Turmas]
+      summary: Remove uma turma
+      responses:
+        '204':
+          description: Turma deletada
+        '404':
+          description: Turma não encontrada
+
+  /areas:
+    get:
+      tags: [Areas]
+      summary: Lista todas as areas
+      responses:
+        '200':
+          description: Lista de areas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Area'
+    post:
+      tags: [Areas]
+      summary: Cria uma nova Area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Area'
+            example:
+              nome: "Portaria"
+              unidade_id: null
+      responses:
+        '201':
+          description: Area criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+
+  /areas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Areas]
+      summary: Retorna uma Area pelo ID
+      responses:
+        '200':
+          description: Area encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+        '404':
+          description: Area não encontrada
+    patch:
+      tags: [Areas]
+      summary: Atualiza uma Area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Area'
+            example:
+              nome: "Pátio"
+              unidade_id: 1 
+      responses:
+        '200':
+          description: Area atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Area'
+        '404':
+          description: Area não encontrada
+    delete:
+      tags: [Areas]
+      summary: Remove uma turma
+      responses:
+        '204':
+          description: Turma deletada
+        '404':
+          description: Turma não encontrada
+
+  /dispositivos:
+    get:
+      tags: [Dispositivos]
+      summary: Lista todos os dispositivos
+      responses:
+        '200':
+          description: Lista de dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dispositivo'
+    post:
+      tags: [Dispositivos]
+      summary: Cria um novo dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Dispositivo'
+            example:
+              nome: "Catraca 1"
+              modelo: "CT-500"
+              endereco: "192.168.0.10"
+              porta: 8080
+              usuario: "admin"
+              senha: "1234"
+              area_id: null
+              numero_serial: "1234567"
+      responses:
+        '201':
+          description: Dispositivo criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+
+  /dispositivos/status:
+    get:
+      tags: [Dispositivos]
+      summary: Lista o status de todos os dispositivos
+      responses:
+        '200':
+          description: Lista de status dos dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    status:
+                      type: string
+                      enum: [ONLINE, OFFLINE]
+  
+  /dispositivos/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Dispositivos]
+      summary: Lista o status de todos os dispositivos
+      responses:
+        '200':
+          description: Lista de status dos dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    status:
+                      type: string
+                      enum: [ONLINE, OFFLINE]
+
+  /dispositivos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Dispositivos]
+      summary: Retorna um dispositivo pelo ID
+      responses:
+        '200':
+          description: Dispositivo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+        '404':
+          description: Dispositivo não encontrado
+    patch:
+      tags: [Dispositivos]
+      summary: Atualiza um dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Dispositivo'
+            example:
+              nome: "Catraca 2SS"
+              modelo: "ControlID"
+              endereco: "192.168.0.11"
+              porta: 8000
+              usuario: "cid"
+              senha: "cid1234"
+              area_id: 1
+              numero_serial: "5674839"
+      responses:
+        '200':
+          description: Dispositivo atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+        '404':
+          description: Dispositivo não encontrado
+    delete:
+      tags: [Dispositivos]
+      summary: Remove um dispositivo
+      responses:
+        '204':
+          description: Dispositivo deletado
+        '404':
+          description: Dispositivo não encontrado
+
+  /empresas:
+    get:
+      tags: [Empresas]
+      summary: Lista todas as empresas
+      responses:
+        '200':
+          description: Lista de empresas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Empresa'
+    post:
+      tags: [Empresas]
+      summary: Cria um nova empresa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empresa'
+            example:
+              nome: "Empresa XYZ"
+              cnpj: "65297682000191"
+              logradouro: "Praça Miguel Ortega"
+              numero: "135"
+              complemento: "Prédio Principal"
+              bairro: "Parque Assunção"
+              cidade: "Taboão da Serra"
+              estado: "SP"
+              cep: "06754160"
+              telefone_contato: "1147011856"
+      responses:
+        '201':
+          description: Empresa criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empresa'
+
+  /empresas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Empresas]
+      summary: Retorna um Empresa pelo ID
+      responses:
+        '200':
+          description: Empresa encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empresa'
+        '404':
+          description: Empresa não encontrado
+    patch:
+      tags: [Empresas]
+      summary: Atualiza um Empresa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empresa'
+            example:
+              nome: "Limpezas X"
+              cnpj: "80453991000105"
+              logradouro: "Rua Exemplo"
+              numero: "001"
+              complemento: "Casa"
+              bairro: "Centro"
+              cidade: "São Paulo"
+              estado: "SP"
+              cep: "01234567"
+              telefone_contato: "1123456789"
+      responses:
+        '200':
+          description: Empresa atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empresa'
+        '404':
+          description: Empresa não encontrado
+    delete:
+      tags: [Empresas]
+      summary: Remove um Empresa
+      responses:
+        '204':
+          description: Empresa deletado
+        '404':
+          description: Empresa não encontrado
+
+  /responsaveis:
+    get:
+      tags: [Responsaveis]
+      summary: Lista todas as responsaveis
+      responses:
+        '200':
+          description: Lista de responsaveis
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Responsavel'
+    post:
+      tags: [Responsaveis]
+      summary: Cria um novo responsavel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Responsavel'
+            example:
+              nome: "Carlos Souza"
+              rg: "123456789"
+              cpf: "12345678900"
+              email: "carlos.souza@exemplo.com"
+              telefone: "11988887777"
+      responses:
+        '201':
+          description: Responsavel criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Responsavel'
+
+  /responsaveis/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Responsaveis]
+      summary: Retorna um Responsavel pelo ID
+      responses:
+        '200':
+          description: Responsavel encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Responsavel'
+        '404':
+          description: Responsavel não encontrado
+    patch:
+      tags: [Responsaveis]
+      summary: Atualiza um Responsavel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Responsavel'
+            example:
+              nome: "João Silva"
+              rg: "123456789"
+              cpf: "43504147032"
+              email: "joao.silva@gmail.com"
+              telefone: "11904352678"
+      responses:
+        '200':
+          description: Responsavel atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Responsavel'
+        '404':
+          description: Responsavel não encontrado
+    delete:
+      tags: [Responsaveis]
+      summary: Remove um Responsavel
+      responses:
+        '204':
+          description: Responsavel deletado
+        '404':
+          description: Responsavel não encontrado
+
+  /pessoas:
+    get:
+      tags: [Pessoas]
+      summary: Lista todas as pessoas
+      responses:
+        '200':
+          description: Lista de pessoas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pessoa'
+    post:
+      tags: [Pessoas]
+      summary: Cria uma nova pessoa (Aluno, Professor, Administrador, ProfAdm ou Terceirizado)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pessoa'
+            examples:
+              Aluno:
+                summary: Exemplo de Aluno
+                value:
+                  nome: "João da Silva"
+                  foto: "foto_joao.png"
+                  rg: "123456789"
+                  cpf: "12345678901"
+                  telefone: "11999999999"
+                  email: "joao.silva@escola.com"
+                  unidade_id: null
+                  qr_code: "123408987569asfasdf87290843"
+                  cartao_rfid: "24350987asdfadsf23592345987"
+                  senha_acesso: "joao123"
+                  data_nascimento: "2005-05-15"
+                  genero: "MASCULINO"
+                  tipo: "ALUNO"
+                  rm: "20252930001"
+                  responsavel_id: null
+                  turma_id: null
+                  divisao: null
+              Professor:
+                summary: Exemplo de Professor
+                value:
+                  nome: "Maria Souza"
+                  foto: "foto_maria.png"
+                  rg: "123446758"
+                  cpf: "12346537819"
+                  telefone: "11988888888"
+                  email: "maria.souza@escola.com"
+                  unidade_id: null
+                  qr_code: "11243567289asdfuj881209438"
+                  cartao_rfid: "11243567289asdfhud08912347"
+                  senha_acesso: "maria123"
+                  data_nascimento: "2000-01-01"
+                  genero: "FEMININO"
+                  tipo: "PROFESSOR"
+                  siape: "123456"
+              Administrador:
+                summary: Exemplo de Administrador
+                value:
+                  nome: "Carlos Pereira"
+                  foto: "foto_carlos.png"
+                  rg: "123647589"
+                  cpf: "12386795043"
+                  telefone: "11977777777"
+                  email: "carlos.pereira@escola.com"
+                  unidade_id: null
+                  qr_code: "11243567289asfdiuh1234079281"
+                  cartao_rfid: "11243567289asdf129487329"
+                  senha_acesso: "carlos123"
+                  data_nascimento: "1995-03-20"
+                  genero: "MASCULINO"
+                  tipo: "ADMINISTRADOR"
+                  cargo: "COORDENADOR_PEDAGOGICO"
+                  entrada: "08:00:00"
+                  saida: "17:00:00"
+              ProfAdm:
+                summary: Exemplo de ProfAdm
+                value:
+                  nome: "Ana Lima"
+                  foto: "foto_ana.png"
+                  rg: "284570934"
+                  cpf: "12345678901"
+                  telefone: "11966666666"
+                  email: "ana.lima@escola.com"
+                  unidade_id: null
+                  qr_code: "11243512341234asdf8127349867289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "ana123"
+                  data_nascimento: "1988-07-30"
+                  genero: "FEMININO"
+                  tipo: "PROFADM"
+                  siape: "789123"
+                  cargo: "DIRETOR"
+              Terceirizado:
+                summary: Exemplo de Terceirizado
+                value:
+                  nome: "Roberto Alves"
+                  foto: "foto_roberto.png"
+                  rg: "123456789"
+                  cpf: "12345687609"
+                  telefone: "11955555555"
+                  email: "roberto.alves@empresa.com"
+                  unidade_id: null
+                  qr_code: "11241234asdf12343567289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "roberto123"
+                  data_nascimento: "1990-12-25"
+                  genero: "MASCULINO"
+                  tipo: "TERCEIRIZADO"
+                  empresa_id: null
+                  funcao: "FAXINEIRO"
+                  entrada: "08:00:00"
+                  saida: "17:00:00"
+      responses:
+        '201':
+          description: Pessoa criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+
+  /pessoas/status:
+    get:
+      tags: [Pessoas]
+      summary: Retorna o status de presença de todas as pessoas
+      responses:
+        '200':
+          description: Status da presença da pessoa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  status:
+                    type: string
+                    enum: [PRESENTE, AUSENTE]
+
+  /pessoas/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Pessoas]
+      summary: Verifica se uma pessoa está presente
+      responses:
+        '200':
+          description: Status da presença da pessoa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  status:
+                    type: string
+                    enum: [PRESENTE, AUSENTE]
+
+  /pessoas/tipo/{tipo}:
+    parameters:
+      - name: tipo
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
+    get:
+      tags: [Pessoas]
+      summary: Lista pessoas por tipo (ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM ou TERCEIRIZADO)
+      responses:
+        '200':
+          description: Lista de pessoas do tipo especificado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pessoa'
+  
+  /pessoas/url:
+    get:
+      tags: [Pessoas]
+      summary: Retorna todas as URLs das fotos de pessoas
+      responses:
+        '200':
+          description: Lista de URLs das fotos encontradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+  
+  /pessoas/url/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Pessoas]
+      summary: Retorna a URL da foto de uma pessoa pelo ID
+      responses:
+        '200':
+          description: URL da foto encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          description: Foto não encontrada
+
+  /pessoas/upload/{id}:
+    post:
+      tags: [Pessoas]
+      summary: Upload de foto de pessoa
+      description: Envia uma imagem para associar a uma pessoa específica
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da pessoa
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: Arquivo da imagem
+              required:
+                - foto
+      responses:
+        '200':
+          description: Upload realizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pessoa_id:
+                    type: integer
+                  foto:
+                    type: string
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Pessoa não encontrada
+        '500':
+          description: Erro interno do servidor
+
+  /pessoas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Pessoas]
+      summary: Retorna uma pessoa pelo ID
+      responses:
+        '200':
+          description: Pessoa encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+        '404':
+          description: Pessoa não encontrada
+    patch:
+      tags: [Pessoas]
+      summary: Atualizar uma pessoa (Aluno, Professor, Administrador, ProfAdm ou Terceirizado)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pessoa'
+            examples:
+              Aluno:
+                summary: Exemplo de Aluno
+                value:
+                  nome: "Pedro Silva"
+                  foto: "foto_pedro.png"
+                  rg: "113276549"
+                  cpf: "12345687609"
+                  telefone: "11887795699"
+                  email: "pedro.silva@escola.com"
+                  unidade_id: 1
+                  qr_code: "11241234asdf12343567289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "pedro123"
+                  data_nascimento: "2004-02-20"
+                  genero: "MASCULINO"
+                  rm: "20252930001"
+                  responsavel_id: 1
+                  turma_id: 1
+                  divisao: "DIV A"
+                  status: "TRANSFERIDO"
+              Professor:
+                summary: Exemplo de Professor
+                value:
+                  nome: "Marcelo Souza"
+                  foto: "foto_marcelo.png"
+                  rg: "284570934"
+                  cpf: "2409875678"
+                  telefone: "11957234801"
+                  email: "marcelo.souza@escola.com"
+                  unidade_id: 1
+                  qr_code: "11243512341234asdf8127349867289"
+                  cartao_rfid: "1124312345asdf123467289"
+                  senha_acesso: "marcelo123"
+                  data_nascimento: "1985-08-15"
+                  genero: "MASCULINO"
+                  siape: "1234875"
+              Administrador:
+                summary: Exemplo de Administrador
+                value:
+                  nome: "Luan Pereira"
+                  foto: "foto_luan.png"
+                  rg: "123647589"
+                  cpf: "12386795043"
+                  telefone: "11977777777"
+                  email: "luan.pereira@escola.com"
+                  unidade_id: 1
+                  qr_code: "11243567289asfdiuh1234079281"
+                  cartao_rfid: "11243567289asdf129487329"
+                  senha_acesso: "luan123"
+                  data_nascimento: "1992-04-10"
+                  genero: "MASCULINO"
+                  cargo: "VICE_DIRETOR"
+                  entrada: "09:00:00"
+                  saida: "16:00:00"
+              ProfAdm:
+                summary: Exemplo de ProfAdm
+                value:
+                  nome: "Gusttavo Lima"
+                  rg: "1234467589"
+                  cpf: "12346537819"
+                  telefone: "11243567289"
+                  email: "gusttavo.lima@escola.com"
+                  foto: "foto_gusttavo.png"
+                  unidade_id: 1
+                  qr_code: "11243567289asdfuj881209438"
+                  cartao_rfid: "11243567289asdfhud08912347"
+                  senha_acesso: "gusttavo123"
+                  data_nascimento: "1987-09-05"
+                  genero: "MASCULINO"
+                  siape: "567348"
+                  funcao: "DIRETOR"
+              Terceirizado:
+                summary: Exemplo de Terceirizado
+                value:
+                  nome: "Manoel Gomes"
+                  foto: "foto_manoel.png"
+                  rg: "11243567289"
+                  cpf: "11243567289"
+                  telefone: "11955555555"
+                  email: "manoel.gomes@empresa.com"
+                  unidade_id: 1
+                  qr_code: "123408987569asfasdf87290843"
+                  cartao_rfid: "24350987asdfadsf23592345987"
+                  senha_acesso: "manoel123"
+                  data_nascimento: "1990-12-25"
+                  genero: "MASCULINO"
+                  empresa_id: 1
+                  funcao: "TECNICO_MANUTENCAO"
+                  entrada: "09:00:00"
+                  saida: "16:00:00"
+      responses:
+        '200':
+          description: Pessoa atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pessoa'
+        '404':
+          description: Pessoa não encontrada
+    delete:
+      tags: [Pessoas]
+      summary: Remove uma pessoa
+      responses:
+        '204':
+          description: Pessoa deletada
+        '404':
+          description: Pessoa não encontrada
+  
+  /materias:
+    get:
+      tags: [Materias]
+      summary: Lista todos as materias
+      responses:
+        '200':
+          description: Lista de materias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Materia'
+    post:
+      tags: [Materias]
+      summary: Cria uma nova materia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Materia'
+            example:
+              nome: "Criação de APIs"
+              sigla: "CA"
+              curso_id: null
+              professor_id: null
+      responses:
+        '201':
+          description: Materia criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+
+  /materias/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Materias]
+      summary: Retorna um Materia pelo ID
+      responses:
+        '200':
+          description: Materia encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+        '404':
+          description: Materia não encontrada
+    patch:
+      tags: [Materias]
+      summary: Atualizar um materia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Materia'
+            example:
+              nome: "Ethinical Hacking"
+              sigla: "EH"
+              curso_id: 1
+              professor_id: 1
+      responses:
+        '200':
+          description: Materia atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Materia'
+        '404':
+          description: Materia não encontrada
+    delete:
+      tags: [Materias]
+      summary: Remove uma materia
+      responses:
+        '204':
+          description: Materia deletada
+        '404':
+          description: Materia não encontrada
+  
+  /aulas:
+    get:
+      tags: [Aulas]
+      summary: Lista todos as aulas
+      responses:
+        '200':
+          description: Lista de aulas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Aula'
+    post:
+      tags: [Aulas]
+      summary: Cria uma nova aula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Aula'
+            example:
+              nome: "Português - 1º Ano"
+              professor_id: null
+              turma_id: null
+              materia_id: null
+              inicio: "08:00"
+              fim: "09:30"
+              dia_semana: "SEGUNDA"
+              divisao: "DIV A/B"
+      responses:
+        '201':
+          description: Aula criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+
+  /aulas/horarios/{turma_id}/{divisao}:
+    parameters:
+      - name: turma_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: divisao
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Aulas]
+      summary: Lista todas as aulas de uma turma e divisão específica
+      responses:
+        '200':
+          description: Lista de aulas da turma e divisão
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Aula'
+
+  /aulas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Aulas]
+      summary: Retorna um Aula pelo ID
+      responses:
+        '200':
+          description: Aula encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+        '404':
+          description: Aula não encontrada
+    patch:
+      tags: [Aulas]
+      summary: Atualizar um aula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Aula'
+            example:
+              nome: "Matemática - 2º Ano"
+              professor_id: 1
+              turma_id: 1
+              materia_id: 1
+              inicio: "10:20"
+              fim: "11:10"
+              dia_semana: "TERCA"
+              divisao: "DIV A"
+      responses:
+        '200':
+          description: Aula atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aula'
+        '404':
+          description: Aula não encontrada
+    delete:
+      tags: [Aulas]
+      summary: Remove uma aula
+      responses:
+        '204':
+          description: Aula deletada
+        '404':
+          description: Aula não encontrada
+  
+  /acessos:
+    get:
+      tags: [Acessos]
+      summary: Lista todos os acessos
+      responses:
+        '200':
+          description: Lista de acessos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Acesso'
+    post:
+      tags: [Acessos]
+      summary: Cria um novo acesso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Acesso'
+            example:
+              pessoa_id: 1
+              dispositivo_id: null
+              status: "ENTRADA"
+              permitido: true
+              metodo_auth: "CARTAO_RFID"
+      responses:
+        '201':
+          description: Acesso criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
+
+  /acessos/sincronizar/{dispositivo_id}:
+    post:
+      summary: Sincronizar acessos de um dispositivo específico
+      description: Obtém os logs de acesso da catraca especificada e insere no banco de dados local.
+      tags: [Acessos]
+      parameters:
+        - in: path
+          name: dispositivo_id
+          required: true
+          schema:
+            type: integer
+          description: ID do dispositivo (catraca) a ser sincronizado.
+      responses:
+        '200':
+          description: Sincronização concluída com sucesso
+          content:
+            application/json:
+              example:
+                dispositivo_id: 1
+                nome: Catraca Entrada 1
+                sucesso: true
+                acessosSincronizados: 8
+        '404':
+          description: Dispositivo não encontrado
+        '500':
+          description: Erro interno ao sincronizar o dispositivo
+
+  /acessos/sincronizar-todos:
+    post:
+      summary: Sincronizar acessos de todos os dispositivos
+      description: Percorre todos os dispositivos cadastrados no banco de dados e sincroniza os eventos de acesso.
+      tags: [Acessos]
+      responses:
+        '200':
+          description: Sincronização de todos os dispositivos concluída
+          content:
+            application/json:
+              example:
+                message: "Sincronização concluída"
+                resultados:
+                  - dispositivo_id: 1
+                    nome: Catraca Entrada 1
+                    sucesso: true
+                    acessosSincronizados: 5
+                  - dispositivo_id: 2
+                    nome: Catraca Saída 2
+                    sucesso: false
+                    message: "Erro ao obter sessão"
+        '500':
+          description: Erro interno ao sincronizar todos os dispositivos
+
+  /acessos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Acessos]
+      summary: Retorna um acesso pelo ID
+      responses:
+        '200':
+          description: Acesso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
+        '404':
+          description: Acesso não encontrado
+    patch:
+      tags: [Acessos]
+      summary: Atualizar um acesso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Acesso'
+            example:
+              pessoa_id: 1
+              dispositivo_id: 1
+              status: "SAIDA"
+              permitido: false
+              metodo_auth: "BIOMETRIA"
+      responses:
+        '200':
+          description: Acesso atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acesso'
+        '404':
+          description: Acesso não encontrado
+    delete:
+      tags: [Acessos]
+      summary: Remove um acesso
+      responses:
+        '204':
+          description: Acesso deletado
+        '404':
+          description: Acesso não encontrado
+
+  /solicitacoes-acessos:
+    get:
+      tags: [SolicitacoesAcessos]
+      summary: Lista todos as solicitações de acessos dos alunos menores de idade
+      responses:
+        '200':
+          description: Lista das solicitações de acessos dos alunos menores de idade
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SolicitacaoAcesso'
+  
+  /solicitacoes-acessos/aprovar/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [SolicitacoesAcessos]
+      summary: Aprovar uma solicitação de acesso de um aluno menor de idade
+      description: Atualiza o status da solicitação de acesso para APROVADA
+      responses:
+        '200':
+          description: Solicitação de acesso do aluno menor de idade aprovada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso do aluno menor de idade não encontrada
+  
+  /solicitacoes-acessos/negar/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [SolicitacoesAcessos]
+      summary: Negar uma solicitação de acesso de um aluno menor de idade
+      description: Atualiza o status da solicitação de acesso para NEGADA
+      responses:
+        '200':
+          description: Solicitação de acesso do aluno menor de idade negada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso do aluno menor de idade não encontrada
+
+  /solicitacoes-acessos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [SolicitacoesAcessos]
+      summary: Retorna uma solicitação de acesso de um aluno menor de idade pelo ID
+      responses:
+        '200':
+          description: Solicitação de acesso encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAcesso'
+        '404':
+          description: Solicitação de acesso não encontrada
+    delete:
+      tags: [SolicitacoesAcessos]
+      summary: Remove uma solicitação de acesso de um aluno menor de idade
+      description: Exclui uma solicitação de acesso de um aluno menor de idade pelo ID
+      responses:
+        '204':
+          description: Solicitação de acesso de um aluno menor de idade deletada
+        '404':
+          description: Solicitação de acesso de um aluno menor de idade não encontrada
+
+components:
+  schemas:
+    Curso:
+      type: object
+      properties:
+        nome:
+          type: string
+        duracao:
+          type: integer
+    
+    Escola:
+      type: object
+      properties:
+        nome:
+          type: string
+        numero_unidade:
+          type: string
+        cnpj:
+          type: string
+        login:
+          type: string
+        senha:
+          type: string
+        logradouro:
+          type: string
+        numero:
+          type: string
+        complemento:
+          type: string
+        bairro:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        cep:
+          type: string
+          description: "CEP com exatamente 8 dígitos numéricos"
+          example: "12345678"
+          pattern: "^[0-9]{8}$"
+        telefone_contato:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
+        logo:
+          type: string
+
+    FotoEscola:
+      type: object
+      properties:
+        unidade_id:
+          type: integer
+        tipo:
+          type: string
+          enum: [FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTRO]
+        caminho:
+          type: string
+        descricao:
+          type: string
+
+    Turma:
+      type: object
+      properties:
+        nome:
+          type: string
+        turno:
+          type: string
+          enum: [MATUTINO, VESPERTINO, NOTURNO, INTEGRAL]
+        curso_id:
+          type: string
+          format: integer
+        unidade_id:
+          type: string
+          format: integer
+
+    Area:
+      type: object
+      properties:
+        nome:
+          type: string
+        unidade_id:
+          type: integer
+
+    Dispositivo:
+      type: object
+      properties:
+        nome:
+          type: string
+        modelo:
+          type: string
+        endereco:
+          type: string
+          format: ipv4
+        porta:
+          type: integer
+        usuario:
+          type: string
+        senha:
+          type: string
+    
+    Empresa:
+      type: object
+      properties:
+        nome:
+          type: string
+        cnpj:
+          type: string
+          description: "CNPJ com exatamente 14 dígitos numéricos"
+          example: "12345678901234"
+          pattern: "^[0-9]{14}$"    
+        logradouro:
+          type: string
+        numero:
+          type: string
+        complemento:
+          type: string
+        bairro:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        cep:
+          type: string
+          description: "CEP com exatamente 8 dígitos numéricos"
+          example: "12345678"
+          pattern: "^[0-9]{8}$"
+        telefone_contato:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
+          
+    Responsavel:
+      type: object
+      properties:
+        nome:
+          type: string
+        rg:
+          type: string
+          description: "RG com exatamente 7 ou 9 dígitos numéricos"
+          example: "1234567 ou 123456789"
+          pattern: "^[0-9]{7}$|^[0-9]{9}$"
+        cpf:
+          type: string
+          description: "CPF com exatamente 11 dígitos numéricos"
+          example: "12345678901"
+          pattern: "^[0-9]{11}$"
+        telefone:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
+        email:
+          type: string
+          format: email
+
+    # Modelo base genérico com todos os campos possíveis
+    Pessoa:
+      type: object
+      properties:
+        nome:
+          type: string
+        foto:
+          type: string
+        rg:
+          type: string
+          description: "RG com exatamente 7 ou 9 dígitos numéricos"
+          example: "1234567 ou 123456789"
+          pattern: "^[0-9]{7}$|^[0-9]{9}$"
+        cpf:
+          type: string
+          description: "CPF com exatamente 11 dígitos numéricos"
+          example: "12345678901"
+          pattern: "^[0-9]{11}$"
+        telefone:
+          type: string
+          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
+          example: "1234567890 ou 12345678901"
+          pattern: "^[0-9]{10,11}$"
+        email:
+          type: string
+          format: email
+        unidade_id:
+          type: integer
+        qr_code:
+          type: string
+        cartao_rfid:
+          type: string
+        senha_acesso:
+          type: string
+        tipo:
+          type: string
+          enum: [ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
+
+    # Exemplos de especializações via herança `allOf`
+    Aluno:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - turma_id
+            - rm
+            - status
+          properties:
+            tipo:
+              type: string
+              enum: [ALUNO]
+            turma_id:
+              type: integer
+            rm:
+              type: string
+            responsavel_id:
+              type: integer
+            status:
+              type: string
+              enum: [ATIVO, INATIVO, TRANSFERIDO, DESLIGADO]
+
+    Professor:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - siape
+          properties:
+            tipo:
+              type: string
+              enum: [PROFESSOR]
+            siape:
+              type: string
+
+    Administrador:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - cargo
+          properties:
+            tipo:
+              type: string
+              enum: [ADMINISTRADOR]
+            cargo:
+              type: string
+              enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
+            entrada:
+              type: string
+            saida:
+              type: string
+    ProfAdm:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - siape
+            - cargo
+          properties:
+            tipo:
+              type: string
+              enum: [PROFADM]
+            siape:
+              type: string
+            cargo:
+              type: string
+              enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
+
+    Terceirizado:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - empresa_id
+            - funcao
+          properties:
+            tipo:
+              type: string
+              enum: [TERCEIRIZADO]
+            empresa_id:
+              type: integer
+            funcao:
+              type: string
+              enum: [VIGILANTE, FAXINEIRO, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, OUTRO]
+            entrada:
+              type: string
+            saida:
+              type: string
+      type: object
+      properties:
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        telefone:
+          type: string
+        foto:
+          type: string
+        unidade_id:
+          type: integer
+        tipo:
+          type: string
+        empresa_id:
+          type: integer
+        funcao:
+          type: string
+
+    Materia:
+      type: object
+      properties:
+        nome:
+          type: string
+        professor_id:
+          type: integer
+        curso_id:
+          type: integer
+    
+    Aula:
+      type: object
+      properties:
+        nome:
+          type: string
+        professor_id:
+          type: integer
+        turma_id:
+          type: integer
+        materia_id:
+          type: integer
+        inicio:
+          type: string
+        fim:
+          type: string
+        dia_semana:
+          type: string
+          enum: [DOMINGO, SEGUNDA, TERCA, QUARTA, QUINTA, SEXTA, SABADO]
+        divisao:
+          type: string
+          enum: [DIV_A/B, DIV_A, DIV_B]
+
+    Acesso:
+      type: object
+      properties:
+        nome:
+          type: string
+        pessoa_id:
+          type: integer
+        dispositivo_id:
+          type: integer
+        status:
+          type: string
+          enum: [ENTRADA, SAIDA]
+        permitido:
+          type: boolean
+        data_hora:
+          type: string
+        metodo_auth:
+          type: string
+          enum: [QR_CODE, CARTAO_RFID, SENHA, BIOMETRIA]
+
+    SolicitacaoAcesso:
+      type: object
+      properties:
+        aluno_id:
+          type: integer
+        data_hora_solicitacao:
+          type: string
+        motivo:
+          type: string
+        status:
+          type: string
+          enum: [PENDENTE, APROVADA, NEGADA]
+        data_hora_resposta:
+          type: string
+        observacao_resposta:
+          type: string
+

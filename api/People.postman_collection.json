@@ -1,0 +1,289 @@
+{
+	"info": {
+		"_postman_id": "adc11bfa-9b70-45ec-8f2d-604f1af3e9b8",
+		"name": "People",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45944265",
+		"_collection_link": "https://catracaetec.postman.co/workspace/Catraca-ETEC's-Workspace~f460a637-b2fa-4772-84e5-de1bd655d0d2/collection/45944265-adc11bfa-9b70-45ec-8f2d-604f1af3e9b8?action=share&source=collection_link&creator=45944265"
+	},
+	"item": [
+		{
+			"name": "/pessoas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas - ALUNO",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"João da Silva\",\r\n  \"foto\": \"foto_joao.png\",\r\n  \"rg\": \"123456789\",\r\n  \"cpf\": \"12345678901\",\r\n  \"telefone\": \"11999999999\",\r\n  \"email\": \"joao.silva@escola.com\",\r\n  \"unidade_id\": null,\r\n  \"qr_code\": \"123408987569asfasdf87290843\",\r\n  \"cartao_rfid\": \"24350987asdfadsf23592345987\",\r\n  \"senha_acesso\": \"joao123\",\r\n  \"data_nascimento\": \"2005-05-15\",\r\n  \"genero\": \"MASCULINO\",\r\n  \"tipo\": \"ALUNO\",\r\n  \"rm\": \"20252930001\",\r\n  \"turma_id\": null,\r\n  \"responsavel_id\": null\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas - PROFESSOR",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Maria Souza\",\r\n  \"foto\": \"foto_maria.png\",\r\n  \"rg\": \"123446758\",\r\n  \"cpf\": \"12346537819\",\r\n  \"telefone\": \"11988888888\",\r\n  \"email\": \"maria.souza@escola.com\",\r\n  \"unidade_id\": null,\r\n  \"qr_code\": \"11243567289asdfuj881209438\",\r\n  \"cartao_rfid\": \"11243567289asdfhud08912347\",\r\n  \"senha_acesso\": \"maria123\",\r\n  \"data_nascimento\": \"2000-01-01\",\r\n  \"genero\": \"FEMININO\",\r\n  \"tipo\": \"PROFESSOR\",\r\n  \"siape\": \"123456\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas - ADMINISTRADOR",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Carlos Pereira\",\r\n  \"foto\": \"foto_carlos.png\",\r\n  \"rg\": \"123647589\",\r\n  \"cpf\": \"12386795043\",\r\n  \"telefone\": \"11977777777\",\r\n  \"email\": \"carlos.pereira@escola.com\",\r\n  \"unidade_id\": null,\r\n  \"qr_code\": \"11243567289asfdiuh1234079281\",\r\n  \"cartao_rfid\": \"11243567289asdf129487329\",\r\n  \"senha_acesso\": \"carlos123\",\r\n  \"data_nascimento\": \"1995-03-20\",\r\n  \"genero\": \"MASCULINO\",\r\n  \"tipo\": \"ADMINISTRADOR\",\r\n  \"funcao\": \"Coordenador\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas - PROFADM",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Ana Lima\",\r\n  \"foto\": \"foto_ana.png\",\r\n  \"rg\": \"284570934\",\r\n  \"cpf\": \"12345678901\",\r\n  \"telefone\": \"11966666666\",\r\n  \"email\": \"ana.lima@escola.com\",\r\n  \"unidade_id\": null,\r\n  \"qr_code\": \"11243512341234asdf8127349867289\",\r\n  \"cartao_rfid\": \"1124312345asdf123467289\",\r\n  \"senha_acesso\": \"ana123\",\r\n  \"data_nascimento\": \"1988-07-30\",\r\n  \"genero\": \"FEMININO\",\r\n  \"tipo\": \"PROFADM\",\r\n  \"siape\": \"789123\",\r\n  \"funcao\": \"Diretor\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas - TERCEIRIZADO",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Roberto Alves\",\r\n  \"foto\": \"foto_roberto.png\",\r\n  \"rg\": \"123456789\",\r\n  \"cpf\": \"12345687609\",\r\n  \"telefone\": \"11955555555\",\r\n  \"email\": \"roberto.alves@empresa.com\",\r\n  \"unidade_id\": null,\r\n  \"qr_code\": \"11241234asdf12343567289\",\r\n  \"cartao_rfid\": \"1124312345asdf123467289\",\r\n  \"senha_acesso\": \"roberto123\",\r\n  \"data_nascimento\": \"1990-12-25\",\r\n  \"genero\": \"MASCULINO\",\r\n  \"tipo\": \"TERCEIRIZADO\",\r\n  \"empresa_id\": null,\r\n  \"funcao\": \"Limpeza\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas/status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/pessoas/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas/:id/status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/pessoas/1/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas",
+						"1",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas/:id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/pessoas/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas/:id",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Igor\",\r\n  \"rm\": 20232930077\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas/2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas",
+						"2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/pessoas/:id",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"nome\": \"Igor Fernando\",\r\n  \"rm\": 20232930077\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/pessoas/4",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"pessoas",
+						"4"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
