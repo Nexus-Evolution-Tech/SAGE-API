@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS Dispositivo (
     nome VARCHAR(50) NOT NULL,
     modelo VARCHAR(50) NOT NULL COMMENT 'Ex: IDBlock, IDAcess',
     endereco VARCHAR(50) NOT NULL,
-    porta INT NOT NULL,
+    porta VARCHAR(50) NOT NULL,
     usuario VARCHAR(255) NOT NULL,
     senha VARCHAR(255) NOT NULL COMMENT 'Precisa ser criptografada na aplicação Node.js',
     area_id INT,

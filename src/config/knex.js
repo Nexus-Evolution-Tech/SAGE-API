@@ -5,7 +5,7 @@ const config = {
   connection: {
     host: 'localhost',
     user: 'root',
-    password: 'root',
+    password: 'etec',
     database: 'checkly',
     timezone: '-03:00'
   }

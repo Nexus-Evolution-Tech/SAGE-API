@@ -18,12 +18,14 @@ function mapearMetodo(metodoOriginal) {
 async function sincronizarAcessos(dispositivo) {
   const link = deviceService.linkCatraca(dispositivo);
   const session = await deviceService.obterSessao(link, dispositivo);
+  console.log(`Sessão obtida: ${session}`);
 
   if (!session) {
     return { sucesso: false, message: `Erro ao obter sessão com a catraca ${dispositivo.nome}` };
   }
 
   const logs = await deviceService.obterLogsCatraca(session, link);
+  console.log(logs);
   let acessosSincronizados = 0;
 
   for (const log of logs) {
@@ -32,6 +34,7 @@ async function sincronizarAcessos(dispositivo) {
     const data_hora = new Date(log.time * 1000);
     const status = log.event; // ENTRADA, SAIDA, NEGADO
     const metodo_auth = mapearMetodo(log.auth_method);
+    console.log(`Método de autenticação: ${metodo_auth}`);
     const permitido = status !== 'NEGADO';
 
     // Verifica se já existe um registro com esses dados

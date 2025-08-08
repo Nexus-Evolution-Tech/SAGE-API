@@ -1,5 +1,6 @@
 const axios = require('axios');
 
+// **NEW**: BUSCAR O NÚMERO TOTAL DE GIROS
 function linkCatraca(dispositivo) {
     return `${dispositivo.endereco}:${dispositivo.porta}`;
 }
