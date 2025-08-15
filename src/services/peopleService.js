@@ -1,11 +1,13 @@
 const {
   criarPessoaBase,
   criarAluno,
+  criarResponsavel,
   criarProfessor,
   criarAdministrador,
   criarTerceirizado,
   criarProfAdm,
   buscarAluno,
+  buscarResponsavel,
   buscarProfessor,
   buscarAdministrador,
   buscarProfAdm,
@@ -39,6 +41,9 @@ async function criarPessoaCompleta(dados) {
   switch (tipo) {
     case 'ALUNO':
       await criarAluno(idPessoa, camposExtras);
+      break;
+    case 'RESPONSAVEL':
+      await criarResponsavel(idPessoa, camposExtras);
       break;
     case 'PROFESSOR':
       await criarProfessor(idPessoa, camposExtras);

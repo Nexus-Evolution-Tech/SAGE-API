@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Checkly API
+  title: SAGE API
   version: 1.0.0
   description: API para gerenciamento de turmas, cursos, dispositivos, pessoas e escolas
 
@@ -22,8 +22,6 @@ tags:
     description: Operações relacionadas aos dispositivos
   - name: Empresas
     description: Operações relacionadas às empresas
-  - name: Responsaveis
-    description: Operações relacionadas aos responsáveis
   - name: Pessoas
     description: Operações relacionadas às pessoas
   - name: Materias
@@ -34,6 +32,10 @@ tags:
     description: Operações relacionadas aos acessos
   - name: SolicitacoesAcessos
     description: Operações relacionadas as solicitações de acessos de saída dos alunos menores de idade
+  - name: Horarios
+    description: Operações relacionadas com os horários dos funcionários
+  - name: Atrasos
+    description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
 
 paths:
   /cursos:
@@ -787,94 +789,6 @@ paths:
         '404':
           description: Empresa não encontrado
 
-  /responsaveis:
-    get:
-      tags: [Responsaveis]
-      summary: Lista todas as responsaveis
-      responses:
-        '200':
-          description: Lista de responsaveis
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Responsavel'
-    post:
-      tags: [Responsaveis]
-      summary: Cria um novo responsavel
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Responsavel'
-            example:
-              nome: "Carlos Souza"
-              rg: "123456789"
-              cpf: "12345678900"
-              email: "carlos.souza@exemplo.com"
-              telefone: "11988887777"
-      responses:
-        '201':
-          description: Responsavel criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Responsavel'
-
-  /responsaveis/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      tags: [Responsaveis]
-      summary: Retorna um Responsavel pelo ID
-      responses:
-        '200':
-          description: Responsavel encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Responsavel'
-        '404':
-          description: Responsavel não encontrado
-    patch:
-      tags: [Responsaveis]
-      summary: Atualiza um Responsavel
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Responsavel'
-            example:
-              nome: "João Silva"
-              rg: "123456789"
-              cpf: "43504147032"
-              email: "joao.silva@gmail.com"
-              telefone: "11904352678"
-      responses:
-        '200':
-          description: Responsavel atualizado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Responsavel'
-        '404':
-          description: Responsavel não encontrado
-    delete:
-      tags: [Responsaveis]
-      summary: Remove um Responsavel
-      responses:
-        '204':
-          description: Responsavel deletado
-        '404':
-          description: Responsavel não encontrado
-
   /pessoas:
     get:
       tags: [Pessoas]
@@ -890,7 +804,7 @@ paths:
                   $ref: '#/components/schemas/Pessoa'
     post:
       tags: [Pessoas]
-      summary: Cria uma nova pessoa (Aluno, Professor, Administrador, ProfAdm ou Terceirizado)
+      summary: Cria uma nova pessoa (Aluno, Responsável, Professor, Administrador, ProfAdm ou Terceirizado)
       requestBody:
         required: true
         content:
@@ -912,12 +826,26 @@ paths:
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "joao123"
                   data_nascimento: "2005-05-15"
-                  genero: "MASCULINO"
                   tipo: "ALUNO"
+                  ra: "0001116473892"
                   rm: "20252930001"
-                  responsavel_id: null
                   turma_id: null
                   divisao: null
+              Responsavel:
+                summary: Exemplo de Responsável
+                value:
+                  nome: "Paulo Silva"
+                  foto: "foto_paulo.png"
+                  rg: "123456789"
+                  cpf: "12345678901"
+                  telefone: "11999999999"
+                  email: "paulo.silva@escola.com"
+                  unidade_id: null
+                  qr_code: null
+                  cartao_rfid: null
+                  senha_acesso: null
+                  data_nascimento: "2005-05-15"
+                  tipo: "RESPONSAVEL"
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -932,9 +860,11 @@ paths:
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "maria123"
                   data_nascimento: "2000-01-01"
-                  genero: "FEMININO"
                   tipo: "PROFESSOR"
-                  siape: "123456"
+                  matricula: "123456"
+                  data_admissao: "2005-05-15"
+                  data_saida: "2007-09-18"
+                  tipo_contrato: "DETERMINADO"
               Administrador:
                 summary: Exemplo de Administrador
                 value:
@@ -949,11 +879,12 @@ paths:
                   cartao_rfid: "11243567289asdf129487329"
                   senha_acesso: "carlos123"
                   data_nascimento: "1995-03-20"
-                  genero: "MASCULINO"
                   tipo: "ADMINISTRADOR"
+                  matricula: "123456"
+                  data_admissao: "2005-05-15"
+                  data_saida: "2007-09-18"
+                  tipo_contrato: "DETERMINADO"
                   cargo: "COORDENADOR_PEDAGOGICO"
-                  entrada: "08:00:00"
-                  saida: "17:00:00"
               ProfAdm:
                 summary: Exemplo de ProfAdm
                 value:
@@ -968,9 +899,11 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "ana123"
                   data_nascimento: "1988-07-30"
-                  genero: "FEMININO"
                   tipo: "PROFADM"
-                  siape: "789123"
+                  matricula: "123456"
+                  data_admissao: "2005-05-15"
+                  data_saida: "2007-09-18"
+                  tipo_contrato: "DETERMINADO"
                   cargo: "DIRETOR"
               Terceirizado:
                 summary: Exemplo de Terceirizado
@@ -986,12 +919,13 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "roberto123"
                   data_nascimento: "1990-12-25"
-                  genero: "MASCULINO"
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
                   funcao: "FAXINEIRO"
-                  entrada: "08:00:00"
-                  saida: "17:00:00"
+                  matricula: "123456"
+                  data_admissao: "2005-05-15"
+                  data_saida: "2007-09-18"
+                  tipo_contrato: "INDETERMINADO"
       responses:
         '201':
           description: Pessoa criada com sucesso
@@ -999,6 +933,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Pessoa'
+
+  /pessoas/tipo/{tipo}:
+    parameters:
+      - name: tipo
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [ALUNO, RESPONSAVEL, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
+    get:
+      tags: [Pessoas]
+      summary: Lista pessoas por tipo (ALUNO, RESPONSAVEL, PROFESSOR, ADMINISTRADOR, PROFADM ou TERCEIRIZADO)
+      responses:
+        '200':
+          description: Lista de pessoas do tipo especificado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pessoa'
 
   /pessoas/status:
     get:
@@ -1045,27 +1000,6 @@ paths:
                   status:
                     type: string
                     enum: [PRESENTE, AUSENTE]
-
-  /pessoas/tipo/{tipo}:
-    parameters:
-      - name: tipo
-        in: path
-        required: true
-        schema:
-          type: string
-          enum: [ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
-    get:
-      tags: [Pessoas]
-      summary: Lista pessoas por tipo (ALUNO, PROFESSOR, ADMINISTRADOR, PROFADM ou TERCEIRIZADO)
-      responses:
-        '200':
-          description: Lista de pessoas do tipo especificado
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pessoa'
   
   /pessoas/url:
     get:
@@ -1198,7 +1132,6 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "pedro123"
                   data_nascimento: "2004-02-20"
-                  genero: "MASCULINO"
                   rm: "20252930001"
                   responsavel_id: 1
                   turma_id: 1
@@ -1218,7 +1151,6 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "marcelo123"
                   data_nascimento: "1985-08-15"
-                  genero: "MASCULINO"
                   siape: "1234875"
               Administrador:
                 summary: Exemplo de Administrador
@@ -1234,7 +1166,6 @@ paths:
                   cartao_rfid: "11243567289asdf129487329"
                   senha_acesso: "luan123"
                   data_nascimento: "1992-04-10"
-                  genero: "MASCULINO"
                   cargo: "VICE_DIRETOR"
                   entrada: "09:00:00"
                   saida: "16:00:00"
@@ -1252,7 +1183,6 @@ paths:
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "gusttavo123"
                   data_nascimento: "1987-09-05"
-                  genero: "MASCULINO"
                   siape: "567348"
                   funcao: "DIRETOR"
               Terceirizado:
@@ -1269,7 +1199,6 @@ paths:
                   cartao_rfid: "24350987asdfadsf23592345987"
                   senha_acesso: "manoel123"
                   data_nascimento: "1990-12-25"
-                  genero: "MASCULINO"
                   empresa_id: 1
                   funcao: "TECNICO_MANUTENCAO"
                   entrada: "09:00:00"
@@ -1721,6 +1650,134 @@ paths:
         '404':
           description: Solicitação de acesso de um aluno menor de idade não encontrada
 
+  /horarios:
+    get:
+      tags: [Horarios]
+      summary: Lista todos os horários
+      responses:
+        '200':
+          description: Lista de horários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Horario'
+    post:
+      tags: [Horarios]
+      summary: Cria um novo horário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Horario'
+            example:
+              pessoa_id: 1
+              dia_semana: "SEGUNDA"
+              entrada: "07:30:00"
+              saida: "15:30:00"
+      responses:
+        '201':
+          description: Horário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Horario'
+
+  /horarios/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Horarios]
+      summary: Retorna um Horário pelo ID
+      responses:
+        '200':
+          description: Horário encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Horario'
+        '404':
+          description: Horário não encontrado
+    patch:
+      tags: [Horarios]
+      summary: Atualizar um Horário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Horário'
+            example:
+              pessoa_id: 1
+              dia_semana: "TERCA"
+              entrada: "08:20:00"
+              saida: "15:30:00"
+      responses:
+        '200':
+          description: Horário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Horario'
+        '404':
+          description: Horário não encontrado
+    delete:
+      tags: [Horarios]
+      summary: Remove um horário
+      responses:
+        '204':
+          description: Horário deletado
+        '404':
+          description: Horário não encontrado
+  
+  /atrasos:
+    get:
+      tags: [Atrasos]
+      summary: Lista todos os horários
+      responses:
+        '200':
+          description: Lista de horários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Atraso'
+
+  /atrasos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Atrasos]
+      summary: Retorna um Atraso pelo ID
+      responses:
+        '200':
+          description: Atraso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atraso'
+        '404':
+          description: Atraso não encontrado
+    delete:
+      tags: [Atrasos]
+      summary: Remove um Atraso
+      responses:
+        '204':
+          description: Atraso deletado
+        '404':
+          description: Atraso não encontrado
+
 components:
   schemas:
     Curso:
@@ -1855,30 +1912,6 @@ components:
           example: "1234567890 ou 12345678901"
           pattern: "^[0-9]{10,11}$"
           
-    Responsavel:
-      type: object
-      properties:
-        nome:
-          type: string
-        rg:
-          type: string
-          description: "RG com exatamente 7 ou 9 dígitos numéricos"
-          example: "1234567 ou 123456789"
-          pattern: "^[0-9]{7}$|^[0-9]{9}$"
-        cpf:
-          type: string
-          description: "CPF com exatamente 11 dígitos numéricos"
-          example: "12345678901"
-          pattern: "^[0-9]{11}$"
-        telefone:
-          type: string
-          description: "Telefone com exatamente 10 ou 11 dígitos numéricos"
-          example: "1234567890 ou 12345678901"
-          pattern: "^[0-9]{10,11}$"
-        email:
-          type: string
-          format: email
-
     # Modelo base genérico com todos os campos possíveis
     Pessoa:
       type: object
@@ -1925,6 +1958,7 @@ components:
           required:
             - tipo
             - turma_id
+            - ra
             - rm
             - status
           properties:
@@ -1939,7 +1973,15 @@ components:
               type: integer
             status:
               type: string
-              enum: [ATIVO, INATIVO, TRANSFERIDO, DESLIGADO]
+              enum: [CANCELADO, CONCLUÍDO, DESISTENTE, EM CURSO, RETIDO, TRANCADO, TRANSFERÊNCIA EXPEDIDA, SUSPENSO]
+    
+    Responsavel:
+      allOf:
+        - $ref: '#/components/schemas/Pessoa'
+        - type: object
+          required:
+            - tipo
+            - aluno_id
 
     Professor:
       allOf:
@@ -1947,7 +1989,6 @@ components:
         - type: object
           required:
             - tipo
-            - siape
           properties:
             tipo:
               type: string
@@ -2100,4 +2141,32 @@ components:
           type: string
         observacao_resposta:
           type: string
-
+    
+    Horario:
+      type: object
+      properties:
+        id:
+          type: integer
+        pessoa_id:
+          type: integer
+        dia_semana:
+          type: string
+          enum: [DOMINGO, SEGUNDA, TERCA, QUARTA, QUINTA, SEXTA, SABADO]
+        entrada:
+          type: string
+        saida:
+          type: string
+    
+    Atraso:
+      type: object
+      properties:
+        id:
+          type: integer
+        pessoa_id:
+          type: integer
+        data:
+          type: string
+        horario_previsto:
+          type: string
+        horario_chegada:
+          type: string

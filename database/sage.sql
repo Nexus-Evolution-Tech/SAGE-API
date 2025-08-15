@@ -1,5 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS checkly;
-USE checkly;
+-- BANCO: PADRÃO, O SCRIPT RODARÁ O sage.sql PRA TER O BANCO
+CREATE SCHEMA IF NOT EXISTS sage;
+USE sage;
 
 SET time_zone = '-03:00';
 
@@ -93,21 +94,68 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     CONSTRAINT chk_telefone CHECK (REGEXP_LIKE(telefone, '^[0-9]{10,11}$')),
     email VARCHAR(100) NOT NULL COMMENT 'Email de contato, em caso de alunos é o institucional',
     unidade_id INT,
-    qr_code VARCHAR(255) NOT NULL COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
-    cartao_rfid VARCHAR(255) NOT NULL COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será um hexadecimal ou numérico com 8 a 16 caracteres',
-    senha_acesso VARCHAR(255) NOT NULL COMMENT 'Precisa de criptografia na aplicação Node.js',
+    qr_code VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
+    cartao_rfid VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será um hexadecimal ou numérico com 8 a 16 caracteres',
+    senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',
     data_nascimento DATE NOT NULL,
-    genero ENUM ('MASCULINO', 'FEMININO', 'OUTRO') NOT NULL,
-    tipo ENUM ('ALUNO', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') NOT NULL,
+    tipo ENUM ('ALUNO', 'RESPONSAVEL', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS Horario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pessoa_id INT NOT NULL,
+    dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    entrada TIME,
+    saida TIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Atraso (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pessoa_id INT NOT NULL,
+    data DATE NOT NULL,
+    horario_previsto TIME,
+    horario_chegada TIME,
+    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Responsavel (
+    id INT PRIMARY KEY,
+    aluno_id INT,
+    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Aluno (
+    id INT PRIMARY KEY,
+    ra CHAR(14) NOT NULL COMMENT '00001115926676 -> 0001115926676<digito>',
+    CONSTRAINT chk_ra CHECK (REGEXP_LIKE(ra, '^[0-9]{10,14}$')),
+    rm CHAR(12) NOT NULL COMMENT '20232930077 -> yyyy<numero_unidade><numero_aluno>',
+    CONSTRAINT chk_rm CHECK (REGEXP_LIKE(rm, '^[0-9]{4}[0-9]{3}[0-9]{4}$')),
+    turma_id INT,
+    divisao ENUM ('DIV A', 'DIV B'),
+    status ENUM ('CANCELADO', 'CONCLUÍDO', 'DESISTENTE', 'EM CURSO', 'RETIDO', 'TRANCADO', 'TRANSFERÊNCIA EXPEDIDA', 'SUSPENSO') NOT NULL,
+    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
+    FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS Funcionario (
+    id INT PRIMARY KEY,
+    matricula VARCHAR(6) NOT NULL,
+    CONSTRAINT chk_matricula CHECK (REGEXP_LIKE(matricula, '^[0-9]{5,6}$')),
+    data_admissao DATE NOT NULL,
+    data_saida DATE NOT NULL,
+    tipo_contrato ENUM ('DETERMINADO', 'INDETERMINADO') NOT NULL,
+    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS Professor (
     id INT PRIMARY KEY,
-    siape VARCHAR(20) NOT NULL,
-    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
+    FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Materia (
@@ -138,9 +186,7 @@ CREATE TABLE IF NOT EXISTS Administrador (
 	  'ALMOXARIFE',
 	  'BIBLIOTECARIO',
 	  'OUTRO') NOT NULL,
-	entrada TIME,
-    saida TIME,
-    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
+    FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Empresa (
@@ -173,37 +219,8 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
 	  'JARDINEIRO',
 	  'CANTINEIRO',
 	  'OUTRO') NOT NULL,
-	entrada TIME NOT NULL,
-    saida TIME NOT NULL,
-    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
+    FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE,
     FOREIGN KEY (empresa_id) REFERENCES Empresa(id) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS Responsavel (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
-    rg VARCHAR(9) NOT NULL,
-    CONSTRAINT chk_rg_responsavel CHECK (REGEXP_LIKE(rg, '^[0-9]{7}$|^[0-9]{9}$')),
-    cpf CHAR(11) NOT NULL,
-    CONSTRAINT chk_cpf_responsavel CHECK (REGEXP_LIKE(cpf, '^[0-9]{11}$')),
-    telefone VARCHAR(11) NOT NULL,
-    CONSTRAINT chk_telefone_responsavel CHECK (REGEXP_LIKE(telefone, '^[0-9]{10,11}$')),
-    email VARCHAR(100) NOT NULL COMMENT 'Email de contato, em caso de alunos é o institucional',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS Aluno (
-    id INT PRIMARY KEY,
-    rm CHAR(12) NOT NULL COMMENT '20232930077 -> yyyy<numero_unidade><numero_aluno>',
-    CONSTRAINT chk_rm CHECK (REGEXP_LIKE(rm, '^[0-9]{4}[0-9]{3}[0-9]{4}$')),
-    responsavel_id INT,
-    turma_id INT,
-    divisao ENUM ('DIV A', 'DIV B'),
-    status ENUM ('ATIVO', 'SUSPENSO', 'TRANSFERIDO', 'DESLIGADO') NOT NULL,
-    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
-    FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL,
-    FOREIGN KEY (responsavel_id) REFERENCES Responsavel(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS Aula (
@@ -214,7 +231,7 @@ CREATE TABLE IF NOT EXISTS Aula (
     materia_id INT,
     inicio TIME NOT NULL,
     fim TIME NOT NULL,
-    dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA') NOT NULL,
+    dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
     divisao ENUM ('DIV A/B', 'DIV A', 'DIV B') NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -257,9 +274,9 @@ BEGIN
     -- Desliga alunos que estão em turmas finais
     UPDATE Aluno a
     JOIN Pessoa p ON a.id = p.id
-    SET a.status = 'DESLIGADO', p.updated_at = NOW() -- o SET ocorre depois do WHERE ser avaliado
+    SET a.status = 'CANCELADO', p.updated_at = NOW() -- o SET ocorre depois do WHERE ser avaliado
     WHERE p.tipo = 'ALUNO'
-      AND a.status = 'ATIVO'
+      AND a.status = 'EM CURSO'
       AND YEAR(p.updated_at) < YEAR(CURDATE())
       AND a.turma_id IN (5, 6, 8, 9);
 
@@ -279,7 +296,7 @@ BEGIN
                     END,
         p.updated_at = NOW()
     WHERE p.tipo = 'ALUNO'
-      AND a.status = 'ATIVO'
+      AND a.status = 'EM CURSO'
       AND YEAR(p.updated_at) < YEAR(CURDATE())
       AND a.turma_id IN (1, 2, 3, 4, 7);
 

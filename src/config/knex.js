@@ -6,7 +6,7 @@ const config = {
     host: 'localhost',
     user: 'root',
     password: 'etec',
-    database: 'checkly',
+    database: 'sage',
     timezone: '-03:00'
   }
 };

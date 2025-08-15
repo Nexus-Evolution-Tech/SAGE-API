@@ -18,25 +18,22 @@ Enum Turno {
 }
 
 Enum DiaSemana {
+  DOMINGO
   SEGUNDA
   TERCA
   QUARTA
   QUINTA
   SEXTA
+  SABADO
 }
 
 Enum TipoPessoa {
   ALUNO
+  RESPONSAVEL
   PROFESSOR
   ADMINISTRADOR
   TERCEIRIZADO
   PROFADM
-}
-
-Enum Genero {
-  MASCULINO
-  FEMININO
-  OUTRO
 }
 
 Enum DivisaoTurma {
@@ -48,6 +45,11 @@ Enum DivisaoTurma {
 Enum DivisaoTurmaAluno {
   DIV_A
   DIV_B
+}
+
+ENUM TipoContrato {
+  DETERMINADO
+  INDETERMINADO
 }
 
 ENUM CargoAdministrativo {
@@ -79,10 +81,14 @@ ENUM FuncaoTerceirizado {
 }
 
 Enum StatusAluno {
-  ATIVO
+  CANCELADO
+  CONCLUÍDO
+  DESISTENTE
+  EM_CURSO
+  RETIDO
+  TRANCADO
+  TRANSFERÊNCIA_EXPEDIDA
   SUSPENSO
-  TRANSFERIDO
-  DESLIGADO
 }
 
 Enum TipoFoto {
@@ -106,8 +112,8 @@ Table UnidadeEscolar {
   nome varchar(255) [not null]
   numero_unidade char(3) [not null]
   cnpj char(14) [not null, note: "Aplicar REGEX para definir o limite como 14 digitos, nada mais, nada menos"]
-  login varchar(100) [not null, note: "Login da unidade para autenticação com a catraca"]
-  senha varchar(255) [not null, note: "Senha da unidade para autenticação com a catraca"]
+  login varchar(100) [note: "Login da unidade para autenticação com a catraca"]
+  senha varchar(255) [note: "Senha da unidade para autenticação com a catraca"]
   logradouro varchar(255) [not null]
   numero varchar(255) [not null, note: "Número do endereço da unidade escolar"]
   complemento varchar(255)
@@ -143,7 +149,7 @@ Table Dispositivo {
   nome varchar(50) [not null]
   modelo varchar(50) [not null, note: "Ex: IDBlock, IDAccess"]
   endereco varchar(50) [not null]
-  porta int [not null]
+  porta varchar(50) [not null]
   usuario varchar(255) [not null]
   senha varchar(255) [not null]
   area_id int [ref: > Area.id]
@@ -173,32 +179,78 @@ Table Turma {
 Table Pessoa {
   id int [pk, increment]
   nome varchar(100) [not null]
-  foto varchar(255) [not null]
   rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
   cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
-  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
   email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
+  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
+  foto varchar(255) [not null]
   unidade_id int [ref: > UnidadeEscolar.id]
   qr_code varchar(255) [not null]
   cartao_rfid varchar(255) [not null]
   senha_acesso varchar(255) [not null]
   data_nascimento date [not null, note: "Data de nascimento deve ser menor ou igual a data atual"]
-  genero Genero [not null, note: "Gênero da pessoa, ex: Masculino, Feminino, Outro"]
   tipo TipoPessoa [not null]
   created_at timestamp
   updated_at timestamp
 }
 
-Table Professor {
+Table Horario {
+  id int [pk, increment]
+  pessoa_id int [not null, ref: > Pessoa.id]
+  dia_semana DiaSemana [not null]
+  entrada date [note: "Horário de entrada da pessoa para determinado dia da semana"]
+  saida date [note: "Horário de saída da pessoa para determinado dia da semana"]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table Atraso {
+  id int [pk, increment]
+  pessoa_id int [not null, ref: > Pessoa.id]
+  data date
+  horario_previsto timestamp [note: "Horário em que a pessoa deveria ter chegado em determinada data"]
+  horario_chegada timestamp [note: "Horário definitivo em que a pessoa chegou - Tolerância para CLT 5 min"]
+}
+
+Table Responsavel {
   id int [pk, ref: > Pessoa.id]
-  siape varchar(20) [not null]
+}
+
+Table Aluno {
+  id int [pk, ref: > Pessoa.id]
+  ra varchar(14) [not null, note: "Formato: 0000111592667<digito>"]
+  rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
+  responsavel_id int [ref: > Responsavel.id]
+  turma_id int [ref: > Turma.id]
+  divisao DivisaoTurmaAluno [not null, note: "Divisão da turma do aluno, ex: DIV A, DIV B"]
+  status StatusAluno [not null, note: "Status do aluno, ex: Ativo, Suspenso, Transferido, Desligado"]
+}
+
+Table Funcionario {
+  id int [pk, ref: > Pessoa.id]
+  matrícula varchar(6) [not null, note: "geralmente um número de 5 dígitos, mas pode ter até 6"]
+  data_admissão date [not null]
+  data_saída date [not null]
+  tipo_contrato TipoContrato [not null]
+}
+
+Table Professor {
+  id int [pk, ref: > Funcionario.id]
+}
+
+Table Materia {
+  id int [pk, increment]
+  nome varchar(100) [not null]
+  sigla varchar(10) [not null, note: "Sigla da matéria, ex: Mat, Port, Ing"]
+  professor_id int [ref: > Professor.id]
+  curso_id int [ref: > Curso.id]
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table Administrador {
-  id int [pk, ref: > Pessoa.id]
+  id int [pk, ref: > Funcionario.id]
   cargo CargoAdministrativo [not null, note: "Cargo do administrador, ex: Diretor, Coordenador, Secretário"]
-  entrada time [not null, note: "Horário de entrada do administrador"]
-  saida time [not null, note: "Horário de saída do administrador"]
 }
 
 Table Empresa {
@@ -215,41 +267,11 @@ Table Empresa {
 }
 
 Table Terceirizado {
-  id int [pk, ref: > Pessoa.id]
+  id int [pk, ref: > Funcionario.id]
   empresa_id int [not null]
   funcao FuncaoTerceirizado [not null, note: "Quem cuida dos atrasos dos terceirizados são suas respectivas empresas onde trabalham."]
   entrada time [not null, note: "Horário de entrada do terceirizado"]
   saida time [not null, note: "Horário de saída do terceirizado"]
-}
-
-Table Responsavel {
-  id int [pk, increment]
-  nome varchar(100) [not null]
-  rg varchar(9) [not null, note: "Aplicar REGEX para definir o limite como exatamente 7 ou 9 digitos"]
-  cpf char(11) [not null, note: "Aplicar REGEX para definir o limite como 11 digitos, nada mais, nada menos"]
-  telefone varchar(11) [not null, note: "Telefone fixo: 10 digitos; Celular: 11 digitos – O sistema deve aceitar apenas 10 ou 11 digitos"]
-  email varchar(100) [not null, note: "Email de contato, em caso de alunos é o institucional"]
-  created_at timestamp
-  updated_at timestamp
-}
-
-Table Aluno {
-  id int [pk, ref: > Pessoa.id]
-  rm char(12) [not null, note: "Formato: yyyy<numero_unidade><numero_aluno>"]
-  responsavel_id int [ref: > Responsavel.id]
-  turma_id int [ref: > Turma.id]
-  divisao DivisaoTurmaAluno [not null, note: "Divisão da turma do aluno, ex: DIV A, DIV B"]
-  status StatusAluno [not null, note: "Status do aluno, ex: Ativo, Suspenso, Transferido, Desligado"]
-}
-
-Table Materia {
-  id int [pk, increment]
-  nome varchar(100) [not null]
-  sigla varchar(10) [not null, note: "Sigla da matéria, ex: Mat, Port, Ing"]
-  professor_id int [ref: > Professor.id]
-  curso_id int [ref: > Curso.id]
-  created_at timestamp
-  updated_at timestamp
 }
 
 Table Aula {

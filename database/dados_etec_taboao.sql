@@ -1,16 +1,16 @@
 /*UNIDADE*/
-INSERT INTO checkly.unidadeescolar (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo) VALUES 
+INSERT INTO sage.unidadeescolar (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo) VALUES 
 ("ETEC Taboão da Serra", 293, "62823257029344", "etec", "etec123", "Praça Miguel Ortega", "135", "Prédio Principal", "Parque Assunção", "Taboão da Serra", "SP", "06754160", "1147011856", "etec.png");
 
 /*CURSOS*/
-INSERT INTO checkly.curso (nome, duracao) VALUES
+INSERT INTO sage.curso (nome, duracao) VALUES
 ("Desenvolvimento de Sistemas", 100),
 ("Informática para Internet", 100),
 ("Modular", 100);
 
 /*MATERIAS*/
 -- DS
-INSERT INTO checkly.materia (nome, sigla, curso_id) VALUES 
+INSERT INTO sage.materia (nome, sigla, curso_id) VALUES 
 ('Língua Portuguesa', 'LP', 1),
 ('Matemática', 'MAT', 1),
 ('Física', 'FIS', 1),
@@ -45,7 +45,7 @@ INSERT INTO checkly.materia (nome, sigla, curso_id) VALUES
 ('Projeto de Trabalho de Conclusão de Curso', 'PDTCC', 1);
 
 -- II
-INSERT INTO checkly.materia (nome, sigla, curso_id) VALUES 
+INSERT INTO sage.materia (nome, sigla, curso_id) VALUES 
 ('Português', 'POR', 2),
 ('Matemática', 'MAT', 2),
 ('Física', 'FIS', 2),
@@ -74,7 +74,7 @@ INSERT INTO checkly.materia (nome, sigla, curso_id) VALUES
 ('Sistemas WEB', 'SWEB', 2);
 
 /*TURMAS*/
-INSERT INTO checkly.turma (nome, turno, curso_id, unidade_id) VALUES
+INSERT INTO sage.turma (nome, turno, curso_id, unidade_id) VALUES
 ("1º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
 ("1º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
 ("2º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
@@ -91,7 +91,7 @@ INSERT INTO checkly.turma (nome, turno, curso_id, unidade_id) VALUES
 
 /*AULAS*/
 -- 1º A - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("Educ. Física - Harry", 1, 1, 13, "07:30:00", "09:10:00", "SEGUNDA", "DIV A/B"),
 ("TPA - Saiz", 2, 1, 21, "09:10:00", "12:00:00", "SEGUNDA", "DIV A"),
 ("TPA - Alicia", 3, 1, 21, "09:10:00", "12:00:00", "SEGUNDA", "DIV B"),
@@ -118,7 +118,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("BD I - Daniel", 16, 1, 23, "13:50:00", "15:30:00", "SEXTA", "DIV A/B");
 
 -- 1º B - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("LP - Rosana", 4, 2, 1, "07:30:00", "09:10:00", "SEGUNDA", "DIV A/B"),
 ("Educ. Física - Harry", 1, 2, 13, "09:10:00", "11:10:00", "SEGUNDA", "DIV A/B"),
 ("LP - Rosana", 4, 2, 1, "11:10:00", "12:00:00", "SEGUNDA", "DIV A/B"),
@@ -146,7 +146,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("Física - Zollo", 14, 2, 3, "09:10:00", "11:10:00", "SEXTA", "DIV A/B");
 
 -- 2º A - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("Biologia - Cristiano", 17, 3, 4, "07:30:00", "09:10:00", "SEGUNDA", "DIV A/B"),
 ("BD II - Votto", 6, 3, 23, "09:10:00", "11:10:00", "SEGUNDA", "DIV A"),
 ("WEB II - Messias", 8, 3, 25, "09:10:00", "11:10:00", "SEGUNDA", "DIV B"),
@@ -173,7 +173,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("LMI Sociocultural - Sâmela", 9, 3, 19, "13:50:00", "15:30:00", "SEXTA", "DIV A/B");
 
 -- 2º B - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("BD II - Votto", 6, 4, 23, "07:30:00", "09:10:00", "SEGUNDA", "DIV A"),
 ("WEB II - Messias", 8, 4, 25, "07:30:00", "09:10:00", "SEGUNDA", "DIV B"),
 ("Biologia - Cristiano", 17, 4, 4, "09:10:00", "11:10:00", "SEGUNDA", "DIV A/B"),
@@ -201,7 +201,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("Física - Zollo", 14, 4, 3, "13:50:00", "15:30:00", "SEXTA", "DIV A/B");
 
 -- 3º A - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("E.A.C - Julia", 22, 5, 14, "07:30:00", "09:10:00", "SEGUNDA", "DIV A"),
 ("E.A.Mat - Thiago", 23, 5, 15, "07:30:00", "09:10:00", "SEGUNDA", "DIV B"),
 ("LP - Rosana", 4, 5, 1, "09:10:00", "11:10:00", "SEGUNDA", "DIV A/B"),
@@ -232,7 +232,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("PDTCC - Nathane", 12, 5, 32, "11:10:00", "14:40:00", "SEXTA", "DIV A");
 
 -- 3º B - MTec-PI Desenvolvimento de Sistemas
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("Filosofia - Ales", 18, 6, 8, "07:30:00", "09:10:00", "SEGUNDA", "DIV A/B"),
 ("E.A.Mat - Thiago", 23, 6, 15, "09:10:00", "12:00:00", "SEGUNDA", "DIV A"),
 ("E.A.C - Julia", 22, 6, 14, "09:10:00", "12:00:00", "SEGUNDA", "DIV B"),
@@ -260,7 +260,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("LP - Rosana", 4, 6, 1, "13:50:00", "15:30:00", "SEXTA", "DIV A/B");
 
 -- 1º A - MTec-N Informática para Internet
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("Física - Jean", 20, 7, 35, "18:10:00", "19:50:00", "SEGUNDA", "DIV A"),
 ("WEB - Daniel", 16, 7, 44, "19:50:00", "20:40:00", "SEGUNDA", "DIV A"),
 ("WEB - ?", NULL, 7, 44, "19:50:00", "20:40:00", "SEGUNDA", "DIV B"),
@@ -284,7 +284,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("Biologia - Rafael - EAD", 28, 7, 36, "00:20:00", "02:00:00", "TERÇA", "DIV A/B");
 
 -- 1º B - MTec-N Informática para Internet
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("EF - Harry", 1, 8, 42, "18:10:00", "19:00:00", "SEGUNDA", "DIV A/B"),
 ("Arte - Josiane", 11, 8, 41, "19:00:00", "20:40:00", "SEGUNDA", "DIV A/B"),
 ("PC - Daniel", 16, 8, 49, "21:00:00", "22:40:00", "SEGUNDA", "DIV A"),
@@ -306,7 +306,7 @@ INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim,
 ("LI - Fabiana", 31, 8, 53, "22:40:00", "00:20:00", "SEXTA", "DIV A/B");
 
 -- 2º A - MTec-N Informática para Internet
-INSERT INTO checkly.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
+INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 -- Segunda
 ("LI - Carlindo", 10, 9, 40, "18:10:00", "19:50:00", "SEGUNDA", "DIV A"),
 ("LI - Carlindo", 10, 9, 40, "18:10:00", "19:50:00", "SEGUNDA", "DIV B"),
