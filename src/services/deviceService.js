@@ -1,5 +1,16 @@
 const axios = require('axios');
 
+async function listarTodos() {
+  try {
+    // global.db é o Knex, então podemos fazer:
+    const dispositivos = await global.db('Dispositivo').select('*');
+    return dispositivos; // retorna array de objetos
+  } catch (error) {
+    console.error('Erro ao listar dispositivos:', error.message);
+    return [];
+  }
+}
+
 // **NEW**: BUSCAR O NÚMERO TOTAL DE GIROS
 function linkCatraca(dispositivo) {
     return `${dispositivo.endereco}:${dispositivo.porta}`;
@@ -42,6 +53,7 @@ async function obterLogsCatraca(session, linkCatraca) {
 }
 
 module.exports = {
+  listarTodos,
   linkCatraca,
   obterSessao,
   verificarSessao,

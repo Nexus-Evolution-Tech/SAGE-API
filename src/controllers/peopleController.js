@@ -1,5 +1,6 @@
 // PESSOA N TEM COMO GENERALIZAR, ELA TEM FUNCOES MTO ESPECIFICAS EM SEU CRUD
 const peopleService = require('../services/peopleService');
+const controlIdService = require('../services/controlIdService');
 const { buscarTodasPessoas, buscarPorId, atualizarPessoaCompleta, removerPessoa } = require('../utils/people-db-utils');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const path = require('path');
@@ -16,13 +17,28 @@ const listar = async (req, res) => {
   }
 };
 
+// SE NÃO CRIAR NA CATRACA TAMBÉM NÃO CRIA NO BANCO - ID NÃO ESTÁ SENDO PASSADO POIS É AUTOINCREMENT, SO É GERADO QUANDO É CRIADO NO BANCO
+// PORTANTO, PRECISA CRIAR NO BANCO PRIMEIRO E DEPOIS NA CATRACA
 const criar = async (req, res) => {
   try {
-    const novaPessoa = await peopleService.criarPessoaCompleta(req.body);
-    res.status(201).json({ message: 'Pessoa criada com sucesso', pessoa: novaPessoa });
+    const novaPessoa = req.body; // aqui só pega os dados para enviar à catraca
+    const resultados = await controlIdService.criarNovaPessoaNaCatraca(novaPessoa);
+
+    // Se chegou aqui, deu certo em todas as catracas → agora salva no banco
+    const pessoaCriada = await peopleService.criarPessoaCompleta(novaPessoa);
+
+    res.status(201).json({
+      message: 'Pessoa criada com sucesso',
+      pessoa: pessoaCriada,
+      sincronizacao: resultados
+    });
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao criar pessoa:', error: error.message });
+    res.status(400).json({
+      message: 'Falha ao criar pessoa',
+      erro: error.message,
+      detalhes: error.detalhes // aqui mostra em qual catraca deu problema
+    });
   }
 };
 
@@ -72,19 +88,26 @@ const listarPorTipo = async (req, res) => {
 const editar = async (req, res) => {
   try {
     const id = req.params.id;
+    const resultados = await controlIdService.editarNomePessoaNaCatraca(id, req.body.nome);
     await atualizarPessoaCompleta(id, req.body);
-    res.json({ message: 'Pessoa atualizada com sucesso' });
+    res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao atualizar pessoa', error: error.message });
+    res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
   }
 };
 
 const deletar = async (req, res) => {
   try {
     const id = req.params.id;
+    
+    const query = `SELECT * FROM Pessoa WHERE id = ?`;
+    const [pessoa] = await db.query(query, [id]);
+    if(!pessoa) return "Pessoa não encontrada";
+
+    const resultados = await controlIdService.deletarPessoaDaCatraca(id, pessoa[0].nome);
     await removerPessoa(id);
-    res.json({ message: 'Pessoa removida com sucesso' });
+    res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
     res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
