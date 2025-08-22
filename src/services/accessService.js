@@ -128,12 +128,18 @@ async function criarAcesso(dados) {
           case 'SUSPENSO':
             permitido = false; // Se o aluno foi suspenso, a saída é negada
             return { message: "Acesso negado: Aluno suspenso" };
-          case 'TRANSFERIDO':
+          case 'TRANSFERENCIA EXPEDIDA':
             permitido = false; // Se o aluno foi transferido, a saída é negada
             return { message: "Acesso negado: Aluno transferido" };
-          case 'DESLIGADO':
-            permitido = false; // Se o aluno foi desligado, a saída é negada
-            return { message: "Acesso negado: Aluno desligado" };
+          case 'TRANCADO':
+            permitido = false; // Se o aluno trancou o curso, a saída é negada
+            return { message: "Acesso negado: Aluno trancado" };
+          case 'DESISTENTE':
+            permitido = false; // Se o aluno desistiu do curso, a saída é negada
+            return { message: "Acesso negado: Aluno desistente" };
+          case 'CANCELADO':
+            permitido = false; // Se o aluno foi cancelado, a saída é negada
+            return { message: "Acesso negado: Aluno cancelado" };
           default:
             permitido = true; // Se o aluno está ativo, a entrada é permitida
             mensagem = "Acesso autorizado: Entrada permitida para aluno ativo";
@@ -149,14 +155,15 @@ async function criarAcesso(dados) {
         mensagem = "Acesso autorizado: Saída permitida para não-alunos";
         break;
       }
+      
+      /*ATE PARA OS MAIORES DE IDADE É EXIGIDO PERMISSÃO*/
+      // if (idadePessoa >= 18) {
+      //   permitido = true;
+      //   mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - ${idadePessoa} anos`;
+      //   break;
+      // } 
 
-      if (idadePessoa >= 18) {
-        permitido = true;
-        mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - ${idadePessoa} anos`;
-        break;
-      }
-
-      // Aluno menor de idade - Verificar horários das aulas
+      // Verificar horários das aulas
       const hoje = new Date();
       const diaSemana = hoje.getDay(); // 0 = domingo, 1 = segunda, etc.
 
@@ -178,12 +185,13 @@ async function criarAcesso(dados) {
 
       const agora = hoje.toTimeString().split(' ')[0]; // HH:MM:SS
 
-      if (agora < primeiraAula.inicio) {
-        // Antes da primeira aula, pode sair sem problemas
-        permitido = true;
-        mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
-        break;
-      }
+      /*INDEPENDENTE SE COMEÇOU A PRIMEIRA AULA DO DIA OU NÃO, A PARTIR DO MOMENTO EM QUE O ALUNO ENTRA NA ESCOLA, SÓ PODERÁ SAIR NO SEU HORÁRIO DE SAÍDA*/
+      // if (agora < primeiraAula.inicio) {
+      //   // Antes da primeira aula, pode sair sem problemas
+      //   permitido = true;
+      //   mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
+      //   break;
+      // }
 
       if (agora >= ultimaAula.fim) {
         // Após o fim da última aula, pode sair sem problemas
@@ -225,7 +233,7 @@ async function criarAcesso(dados) {
 
             if (mesmaData) {
               permitido = true;
-              mensagem = `Acesso autorizado: Solicitação aprovada - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+              mensagem = `Acesso autorizado: Solicitação aprovada - Aluno com ${idadePessoa} anos`;
               break;
             } else {
               permitido = false;
