@@ -921,7 +921,7 @@ paths:
                   data_nascimento: "1990-12-25"
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
-                  funcao: "FAXINEIRO"
+                  funcao: "AUXILIAR_LIMPEZA"
                   matricula: "123456"
                   data_admissao: "2005-05-15"
                   data_saida: "2007-09-18"
@@ -1132,11 +1132,12 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "pedro123"
                   data_nascimento: "2004-02-20"
+                  ra: "0001117648834"
                   rm: "20252930001"
                   responsavel_id: 1
                   turma_id: 1
                   divisao: "DIV A"
-                  status: "TRANSFERIDO"
+                  status: "EM CURSO"
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -1151,7 +1152,6 @@ paths:
                   cartao_rfid: "1124312345asdf123467289"
                   senha_acesso: "marcelo123"
                   data_nascimento: "1985-08-15"
-                  siape: "1234875"
               Administrador:
                 summary: Exemplo de Administrador
                 value:
@@ -1173,7 +1173,7 @@ paths:
                 summary: Exemplo de ProfAdm
                 value:
                   nome: "Gusttavo Lima"
-                  rg: "1234467589"
+                  rg: "123467589"
                   cpf: "12346537819"
                   telefone: "11243567289"
                   email: "gusttavo.lima@escola.com"
@@ -1183,8 +1183,7 @@ paths:
                   cartao_rfid: "11243567289asdfhud08912347"
                   senha_acesso: "gusttavo123"
                   data_nascimento: "1987-09-05"
-                  siape: "567348"
-                  funcao: "DIRETOR"
+                  cargo: "DIRETOR"
               Terceirizado:
                 summary: Exemplo de Terceirizado
                 value:
@@ -1993,8 +1992,6 @@ components:
             tipo:
               type: string
               enum: [PROFESSOR]
-            siape:
-              type: string
 
     Administrador:
       allOf:
@@ -2020,14 +2017,11 @@ components:
         - type: object
           required:
             - tipo
-            - siape
             - cargo
           properties:
             tipo:
               type: string
               enum: [PROFADM]
-            siape:
-              type: string
             cargo:
               type: string
               enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
@@ -2048,7 +2042,7 @@ components:
               type: integer
             funcao:
               type: string
-              enum: [VIGILANTE, FAXINEIRO, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, OUTRO]
+              enum: [VIGILANTE, AUXILIAR_LIMPEZA, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, COZINHEIRO, OUTRO]
             entrada:
               type: string
             saida:
