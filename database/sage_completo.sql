@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     email VARCHAR(100) NOT NULL COMMENT 'Email de contato, em caso de alunos é o institucional',
     unidade_id INT,
     qr_code VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
-    cartao_rfid VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será um hexadecimal ou numérico com 8 a 16 caracteres',
+    cartao_rfid VARCHAR(255) COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
+    CONSTRAINT chk_rfid CHECK (REGEXP_LIKE(cartao_rfid, '^[0-9]{3}[0-9]{5}$')),
     senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',
     data_nascimento DATE NOT NULL,
     tipo ENUM ('ALUNO', 'RESPONSAVEL', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') NOT NULL,
@@ -212,12 +213,13 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
     id INT PRIMARY KEY,
     empresa_id INT,
     funcao ENUM ('VIGILANTE',
-	  'FAXINEIRO',
+	  'AUXILIAR_LIMPEZA',
 	  'SEGURANCA',
 	  'SERVICOS_GERAIS',
 	  'TECNICO_MANUTENCAO',
 	  'JARDINEIRO',
 	  'CANTINEIRO',
+      'COZINHEIRO',
 	  'OUTRO') NOT NULL,
     FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE,
     FOREIGN KEY (empresa_id) REFERENCES Empresa(id) ON DELETE SET NULL
@@ -794,7 +796,7 @@ INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, di
 ("S. Web I -", NULL, 9, 44, "21:00:00", "22:40:00", "SEXTA", "DIV B");
 
 INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial)
-VALUES ("Catraca 01", "IDBlock", "192.168.0.126", "81", "admin", "admin", "0K0410/0011BC");
+VALUES ("Catraca 01", "IDBlock", "192.168.0.126", "80", "admin", "admin", "0K0410/0011BC");
 
 INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial)
 VALUES ("Catraca 02", "IDBlock", "192.168.0.127", "82", "admin", "admin", "0K0410/00177E");
