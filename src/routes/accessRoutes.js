@@ -2,12 +2,13 @@ const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const accessController = require('../controllers/accessController');
 const { sincronizarAcessos, sincronizarTodosAcessos } = require('../services/accessService');
+const autenticar = require('../middlewares/autenticar');
 
 const router = gerarRotas(accessController, 'acessos');
 const routerExtra = express.Router();
 
 routerExtra.post('/acessos', accessController.criar);
-router.post('/acessos/sincronizar/:dispositivo_id', async (req, res) => {
+router.post('/acessos/sincronizar/:dispositivo_id', autenticar, async (req, res) => {
   try {
     const dispositivo = await global.db('Dispositivo').where('id', req.params.dispositivo_id).first();
 
@@ -22,7 +23,7 @@ router.post('/acessos/sincronizar/:dispositivo_id', async (req, res) => {
     res.status(500).json({ message: 'Erro ao sincronizar acessos' });
   }
 });
-router.post('/acessos/sincronizar-todos', async (req, res) => {
+router.post('/acessos/sincronizar-todos', autenticar, async (req, res) => {
   try {
     const resultados = await sincronizarTodosAcessos();
     res.json({ message: 'Sincronização concluída', resultados });
