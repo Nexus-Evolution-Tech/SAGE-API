@@ -147,11 +147,12 @@ const getUrlById = async (req, res) => {
 
 const uploadFoto = async (req, res) => {
   try {
-    await peopleService.uploadFotoPessoa(req, res);
-    res.status(201).json({ message: 'Foto enviada com sucesso' });
+    await peopleService.uploadFotoPessoa(req, res); // o service envia a resposta
   } catch (error) {
     console.error('Erro ao enviar foto:', error);
-    res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+    }
   }
 }
 

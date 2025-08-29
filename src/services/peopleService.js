@@ -442,7 +442,7 @@ async function uploadFotoPessoa(req, res) {
   try {
     // Verificar se a pessoa existe
     const [rows] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [pessoa_id]);
-    console.log('Pessoa encontrada:', rows[0]);
+    // console.log('Pessoa encontrada:', rows[0]);
 
     if (rows.length === 0) {
       const arquivoTemp = path.resolve(__dirname, '..', 'uploads', req.file.filename);
@@ -463,7 +463,7 @@ async function uploadFotoPessoa(req, res) {
     }
 
     // Gerar nome único para a foto
-    const novoNome = `pessoa_${pessoa_id}.jpg`;
+    const novoNome = `pessoa_${pessoa_id}.png`;
     const antigoCaminho = path.resolve(__dirname, '..', 'uploads', req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
 
