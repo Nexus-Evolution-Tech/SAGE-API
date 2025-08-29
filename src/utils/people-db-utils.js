@@ -136,7 +136,7 @@ async function criarFuncionarioBase(pessoaId, dados) {
 
 // 📌 Criar Professor
 async function criarProfessor(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Professor (id)
     VALUES (?)
@@ -146,7 +146,7 @@ async function criarProfessor(pessoaId, dados) {
 
 // 📌 Criar Administrador
 async function criarAdministrador(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Administrador (id, cargo)
     VALUES (?, ?)
@@ -156,7 +156,7 @@ async function criarAdministrador(pessoaId, dados) {
 
 // 📌 Criar Terceirizado
 async function criarTerceirizado(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Terceirizado (id, empresa_id, funcao)
     VALUES (?, ?, ?)
@@ -172,7 +172,7 @@ async function criarTerceirizado(pessoaId, dados) {
 // 📌 Criar Professor Administrador
 async function criarProfAdm(pessoaId, dados) {
   // Cria apenas uma vez na tabela Funcionario
-  await criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
 
   // Depois insere nas tabelas específicas
   const queryProfessor = `INSERT INTO Professor (id) VALUES (?)`;
@@ -316,6 +316,7 @@ async function atualizarPessoaCompleta(id, updates) {
 
   // Não permitir alterar tipo
   delete updates.tipo;
+  delete updates.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
 
   // Buscar o tipo da pessoa para saber quais tabelas atualizar
   const tipo = await buscarTipoPessoa(id);

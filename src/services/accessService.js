@@ -30,10 +30,10 @@ async function sincronizarAcessos(dispositivo) {
 
   for (const log of logs) {
     const pessoa_id = log.user_id;
-    const dispositivo_id = dispositivo.id;
+    const dispositivo_id = dispositivo.id; //log.device_id
     const data_hora = new Date(log.time * 1000);
-    const status = log.event; // ENTRADA, SAIDA, NEGADO
-    const metodo_auth = mapearMetodo(log.auth_method);
+    const status = "ENTRADA"/*log.event*/; // ENTRADA, SAIDA, NEGADO - !!! - NÃO TEM
+    const metodo_auth = "CARTAO_RFID"/*mapearMetodo(log.auth_method)*/; // !!! - NÃO TEM
     console.log(`Método de autenticação: ${metodo_auth}`);
     const permitido = status !== 'NEGADO';
 

@@ -6,6 +6,8 @@ const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/database');
+const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
+const { buscarPessoaBase } = require('../utils/people-db-utils');
 
 const listar = async (req, res) => {
   try {
@@ -21,23 +23,43 @@ const listar = async (req, res) => {
 // PORTANTO, PRECISA CRIAR NO BANCO PRIMEIRO E DEPOIS NA CATRACA
 const criar = async (req, res) => {
   try {
-    const novaPessoa = req.body; // aqui só pega os dados para enviar à catraca
-    const resultados = await controlIdService.criarNovaPessoaNaCatraca(novaPessoa);
+    // 1. Salva no banco
+    const pessoaCriada = await peopleService.criarPessoaCompleta(req.body);
 
-    // Se chegou aqui, deu certo em todas as catracas → agora salva no banco
-    const pessoaCriada = await peopleService.criarPessoaCompleta(novaPessoa);
+    const id = pessoaCriada.idPessoa;
+    //buscar no banco a pessoa criada
+    const pessoa = await buscarPessoaBase(id);
+
+    // 2. Monta o objeto completo para a catraca
+    const novaPessoaParaCatraca = {
+      id: pessoa.id,
+      nome: pessoa.nome,
+      cartao_rfid: pessoa.cartao_rfid,
+      qrcode: pessoa.qr_code
+      // outros campos que a catraca espera
+    };
+
+    // 3. Sincroniza com catraca
+    let resultados = [];
+    try {
+      if (pessoa.tipo !== 'RESPONSAVEL')
+        resultados = await controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca);
+    } catch (errorCatraca) {
+      console.error('Erro ao sincronizar com catraca:', errorCatraca);
+    }
 
     res.status(201).json({
       message: 'Pessoa criada com sucesso',
       pessoa: pessoaCriada,
       sincronizacao: resultados
     });
+
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
     res.status(400).json({
       message: 'Falha ao criar pessoa',
       erro: error.message,
-      detalhes: error.detalhes // aqui mostra em qual catraca deu problema
+      detalhes: error.detalhes
     });
   }
 };
@@ -88,7 +110,7 @@ const listarPorTipo = async (req, res) => {
 const editar = async (req, res) => {
   try {
     const id = req.params.id;
-    const resultados = await controlIdService.editarNomePessoaNaCatraca(id, req.body.nome);
+    const resultados = await controlIdService.editarPessoaNasCatracas(id, req.body.nome, req.body.cartao_rfid);
     await atualizarPessoaCompleta(id, req.body);
     res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
   } catch (error) {
@@ -101,11 +123,11 @@ const deletar = async (req, res) => {
   try {
     const id = req.params.id;
     
-    const query = `SELECT * FROM Pessoa WHERE id = ?`;
-    const [pessoa] = await db.query(query, [id]);
-    if(!pessoa) return "Pessoa não encontrada";
+    // const query = `SELECT * FROM Pessoa WHERE id = ?`;
+    // const [pessoa] = await db.query(query, [id]);
+    // if(!pessoa) return "Pessoa não encontrada";
 
-    const resultados = await controlIdService.deletarPessoaDaCatraca(id, pessoa[0].nome);
+    const resultados = await controlIdService.deletarPessoaDasCatracas(id/*, pessoa[0].nome*/);
     await removerPessoa(id);
     res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
@@ -148,11 +170,28 @@ const getUrlById = async (req, res) => {
 const uploadFoto = async (req, res) => {
   try {
     await peopleService.uploadFotoPessoa(req, res); // o service envia a resposta
+    if(req.file) await criarImagemUsuario(req.params.id)
+    else return res.status(400).json({ message: 'Arquivo de foto não enviado' });
   } catch (error) {
     console.error('Erro ao enviar foto:', error);
     if (!res.headersSent) {
       res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
     }
+  }
+}
+
+const gerarQrCode = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const data = await generateQrCode(id);
+
+    const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
+    await db.query(query, [data.qrcode, id]);
+
+    res.json({ message: "QrCode gerado com sucesso para a pessoa", id });
+  } catch (error) {
+    console.error('Erro ao gerar qrcode para users:', error);
+    res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
   }
 }
 
@@ -167,5 +206,6 @@ module.exports = {
   deletar,
   getUrls,
   getUrlById,
-  uploadFoto
+  uploadFoto,
+  gerarQrCode
 };
