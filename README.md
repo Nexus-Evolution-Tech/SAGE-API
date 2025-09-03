@@ -1,4 +1,4 @@
-# 🎓 SGC-API | Sistema de Gestão e Controle de Acesso
+# 🎓 SAGE-API | Sistema de Automação e Gerenciamento Escolar
 
 <div align="center">
 
@@ -52,14 +52,14 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 ## 🗂️ Arquitetura do Projeto
 
 ```
-📦 SGC-API/
+📦 SAGE-API/
 ├── 📁 api/                          # Documentação e Collections
-│   ├── 📄 checklyapi.yml           # OpenAPI/Swagger spec
+│   ├── 📄 sageapi.yml           # OpenAPI/Swagger spec
 │   └── 📄 *.postman_collection.json # Collections organizadas por entidade
 ├── 📁 database/                     # Scripts e Modelagem
-│   ├── 📄 checklydb.sql            # Schema completo do banco
-│   ├── 📄 checkly.dbml             # Modelagem DBML
-│   ├── �️ ChecklyDER.png           # Diagrama ER visual
+│   ├── 📄 sagedb.sql            # Schema completo do banco
+│   ├── 📄 sage.dbml             # Modelagem DBML
+│   ├── �️ sageDER.png           # Diagrama ER visual
 │   └── 📄 dados_etec_taboao.sql    # Dados de exemplo
 ├── 📁 src/
 │   ├── 📁 config/                   # Configurações centralizadas
@@ -108,10 +108,10 @@ npm install
 ### 3️⃣ Configure o banco de dados
 ```bash
 # Execute o script SQL para criar o schema
-mysql -u root -p < database/checklydb.sql
+mysql -u root -p < database/sagedb.sql
 
 # (Opcional) Carregue dados de exemplo
-mysql -u root -p checkly < database/dados_etec_taboao.sql
+mysql -u root -p sage < database/dados_etec_taboao.sql
 ```
 
 ### 4️⃣ Configure as variáveis de ambiente
@@ -121,7 +121,7 @@ const pool = mysql.createPool({
   host: 'localhost',
   user: 'seu_usuario',
   password: 'sua_senha',
-  database: 'checkly',
+  database: 'sage',
   // ...
 });
 ```
