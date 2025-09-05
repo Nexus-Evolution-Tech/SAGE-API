@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS Aluno (
     rm CHAR(12) NOT NULL COMMENT '20232930077 -> yyyy<numero_unidade><numero_aluno>',
     CONSTRAINT chk_rm CHECK (REGEXP_LIKE(rm, '^[0-9]{4}[0-9]{3}[0-9]{4}$')),
     turma_id INT,
-    divisao ENUM ('DIV A', 'DIV B'),
+    divisao ENUM ('DIV A', 'DIV B', 'INT'),
     status ENUM ('CANCELADO', 'CONCLUIDO', 'DESISTENTE', 'EM CURSO', 'RETIDO', 'TRANCADO', 'TRANSFERENCIA EXPEDIDA', 'SUSPENSO') NOT NULL,
     FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
     FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL
@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS Aula (
     inicio TIME NOT NULL,
     fim TIME NOT NULL,
     dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    divisao ENUM ('DIV A/B', 'DIV A', 'DIV B') NOT NULL,
+    divisao ENUM ('INT', 'DIV A', 'DIV B') NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (professor_id) REFERENCES Professor(id) ON DELETE SET NULL,
