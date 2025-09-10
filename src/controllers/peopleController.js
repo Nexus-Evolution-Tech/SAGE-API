@@ -8,6 +8,7 @@ const fs = require('fs');
 const db = require('../config/database');
 const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
 const { buscarPessoaBase } = require('../utils/people-db-utils');
+const { sincronizarTodasPessoasNasCatracas } = require('../utils/syncAll');
 
 const listar = async (req, res) => {
   try {
@@ -195,6 +196,16 @@ const gerarQrCode = async (req, res) => {
   }
 }
 
+const sincronizarBanco = async (req, res) => {
+  try {
+    await sincronizarTodasPessoasNasCatracas();
+    res.json({ message: "Banco sincronizado com sucesso", id });
+  } catch (error) {
+    console.error('Erro ao sincronizar banco:', error);
+    res.status(500).json({ message: 'Erro ao sincronizar banco', error: error.message });
+  }
+}
+
 module.exports = {
   listar,
   criar,
@@ -207,5 +218,6 @@ module.exports = {
   getUrls,
   getUrlById,
   uploadFoto,
-  gerarQrCode
+  gerarQrCode,
+  sincronizarBanco
 };

@@ -1250,6 +1250,30 @@ paths:
           description: Pessoa não encontrada
         '500':
           description: Erro interno do servidor
+  
+  /pessoas/sincronizar-banco/:
+    post:
+      tags: [Pessoas]
+      summary: Sincronizar Banco com a Catraca
+      description: Sincroniza todos os registros da tabela Pessoa com a API da Control ID em Users e Cards
+      responses:
+        '200':
+          description: Banco sincronizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pessoa_id:
+                    type: integer
+                  foto:
+                    type: string
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Pessoa não encontrada
+        '500':
+          description: Erro interno do servidor
 
   /materias:
     get:

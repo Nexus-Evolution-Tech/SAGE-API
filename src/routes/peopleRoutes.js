@@ -14,6 +14,7 @@ routerExtra.get('/pessoas/:id/status', peopleController.getStatusId);
 routerExtra.post('/pessoas/upload/:id', upload.single('foto'), peopleController.uploadFoto);
 routerExtra.get('/pessoas/tipo/:tipo', peopleController.listarPorTipo);
 routerExtra.post('/pessoas/gerar_qrcode/:id', peopleController.gerarQrCode);
+routerExtra.post('/pessoas/sincronizar-banco', peopleController.sincronizarBanco);
 
 routerExtra.use(router);
 
