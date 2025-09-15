@@ -111,9 +111,12 @@ const listarPorTipo = async (req, res) => {
 const editar = async (req, res) => {
   try {
     const id = req.params.id;
-    const resultados = await controlIdService.editarPessoaNasCatracas(id, req.body.nome, req.body.cartao_rfid);
     await atualizarPessoaCompleta(id, req.body);
-    res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
+    if (req.body.nome !== null && req.body.cartao_rfid !== null){
+      const resultados = await controlIdService.editarPessoaNasCatracas(id, req.body.nome, req.body.cartao_rfid);
+      res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
+    }
+    res.json({ message: 'Pessoa atualizada com sucesso'});
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
     res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
