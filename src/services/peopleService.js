@@ -326,6 +326,8 @@ async function verificarTodasPessoasPresentesEAtrasadas() {
       atrasado = entradaDate > horarioTolerancia;
     }
 
+    //AQUI SERÁ A LÓGICA DE ATRASOS
+
     resultados.push({
       id: pessoa.id,
       nome: pessoa.nome,

@@ -8,7 +8,7 @@ const fs = require('fs');
 const db = require('../config/database');
 const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
 const { buscarPessoaBase } = require('../utils/people-db-utils');
-const { sincronizarTodasPessoasNasCatracas } = require('../utils/syncAll');
+const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
 
 const listar = async (req, res) => {
   try {
@@ -65,6 +65,7 @@ const criar = async (req, res) => {
   }
 };
 
+//AQUI SERÁ ONDE ESTARÁ A LÓGICA DE ATRASOS
 const getStatus = async (req, res) => {
   try {
     const estaPresenteAtrasado = await peopleService.verificarTodasPessoasPresentesEAtrasadas();
@@ -131,8 +132,8 @@ const deletar = async (req, res) => {
     // const [pessoa] = await db.query(query, [id]);
     // if(!pessoa) return "Pessoa não encontrada";
 
-    const resultados = await controlIdService.deletarPessoaDasCatracas(id/*, pessoa[0].nome*/);
     await removerPessoa(id);
+    const resultados = await controlIdService.deletarPessoaDasCatracas(id/*, pessoa[0].nome*/);
     res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
