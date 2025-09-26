@@ -12,6 +12,7 @@ const {
   buscarAdministrador,
   buscarProfAdm,
   buscarTerceirizado,
+  criarFuncionarioBase,
 } = require('../utils/people-db-utils');
 const { hashSenha } = require('../utils/criptografia');
 const db = require('../config/database');
@@ -19,7 +20,12 @@ const path = require('path');
 const fs = require('fs');
 
 async function criarPessoaCompleta(dados) {
-  const { nome, foto, rg, cpf, telefone, email, data_nascimento, genero, tipo, ...camposExtras } = dados;
+  const {
+    nome, foto, rg, cpf, telefone, email, data_nascimento,
+    genero, tipo, ...camposExtras
+  } = dados;
+
+  // 1. Criar Pessoa
   const pessoa = await criarPessoaBase({
     nome,
     foto,
@@ -32,12 +38,18 @@ async function criarPessoaCompleta(dados) {
     cartao_rfid: camposExtras.cartao_rfid || null,
     senha_acesso: camposExtras.senha_acesso ? await hashSenha(camposExtras.senha_acesso) : null,
     data_nascimento,
-    genero,
     tipo
   });
 
   const idPessoa = pessoa.id;
 
+  // 2. Se não for aluno nem responsável, criar Funcionario
+  const tiposFuncionario = ['PROFESSOR', 'ADMINISTRADOR', 'PROFADM', 'TERCEIRIZADO'];
+  if (tiposFuncionario.includes(tipo)) {
+    await criarFuncionarioBase(idPessoa, camposExtras)
+  }
+
+  // 3. Criar tipo específico
   switch (tipo) {
     case 'ALUNO':
       await criarAluno(idPessoa, camposExtras);
@@ -442,7 +454,7 @@ async function uploadFotoPessoa(req, res) {
   try {
     // Verificar se a pessoa existe
     const [rows] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [pessoa_id]);
-    console.log('Pessoa encontrada:', rows[0]);
+    // console.log('Pessoa encontrada:', rows[0]);
 
     if (rows.length === 0) {
       const arquivoTemp = path.resolve(__dirname, '..', 'uploads', req.file.filename);
@@ -463,7 +475,7 @@ async function uploadFotoPessoa(req, res) {
     }
 
     // Gerar nome único para a foto
-    const novoNome = `pessoa_${pessoa_id}.jpg`;
+    const novoNome = `pessoa_${pessoa_id}.png`;
     const antigoCaminho = path.resolve(__dirname, '..', 'uploads', req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
 

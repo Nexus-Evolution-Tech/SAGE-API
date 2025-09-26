@@ -136,7 +136,7 @@ async function criarFuncionarioBase(pessoaId, dados) {
 
 // 📌 Criar Professor
 async function criarProfessor(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Professor (id)
     VALUES (?)
@@ -146,7 +146,7 @@ async function criarProfessor(pessoaId, dados) {
 
 // 📌 Criar Administrador
 async function criarAdministrador(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Administrador (id, cargo)
     VALUES (?, ?)
@@ -156,7 +156,7 @@ async function criarAdministrador(pessoaId, dados) {
 
 // 📌 Criar Terceirizado
 async function criarTerceirizado(pessoaId, dados) {
-  criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
   const query = `
     INSERT INTO Terceirizado (id, empresa_id, funcao)
     VALUES (?, ?, ?)
@@ -172,7 +172,7 @@ async function criarTerceirizado(pessoaId, dados) {
 // 📌 Criar Professor Administrador
 async function criarProfAdm(pessoaId, dados) {
   // Cria apenas uma vez na tabela Funcionario
-  await criarFuncionarioBase(pessoaId, dados);
+  // await criarFuncionarioBase(pessoaId, dados);
 
   // Depois insere nas tabelas específicas
   const queryProfessor = `INSERT INTO Professor (id) VALUES (?)`;
@@ -307,54 +307,56 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
 
 // 🚀 Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
-  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'genero'];
-  const alunoFields = ['ra', 'rm','turma_id', 'divisao', 'status'];
-  const responsavelFields = [''];
-  const professorFields = [''];
+  // Campos específicos por tabela
+  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento'];
+  const funcionarioFields = ['matricula', 'data_admissao', 'data_saida', 'tipo_contrato'];
+  const alunoFields = ['ra', 'rm', 'turma_id', 'divisao', 'status'];
   const administradorFields = ['cargo'];
   const terceirizadoFields = ['empresa_id', 'funcao'];
-  
-  // 🚫 Impedir alteração do campo "tipo"
-  delete updates.tipo;
 
-  // 1. Buscar tipo da pessoa
+  // Não permitir alterar tipo
+  delete updates.tipo;
+  delete updates.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
+
+  // Buscar o tipo da pessoa para saber quais tabelas atualizar
   const tipo = await buscarTipoPessoa(id);
 
-  // 2. Atualizar campos da tabela Pessoa
-  const pessoaUpdates = {};
-  for (const campo of pessoaFields) {
-    if (updates[campo] !== undefined) {
-      pessoaUpdates[campo] = updates[campo];
-    }
-  }
-  if (Object.keys(pessoaUpdates).length > 0) {
-    await atualizarTabela('Pessoa', pessoaUpdates, id);
-  }
+  // Atualizar a tabela base (Pessoa) sempre
+  await atualizarSeExistir('Pessoa', pessoaFields, updates, id);
 
-  // 3. Atualizar tabelas específicas
-  if (tipo === 'ALUNO') {
-    await atualizarSeExistir('Aluno', alunoFields, updates, id);
-  }
+  // Atualizar conforme tipo
+  switch (tipo) {
+    case 'ALUNO':
+      await atualizarSeExistir('Aluno', alunoFields, updates, id);
+      break;
 
-  if (tipo === 'RESPONSAVEL') {
-    await atualizarSeExistir('Responsavel', responsavelFields, updates, id);
-  }
+    case 'RESPONSAVEL':
+      // Nenhum campo específico em Responsavel, mas mantém por clareza
+      break;
 
-  if (tipo === 'PROFESSOR') {
-    await atualizarSeExistir('Professor', professorFields, updates, id);
-  }
+    case 'PROFESSOR':
+      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
+      // Nenhum campo específico em Professor por enquanto
+      break;
 
-  if (tipo === 'ADMINISTRADOR') {
-    await atualizarSeExistir('Administrador', administradorFields, updates, id);
-  }
+    case 'ADMINISTRADOR':
+      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
+      await atualizarSeExistir('Administrador', administradorFields, updates, id);
+      break;
 
-  if (tipo === 'PROFADM') {
-    await atualizarSeExistir('Professor', professorFields, updates, id);
-    await atualizarSeExistir('Administrador', administradorFields, updates, id);
-  }
+    case 'PROFADM':
+      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
+      await atualizarSeExistir('Professor', [], updates, id); // Ainda que sem campos, mantém por clareza estrutural
+      await atualizarSeExistir('Administrador', administradorFields, updates, id);
+      break;
 
-  if (tipo === 'TERCEIRIZADO') {
-    await atualizarSeExistir('Terceirizado', terceirizadoFields, updates, id);
+    case 'TERCEIRIZADO':
+      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
+      await atualizarSeExistir('Terceirizado', terceirizadoFields, updates, id);
+      break;
+
+    default:
+      throw new Error(`Tipo '${tipo}' não reconhecido para atualização.`);
   }
 }
 

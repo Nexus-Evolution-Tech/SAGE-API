@@ -18,18 +18,32 @@ const getHorariosPorTurma = async (req, res) => {
         case 'B':
             div = 'DIV B';
             break;
+        case 'INT':
+            div = 'INT';
+            break;
         default:
             return res.status(400).json({ message: 'Divisão inválida. Use "A" ou "B".' });
     }
 
     try {
-        console.log(`Buscando aulas para turma_id: ${turma_id}, divisao: ${div}`);
-        const aulas = await global.db('Aula')
-            .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
-            .where('turma_id', turma_id)
-            .andWhere(function() {
-                this.where('divisao', 'DIV A/B').orWhere('divisao', div);
-            });
+        let aulas;
+        if (div !== 'INT'){
+            console.log(`Buscando aulas para turma_id: ${turma_id}, divisao: ${div}`);
+            aulas = await global.db('Aula')
+                .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
+                .where('turma_id', turma_id)
+                .andWhere(function() {
+                    this.where('divisao', 'INT').orWhere('divisao', div);
+                });
+        } else if (div === 'INT') {
+            console.log(`Buscando aulas para turma_id: ${turma_id}, divisao: ${div}`);
+            aulas = await global.db('Aula')
+                .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
+                .where('turma_id', turma_id) // quando o aluno for INT não será filtrado por div, apenas por turma, uma turma que não tem divisão a e b só terá aulas INT
+                // .andWhere(function() {
+                //     this.where('divisao', 'INT');
+                // });
+        }
 
         if (aulas.length === 0) {
             return res.status(404).json({ message: 'Nenhuma aula encontrada para a turma e divisão especificadas.' });

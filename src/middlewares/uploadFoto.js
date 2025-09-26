@@ -10,7 +10,7 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, pasta),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const nomeTemporario = `temp_${uuidv4()}.jpg`;
+    const nomeTemporario = `temp_${uuidv4()}.png`;
     cb(null, nomeTemporario);
   }
 });

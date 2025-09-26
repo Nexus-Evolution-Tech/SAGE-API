@@ -822,8 +822,8 @@ paths:
                   telefone: "11999999999"
                   email: "joao.silva@escola.com"
                   unidade_id: null
-                  qr_code: "123408987569asfasdf87290843"
-                  cartao_rfid: "24350987asdfadsf23592345987"
+                  qr_code: "14536276"
+                  cartao_rfid: "45698321"
                   senha_acesso: "joao123"
                   data_nascimento: "2005-05-15"
                   tipo: "ALUNO"
@@ -856,8 +856,8 @@ paths:
                   telefone: "11988888888"
                   email: "maria.souza@escola.com"
                   unidade_id: null
-                  qr_code: "11243567289asdfuj881209438"
-                  cartao_rfid: "11243567289asdfhud08912347"
+                  qr_code: "45698321"
+                  cartao_rfid: "75489632"
                   senha_acesso: "maria123"
                   data_nascimento: "2000-01-01"
                   tipo: "PROFESSOR"
@@ -875,8 +875,8 @@ paths:
                   telefone: "11977777777"
                   email: "carlos.pereira@escola.com"
                   unidade_id: null
-                  qr_code: "11243567289asfdiuh1234079281"
-                  cartao_rfid: "11243567289asdf129487329"
+                  qr_code: "45879636"
+                  cartao_rfid: "12546938"
                   senha_acesso: "carlos123"
                   data_nascimento: "1995-03-20"
                   tipo: "ADMINISTRADOR"
@@ -895,8 +895,8 @@ paths:
                   telefone: "11966666666"
                   email: "ana.lima@escola.com"
                   unidade_id: null
-                  qr_code: "11243512341234asdf8127349867289"
-                  cartao_rfid: "1124312345asdf123467289"
+                  qr_code: "12365489"
+                  cartao_rfid: "75986321"
                   senha_acesso: "ana123"
                   data_nascimento: "1988-07-30"
                   tipo: "PROFADM"
@@ -915,13 +915,13 @@ paths:
                   telefone: "11955555555"
                   email: "roberto.alves@empresa.com"
                   unidade_id: null
-                  qr_code: "11241234asdf12343567289"
-                  cartao_rfid: "1124312345asdf123467289"
+                  qr_code: "12453698"
+                  cartao_rfid: "56489756"
                   senha_acesso: "roberto123"
                   data_nascimento: "1990-12-25"
                   tipo: "TERCEIRIZADO"
                   empresa_id: null
-                  funcao: "FAXINEIRO"
+                  funcao: "AUXILIAR_LIMPEZA"
                   matricula: "123456"
                   data_admissao: "2005-05-15"
                   data_saida: "2007-09-18"
@@ -1071,7 +1071,7 @@ paths:
               required:
                 - foto
       responses:
-        '200':
+        '201':
           description: Upload realizado com sucesso
           content:
             application/json:
@@ -1128,15 +1128,16 @@ paths:
                   telefone: "11887795699"
                   email: "pedro.silva@escola.com"
                   unidade_id: 1
-                  qr_code: "11241234asdf12343567289"
-                  cartao_rfid: "1124312345asdf123467289"
+                  qr_code: "12356987"
+                  cartao_rfid: "78564986"
                   senha_acesso: "pedro123"
                   data_nascimento: "2004-02-20"
+                  ra: "0001117648834"
                   rm: "20252930001"
                   responsavel_id: 1
                   turma_id: 1
                   divisao: "DIV A"
-                  status: "TRANSFERIDO"
+                  status: "EM CURSO"
               Professor:
                 summary: Exemplo de Professor
                 value:
@@ -1147,11 +1148,10 @@ paths:
                   telefone: "11957234801"
                   email: "marcelo.souza@escola.com"
                   unidade_id: 1
-                  qr_code: "11243512341234asdf8127349867289"
-                  cartao_rfid: "1124312345asdf123467289"
+                  qr_code: "45632147"
+                  cartao_rfid: "98765329"
                   senha_acesso: "marcelo123"
                   data_nascimento: "1985-08-15"
-                  siape: "1234875"
               Administrador:
                 summary: Exemplo de Administrador
                 value:
@@ -1162,8 +1162,8 @@ paths:
                   telefone: "11977777777"
                   email: "luan.pereira@escola.com"
                   unidade_id: 1
-                  qr_code: "11243567289asfdiuh1234079281"
-                  cartao_rfid: "11243567289asdf129487329"
+                  qr_code: "78965234"
+                  cartao_rfid: "45693258"
                   senha_acesso: "luan123"
                   data_nascimento: "1992-04-10"
                   cargo: "VICE_DIRETOR"
@@ -1173,18 +1173,17 @@ paths:
                 summary: Exemplo de ProfAdm
                 value:
                   nome: "Gusttavo Lima"
-                  rg: "1234467589"
+                  rg: "123467589"
                   cpf: "12346537819"
                   telefone: "11243567289"
                   email: "gusttavo.lima@escola.com"
                   foto: "foto_gusttavo.png"
                   unidade_id: 1
-                  qr_code: "11243567289asdfuj881209438"
-                  cartao_rfid: "11243567289asdfhud08912347"
+                  qr_code: "89435745"
+                  cartao_rfid: "14526987"
                   senha_acesso: "gusttavo123"
                   data_nascimento: "1987-09-05"
-                  siape: "567348"
-                  funcao: "DIRETOR"
+                  cargo: "DIRETOR"
               Terceirizado:
                 summary: Exemplo de Terceirizado
                 value:
@@ -1195,8 +1194,8 @@ paths:
                   telefone: "11955555555"
                   email: "manoel.gomes@empresa.com"
                   unidade_id: 1
-                  qr_code: "123408987569asfasdf87290843"
-                  cartao_rfid: "24350987asdfadsf23592345987"
+                  qr_code: "75674893"
+                  cartao_rfid: "12345678"
                   senha_acesso: "manoel123"
                   data_nascimento: "1990-12-25"
                   empresa_id: 1
@@ -1220,7 +1219,62 @@ paths:
           description: Pessoa deletada
         '404':
           description: Pessoa não encontrada
+
+  /pessoas/gerar_qrcode/{id}:
+    post:
+      tags: [Pessoas]
+      summary: Gerar novo QrCode para uma Pessoa
+      description: Gera um novo qrcode para um usuário
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da pessoa
+      responses:
+        '201':
+          description: QrCode gerado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pessoa_id:
+                    type: integer
+                  foto:
+                    type: string
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Pessoa não encontrada
+        '500':
+          description: Erro interno do servidor
   
+  /pessoas/sincronizar-banco/:
+    post:
+      tags: [Pessoas]
+      summary: Sincronizar Banco com a Catraca
+      description: Sincroniza todos os registros da tabela Pessoa com a API da Control ID em Users e Cards
+      responses:
+        '200':
+          description: Banco sincronizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pessoa_id:
+                    type: integer
+                  foto:
+                    type: string
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Pessoa não encontrada
+        '500':
+          description: Erro interno do servidor
+
   /materias:
     get:
       tags: [Materias]
@@ -1993,8 +2047,6 @@ components:
             tipo:
               type: string
               enum: [PROFESSOR]
-            siape:
-              type: string
 
     Administrador:
       allOf:
@@ -2020,14 +2072,11 @@ components:
         - type: object
           required:
             - tipo
-            - siape
             - cargo
           properties:
             tipo:
               type: string
               enum: [PROFADM]
-            siape:
-              type: string
             cargo:
               type: string
               enum: [DIRETOR, VICE_DIRETOR, COORDENADOR_PEDAGOGICO, SECRETARIO_ESCOLAR, TESOUREIRO, SUPERVISOR_ADMINISTRATIVO, AUXILIAR_ADMINISTRATIVO, TECNICO_ADMINISTRATIVO, ORIENTADOR_EDUCACIONAL, COORDENADOR_DE_CURSO, RESPONSAVEL_FINANCEIRO, ALMOXARIFE, BIBLIOTECARIO, OUTRO]
@@ -2048,7 +2097,7 @@ components:
               type: integer
             funcao:
               type: string
-              enum: [VIGILANTE, FAXINEIRO, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, OUTRO]
+              enum: [VIGILANTE, AUXILIAR_LIMPEZA, SEGURANCA, SERVICOS_GERAIS, TECNICO_MANUTENCAO, JARDINEIRO, CANTINEIRO, COZINHEIRO, OUTRO]
             entrada:
               type: string
             saida:

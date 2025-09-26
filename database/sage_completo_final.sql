@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     foto VARCHAR(255),
+    orgao_emissor_rg VARCHAR(255),
     rg VARCHAR(9) NOT NULL,
     CONSTRAINT chk_rg CHECK (REGEXP_LIKE(rg, '^[0-9]{7}$|^[0-9]{9}$')),
     cpf CHAR(11) NOT NULL,
@@ -95,7 +96,8 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     email VARCHAR(100) NOT NULL COMMENT 'Email de contato, em caso de alunos é o institucional',
     unidade_id INT,
     qr_code VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
-    cartao_rfid VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será um hexadecimal ou numérico com 8 a 16 caracteres',
+    cartao_rfid VARCHAR(8) COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
+    CONSTRAINT chk_rfid CHECK (REGEXP_LIKE(cartao_rfid, '^[0-9]{3}[0-9]{5}$')),
     senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',
     data_nascimento DATE NOT NULL,
     tipo ENUM ('ALUNO', 'RESPONSAVEL', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') NOT NULL,
@@ -137,8 +139,8 @@ CREATE TABLE IF NOT EXISTS Aluno (
     rm CHAR(12) NOT NULL COMMENT '20232930077 -> yyyy<numero_unidade><numero_aluno>',
     CONSTRAINT chk_rm CHECK (REGEXP_LIKE(rm, '^[0-9]{4}[0-9]{3}[0-9]{4}$')),
     turma_id INT,
-    divisao ENUM ('DIV A', 'DIV B'),
-    status ENUM ('CANCELADO', 'CONCLUÍDO', 'DESISTENTE', 'EM CURSO', 'RETIDO', 'TRANCADO', 'TRANSFERÊNCIA EXPEDIDA', 'SUSPENSO') NOT NULL,
+    divisao ENUM ('DIV A', 'DIV B', 'INT'),
+    status ENUM ('CANCELADO', 'CONCLUIDO', 'DESISTENTE', 'EM CURSO', 'RETIDO', 'TRANCADO', 'TRANSFERENCIA EXPEDIDA', 'SUSPENSO') NOT NULL,
     FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE,
     FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL
 );
@@ -212,12 +214,13 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
     id INT PRIMARY KEY,
     empresa_id INT,
     funcao ENUM ('VIGILANTE',
-	  'FAXINEIRO',
+	  'AUXILIAR_LIMPEZA',
 	  'SEGURANCA',
 	  'SERVICOS_GERAIS',
 	  'TECNICO_MANUTENCAO',
 	  'JARDINEIRO',
 	  'CANTINEIRO',
+      'COZINHEIRO',
 	  'OUTRO') NOT NULL,
     FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE,
     FOREIGN KEY (empresa_id) REFERENCES Empresa(id) ON DELETE SET NULL
@@ -232,7 +235,7 @@ CREATE TABLE IF NOT EXISTS Aula (
     inicio TIME NOT NULL,
     fim TIME NOT NULL,
     dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    divisao ENUM ('DIV A/B', 'DIV A', 'DIV B') NOT NULL,
+    divisao ENUM ('INT', 'DIV A', 'DIV B') NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (professor_id) REFERENCES Professor(id) ON DELETE SET NULL,
@@ -418,43 +421,43 @@ INSERT INTO sage.turma (nome, turno, curso_id, unidade_id) VALUES
 -- Inserção de Professores e Administradores
 INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, tipo)
 VALUES
-('Harry Antônio Leite', 'foto.jpg', '123456789', '11122233344', '11999998888', 'harry@escola.com', 1, 'uuid-harry', 'rfid1234A', 'senha123', '1980-01-01', 'PROFESSOR'),
-('Francisco Saiz', 'foto.jpg', '223456789', '11122233355', '11999998887', 'saiz@escola.com', 1, 'uuid-saiz', 'rfid1234B', 'senha123', '1981-02-01', 'PROFESSOR'),
-('Alícia Stefany', 'foto.jpg', '323456789', '11122233366', '11999998886', 'alicia@escola.com', 1, 'uuid-alicia', 'rfid1234C', 'senha123', '1982-03-01', 'PROFADM'),
-('Rosana', 'foto.jpg', '423456789', '11122233377', '11999998885', 'rosana@escola.com', 1, 'uuid-rosana', 'rfid1234D', 'senha123', '1983-04-01', 'PROFESSOR'),
-('Heliene dos Santos', 'foto.jpg', '523456789', '11122233388', '11999998884', 'heliene@escola.com', 1, 'uuid-heliene', 'rfid1234E', 'senha123', '1984-05-01', 'PROFESSOR'),
-('Votto', 'foto.jpg', '623456789', '11122233399', '11999998883', 'votto@escola.com', 1, 'uuid-votto', 'rfid1234F', 'senha123', '1985-06-01', 'PROFESSOR'),
-('Giancelo', 'foto.jpg', '723456789', '11122233400', '11999998882', 'giancelo@escola.com', 1, 'uuid-giancoleo', 'rfid1234G', 'senha123', '1986-07-01', 'PROFESSOR'),
-('Manoel Messias Araújo', 'foto.jpg', '823456789', '11122233411', '11999998881', 'messias@escola.com', 1, 'uuid-messias', 'rfid1234H', 'senha123', '1987-08-01', 'PROFESSOR'),
-('Sâmela Wutzuke', 'foto.jpg', '923456789', '11122233422', '11999998880', 'samela@escola.com', 1, 'uuid-samela', 'rfid1234I', 'senha123', '1988-09-01', 'PROFADM'),
-('Carlindo Baeta', 'foto.jpg', '133456789', '11122233433', '11999998879', 'carlindo@escola.com', 1, 'uuid-carlindo', 'rfid1234J', 'senha123', '1989-10-01', 'PROFESSOR'),
-('Josiane', 'foto.jpg', '143456789', '11122233444', '11999998878', 'josiane@escola.com', 1, 'uuid-josiane', 'rfid1234K', 'senha123', '1990-01-01', 'PROFESSOR'),
-('Nathane', 'foto.jpg', '153456789', '11122233455', '11999998877', 'nathane@escola.com', 1, 'uuid-nathane', 'rfid1234L', 'senha123', '1990-02-01', 'PROFESSOR'),
-('Diego', 'foto.jpg', '163456789', '11122233466', '11999998876', 'diego@escola.com', 1, 'uuid-diego', 'rfid1234M', 'senha123', '1990-03-01', 'PROFESSOR'),
-('Marcelo Afonso Zollo', 'foto.jpg', '173456789', '11122233477', '11999998875', 'zollo@escola.com', 1, 'uuid-zollo', 'rfid1234N', 'senha123', '1990-04-01', 'PROFESSOR'),
-('Patrícia', 'foto.jpg', '183456789', '11122233488', '11999998874', 'patricia@escola.com', 1, 'uuid-patricia', 'rfid1234O', 'senha123', '1990-05-01', 'PROFESSOR'),
-('Daniel', 'foto.jpg', '193456789', '11122233499', '11999998873', 'daniel@escola.com', 1, 'uuid-daniel', 'rfid1234P', 'senha123', '1990-06-01', 'PROFESSOR'),
-('Cristiano SA', 'foto.jpg', '203456789', '11122233500', '11999998872', 'cristiano@escola.com', 1, 'uuid-cristiano', 'rfid1234Q', 'senha123', '1990-07-01', 'PROFESSOR'),
-('Ales Raposo', 'foto.jpg', '213456789', '11122233511', '11999998871', 'ales@escola.com', 1, 'uuid-ales', 'rfid1234R', 'senha123', '1990-08-01', 'PROFESSOR'),
-('Marcos S.', 'foto.jpg', '223456789', '11122233522', '11999998870', 'marcos.s@escola.com', 1, 'uuid-marcos-s', 'rfid1234S', 'senha123', '1990-09-01', 'PROFESSOR'),
-('Jean', 'foto.jpg', '233456789', '11122233533', '11999998869', 'jean@escola.com', 1, 'uuid-jean', 'rfid1234T', 'senha123', '1990-10-01', 'PROFESSOR'),
-('Sheila', 'foto.jpg', '253456789', '11122233555', '11999998867', 'sheila@escola.com', 1, 'uuid-sheila', 'rfid1234V', 'senha123', '1990-12-01', 'PROFESSOR'),
-('Julia', 'foto.jpg', '263456789', '11122233566', '11999998866', 'julia@escola.com', 1, 'uuid-julia', 'rfid1234W', 'senha123', '1991-01-01', 'PROFESSOR'),
-('Thiago', 'foto.jpg', '273456789', '11122233577', '11999998865', 'thiago@escola.com', 1, 'uuid-thiago', 'rfid1234X', 'senha123', '1991-02-01', 'PROFESSOR'),
-('Leide', 'foto.jpg', '283456789', '11122233588', '11999998864', 'leide@escola.com', 1, 'uuid-leide', 'rfid1234Y', 'senha123', '1991-03-01', 'PROFESSOR'),
-('Stephany', 'foto.jpg', '293456789', '11122233599', '11999998863', 'stephany@escola.com', 1, 'uuid-stephany', 'rfid1234Z1', 'senha123', '1991-04-01', 'PROFESSOR'),
-('Joelane', 'foto.jpg', '303456789', '11122233600', '11999998862', 'joelane@escola.com', 1, 'uuid-joelane', 'rfid1234Z2', 'senha123', '1991-05-01', 'PROFESSOR'),
-('Lucas', 'foto.jpg', '313456789', '11122233611', '11999998861', 'lucas@escola.com', 1, 'uuid-lucas', 'rfid1234Z3', 'senha123', '1991-06-01', 'PROFESSOR'),
-('Rafael', 'foto.jpg', '323456789', '11122233622', '11999998860', 'rafael@escola.com', 1, 'uuid-rafael', 'rfid1234Z4', 'senha123', '1991-07-01', 'PROFESSOR'),
-('Flávia', 'foto.jpg', '333456789', '11122233633', '11999998859', 'flavia@escola.com', 1, 'uuid-flavia', 'rfid1234Z5', 'senha123', '1991-08-01', 'PROFESSOR'),
-('Sullivan', 'foto.jpg', '343456789', '11122233644', '11999998858', 'sullivan@escola.com', 1, 'uuid-sullivan', 'rfid1234Z6', 'senha123', '1991-09-01', 'PROFESSOR'),
-('Fabiana', 'foto.jpg', '353456789', '11122233655', '11999998857', 'fabiana@escola.com', 1, 'uuid-fabiana', 'rfid1234Z7', 'senha123', '1991-10-01', 'PROFESSOR'),
-('Gleyce', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR'),
-('Acássio', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR'),
-('Débora', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR'),
-('Joelane', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR'),
-('Marcos Lisa', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR'),
-('Felipe', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', 'rfid1234Z8', 'senha123', '1991-11-01', 'PROFESSOR');
+('Harry Antônio Leite', 'foto.jpg', '123456789', '11122233344', '11999998888', 'harry@escola.com', 1, 'uuid-harry', '12345678', 'senha123', '1980-01-01', 'PROFESSOR'),
+('Francisco Saiz', 'foto.jpg', '223456789', '11122233355', '11999998887', 'saiz@escola.com', 1, 'uuid-saiz', '94857293', 'senha123', '1981-02-01', 'PROFESSOR'),
+('Alícia Stefany', 'foto.jpg', '323456789', '11122233366', '11999998886', 'alicia@escola.com', 1, 'uuid-alicia', '16374859', 'senha123', '1982-03-01', 'PROFADM'),
+('Rosana', 'foto.jpg', '423456789', '11122233377', '11999998885', 'rosana@escola.com', 1, 'uuid-rosana', '17263548', 'senha123', '1983-04-01', 'PROFESSOR'),
+('Heliene dos Santos', 'foto.jpg', '523456789', '11122233388', '11999998884', 'heliene@escola.com', 1, 'uuid-heliene', '86952341', 'senha123', '1984-05-01', 'PROFESSOR'),
+('Votto', 'foto.jpg', '623456789', '11122233399', '11999998883', 'votto@escola.com', 1, 'uuid-votto', '85746273', 'senha123', '1985-06-01', 'PROFESSOR'),
+('Giancelo', 'foto.jpg', '723456789', '11122233400', '11999998882', 'giancelo@escola.com', 1, 'uuid-giancoleo', '47463625', 'senha123', '1986-07-01', 'PROFESSOR'),
+('Manoel Messias Araújo', 'foto.jpg', '823456789', '11122233411', '11999998881', 'messias@escola.com', 1, 'uuid-messias', '85745849', 'senha123', '1987-08-01', 'PROFESSOR'),
+('Sâmela Wutzuke', 'foto.jpg', '923456789', '11122233422', '11999998880', 'samela@escola.com', 1, 'uuid-samela', '14562545', 'senha123', '1988-09-01', 'PROFADM'),
+('Carlindo Baeta', 'foto.jpg', '133456789', '11122233433', '11999998879', 'carlindo@escola.com', 1, 'uuid-carlindo', '78549635', 'senha123', '1989-10-01', 'PROFESSOR'),
+('Josiane', 'foto.jpg', '143456789', '11122233444', '11999998878', 'josiane@escola.com', 1, 'uuid-josiane', '45215478', 'senha123', '1990-01-01', 'PROFESSOR'),
+('Nathane', 'foto.jpg', '153456789', '11122233455', '11999998877', 'nathane@escola.com', 1, 'uuid-nathane', '96586598', 'senha123', '1990-02-01', 'PROFESSOR'),
+('Diego', 'foto.jpg', '163456789', '11122233466', '11999998876', 'diego@escola.com', 1, 'uuid-diego', '78548965', 'senha123', '1990-03-01', 'PROFESSOR'),
+('Marcelo Afonso Zollo', 'foto.jpg', '173456789', '11122233477', '11999998875', 'zollo@escola.com', 1, 'uuid-zollo', '78549658', 'senha123', '1990-04-01', 'PROFESSOR'),
+('Patrícia', 'foto.jpg', '183456789', '11122233488', '11999998874', 'patricia@escola.com', 1, 'uuid-patricia', '12547896', 'senha123', '1990-05-01', 'PROFESSOR'),
+('Daniel', 'foto.jpg', '193456789', '11122233499', '11999998873', 'daniel@escola.com', 1, 'uuid-daniel', '15487965', 'senha123', '1990-06-01', 'PROFESSOR'),
+('Cristiano SA', 'foto.jpg', '203456789', '11122233500', '11999998872', 'cristiano@escola.com', 1, 'uuid-cristiano', '12365478', 'senha123', '1990-07-01', 'PROFESSOR'),
+('Ales Raposo', 'foto.jpg', '213456789', '11122233511', '11999998871', 'ales@escola.com', 1, 'uuid-ales', '45678197', 'senha123', '1990-08-01', 'PROFESSOR'),
+('Marcos S.', 'foto.jpg', '223456789', '11122233522', '11999998870', 'marcos.s@escola.com', 1, 'uuid-marcos-s', '34257618', 'senha123', '1990-09-01', 'PROFESSOR'),
+('Jean', 'foto.jpg', '233456789', '11122233533', '11999998869', 'jean@escola.com', 1, 'uuid-jean', '15342768', 'senha123', '1990-10-01', 'PROFESSOR'),
+('Sheila', 'foto.jpg', '253456789', '11122233555', '11999998867', 'sheila@escola.com', 1, 'uuid-sheila', '15678494', 'senha123', '1990-12-01', 'PROFESSOR'),
+('Julia', 'foto.jpg', '263456789', '11122233566', '11999998866', 'julia@escola.com', 1, 'uuid-julia', '12345768', 'senha123', '1991-01-01', 'PROFESSOR'),
+('Thiago', 'foto.jpg', '273456789', '11122233577', '11999998865', 'thiago@escola.com', 1, 'uuid-thiago', '15648791', 'senha123', '1991-02-01', 'PROFESSOR'),
+('Leide', 'foto.jpg', '283456789', '11122233588', '11999998864', 'leide@escola.com', 1, 'uuid-leide', '15678194', 'senha123', '1991-03-01', 'PROFESSOR'),
+('Stephany', 'foto.jpg', '293456789', '11122233599', '11999998863', 'stephany@escola.com', 1, 'uuid-stephany', '15648791', 'senha123', '1991-04-01', 'PROFESSOR'),
+('Joelane', 'foto.jpg', '303456789', '11122233600', '11999998862', 'joelane@escola.com', 1, 'uuid-joelane', '64372519', 'senha123', '1991-05-01', 'PROFESSOR'),
+('Lucas', 'foto.jpg', '313456789', '11122233611', '11999998861', 'lucas@escola.com', 1, 'uuid-lucas', '54679187', 'senha123', '1991-06-01', 'PROFESSOR'),
+('Rafael', 'foto.jpg', '323456789', '11122233622', '11999998860', 'rafael@escola.com', 1, 'uuid-rafael', '13426758', 'senha123', '1991-07-01', 'PROFESSOR'),
+('Flávia', 'foto.jpg', '333456789', '11122233633', '11999998859', 'flavia@escola.com', 1, 'uuid-flavia', '13246758', 'senha123', '1991-08-01', 'PROFESSOR'),
+('Sullivan', 'foto.jpg', '343456789', '11122233644', '11999998858', 'sullivan@escola.com', 1, 'uuid-sullivan', '45678137', 'senha123', '1991-09-01', 'PROFESSOR'),
+('Fabiana', 'foto.jpg', '353456789', '11122233655', '11999998857', 'fabiana@escola.com', 1, 'uuid-fabiana', '59867534', 'senha123', '1991-10-01', 'PROFESSOR'),
+('Gleyce', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '99657846', 'senha123', '1991-11-01', 'PROFESSOR'),
+('Acássio', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '67854316', 'senha123', '1991-11-01', 'PROFESSOR'),
+('Débora', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '76489756', 'senha123', '1991-11-01', 'PROFESSOR'),
+('Joelane', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '46578493', 'senha123', '1991-11-01', 'PROFESSOR'),
+('Marcos Lisa', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '34215679', 'senha123', '1991-11-01', 'PROFESSOR'),
+('Felipe', 'foto.jpg', '363456789', '11122233666', '11999998856', 'gleyce@escola.com', 1, 'uuid-gleyce', '54685673', 'senha123', '1991-11-01', 'PROFESSOR');
 
 INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato) VALUES
 (1, '10001', '2015-02-10', '2018-02-10', 'DETERMINADO'),
@@ -541,7 +544,7 @@ INSERT INTO Administrador (id, cargo) VALUES
 -- Alunos 3°B
 INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, tipo)
 VALUES
-('Igor', 'foto.jpg', '634150467', '45328562801', '11930402308', 'igorfcfs@gmail.com', 1, 'uuid-harry', 'rfid1234A', 'senha123', '2007-08-23', 'ALUNO');
+('Igor', 'foto.jpg', '634150467', '45328562801', '11930402308', 'igorfcfs@gmail.com', 1, 'uuid-harry', '15822040', 'senha123', '2007-08-23', 'ALUNO');
 INSERT INTO Aluno (id, ra, rm, turma_id, divisao, status) VALUES
 (38, "0001115926676", "20232930077", 6, 'DIV A', 'EM CURSO');
 
@@ -553,7 +556,7 @@ INSERT INTO Responsavel (id, aluno_id) VALUES (39, 38);
 -- AULAS SERÃO INSERIDAS PELO SISTEMA
 
 INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial)
-VALUES ("Catraca 01", "IDBlock", "192.168.0.126", "81", "admin", "admin", "0K0410/0011BC");
+VALUES ("Catraca 01", "IDBlock", "192.168.0.126", "80", "admin", "admin", "0K0410/0011BC");
 
 INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial)
 VALUES ("Catraca 02", "IDBlock", "192.168.0.127", "82", "admin", "admin", "0K0410/00177E");

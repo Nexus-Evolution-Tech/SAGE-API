@@ -1,18 +1,13 @@
 const deviceService = require('./deviceService');
 
-function mapearMetodo(metodoOriginal) {
-  switch (metodoOriginal) {
-    case 'QRCODE':
-      return 'QR_CODE';
-    case 'RFID':
-      return 'CARTAO_RFID';
-    case 'PASSWORD':
-      return 'SENHA';
-    case 'FINGERPRINT':
-      return 'BIOMETRIA';
-    default:
-      return 'QR_CODE';
-  }
+function mapearMetodo(value) {
+  if (value.length === 8) return 'QRCODE';
+  else return 'CARTAO_RFID';
+}
+
+function identificarAcesso(portal_id) {
+  if (portal_id === 1) return 'ENTRADA'
+  else return 'SAIDA'
 }
 
 async function sincronizarAcessos(dispositivo) {
@@ -24,18 +19,34 @@ async function sincronizarAcessos(dispositivo) {
     return { sucesso: false, message: `Erro ao obter sessão com a catraca ${dispositivo.nome}` };
   }
 
-  const logs = await deviceService.obterLogsCatraca(session, link);
-  console.log(logs);
+  // Busca o último acesso sincronizado para este dispositivo
+  const ultimoAcesso = await global.db('Acesso')
+    .where({ dispositivo_id: dispositivo.id })
+    .orderBy('data_hora', 'desc')
+    .first();
+
+  // Timestamp inicial (em segundos)
+  const timestampInicial = ultimoAcesso
+    ? Math.floor(new Date(ultimoAcesso.data_hora).getTime() / 1000)
+    : 0;
+
+  // Obtem logs da catraca e filtra os que são maiores que timestampInicial
+  const logs = await deviceService.obterLogsCatraca(session, link, timestampInicial);
+
   let acessosSincronizados = 0;
 
   for (const log of logs) {
-    const pessoa_id = log.user_id;
+    if (log.time <= timestampInicial) {
+      // Ignora logs antigos ou já processados (por segurança)
+      continue;
+    }
+
+    const pessoa_id = /*log.user_id - 110000000*/ 1; //PARA PASSAR O ID DAS PESSOAS É PRECISO DELETAR TODOS OS OUTROS DADOS ANTERIORES
     const dispositivo_id = dispositivo.id;
     const data_hora = new Date(log.time * 1000);
-    const status = log.event; // ENTRADA, SAIDA, NEGADO
-    const metodo_auth = mapearMetodo(log.auth_method);
-    console.log(`Método de autenticação: ${metodo_auth}`);
-    const permitido = status !== 'NEGADO';
+    const status = identificarAcesso(log.portal_id);
+    const metodo_auth = mapearMetodo(log.card_value);
+    const permitido = true;
 
     // Verifica se já existe um registro com esses dados
     const acessoExistente = await global.db('Acesso')
@@ -49,7 +60,8 @@ async function sincronizarAcessos(dispositivo) {
         status,
         permitido,
         metodo_auth,
-        data_hora
+        data_hora,
+        updated_at: new Date()
       });
 
       acessosSincronizados++;
@@ -65,17 +77,110 @@ async function sincronizarAcessos(dispositivo) {
   };
 }
 
+// OBS: A API DA CONTROLID JÁ SINCRONIZA OS LOGS EM TODAS AS CATRACAS AUTOMATICAMENTE - NÃO TEM ENTRADA E SAÍDA ESPECÍFICA - AS CATRACAS NÃO SE CONVERSAM, PRECISA VOLTAR AO SISTEMA ANTERIOR, A ESPECULAÇÃO SERÁ APENAS PELO HORÁRIO
 async function sincronizarTodosAcessos() {
   const dispositivos = await global.db('Dispositivo');
   const resultados = [];
 
-  for (const dispositivo of dispositivos) {
-    const resultado = await sincronizarAcessos(dispositivo);
-    resultados.push(resultado);
-  }
+  const resultado = await sincronizarAcessos(dispositivos[0]);
+  resultados.push(resultado);
 
   return resultados;
 }
+
+// async function sincronizarTodosAcessos() {
+//   const dispositivos = await global.db('Dispositivo');
+//   const resultados = [];
+
+//   for (const dispositivo of dispositivos) {
+//     const resultado = await sincronizarAcessos(dispositivo);
+//     resultados.push(resultado);
+//   }
+
+//   return resultados;
+// }
+
+// ESSE SINCRONIZA AS DUAS CATRACAS PELA ORDEM CASO CADA UMA TIVESSE UM LOG INDIVIDUAL
+// async function sincronizarTodasCatracas() {
+//   // 1. Pega todas as catracas do banco
+//   const dispositivos = await global.db('Dispositivo');
+
+//   // 2. Para cada dispositivo, pega o último timestamp sincronizado na tabela Acesso
+//   const promessasLogs = dispositivos.map(async (dispositivo) => {
+//     const ultimoAcesso = await global.db('Acesso')
+//       .where({ dispositivo_id: dispositivo.id })
+//       .orderBy('data_hora', 'desc')
+//       .first();
+
+//     const timestampInicial = ultimoAcesso
+//       ? Math.floor(new Date(ultimoAcesso.data_hora).getTime() / 1000)
+//       : 0;
+
+//     // Obtém sessão e logs incrementais
+//     const link = deviceService.linkCatraca(dispositivo);
+//     const session = await deviceService.obterSessao(link, dispositivo);
+
+//     if (!session) {
+//       console.log(`Erro ao obter sessão para a catraca ${dispositivo.nome}`);
+//       return [];
+//     }
+
+//     const logs = await deviceService.obterLogsCatraca(session, link, timestampInicial);
+
+//     // Acrescenta info do dispositivo para cada log
+//     return logs.map(log => ({
+//       ...log,
+//       dispositivo_id: dispositivo.id,
+//       dispositivo_nome: dispositivo.nome
+//     }));
+//   });
+
+//   // 3. Aguarda todos os logs serem buscados em paralelo
+//   const resultados = await Promise.all(promessasLogs);
+
+//   // 4. Junta tudo em uma lista só
+//   let todosLogs = resultados.flat();
+
+//   // 5. Ordena os logs por timestamp
+//   todosLogs.sort((a, b) => a.time - b.time);
+
+//   // 6. Insere os logs ordenados na tabela Acesso
+//   let acessosSincronizados = 0;
+
+//   for (const log of todosLogs) {
+//     const pessoa_id = /* log.user_id - 110000000 */ 1; // ajuste conforme sua regra
+//     const dispositivo_id = log.dispositivo_id;
+//     const data_hora = new Date(log.time * 1000);
+//     const status = identificarAcesso(log.portal_id);
+//     const metodo_auth = mapearMetodo(log.card_value);
+//     const permitido = true;
+
+//     // Evita duplicidade
+//     const acessoExistente = await global.db('Acesso')
+//       .where({ pessoa_id, dispositivo_id, data_hora })
+//       .first();
+
+//     if (!acessoExistente) {
+//       await global.db('Acesso').insert({
+//         pessoa_id,
+//         dispositivo_id,
+//         status,
+//         permitido,
+//         metodo_auth,
+//         data_hora,
+//         updated_at: new Date()
+//       });
+
+//       acessosSincronizados++;
+//     }
+//   }
+
+//   return {
+//     sucesso: true,
+//     acessosSincronizados,
+//     message: `${acessosSincronizados} acessos sincronizados com sucesso, em ordem cronológica global.`
+//   };
+// }
 
 function calcularIdade(dataNascimento) {
   const hoje = new Date();
@@ -128,12 +233,18 @@ async function criarAcesso(dados) {
           case 'SUSPENSO':
             permitido = false; // Se o aluno foi suspenso, a saída é negada
             return { message: "Acesso negado: Aluno suspenso" };
-          case 'TRANSFERIDO':
+          case 'TRANSFERENCIA EXPEDIDA':
             permitido = false; // Se o aluno foi transferido, a saída é negada
             return { message: "Acesso negado: Aluno transferido" };
-          case 'DESLIGADO':
-            permitido = false; // Se o aluno foi desligado, a saída é negada
-            return { message: "Acesso negado: Aluno desligado" };
+          case 'TRANCADO':
+            permitido = false; // Se o aluno trancou o curso, a saída é negada
+            return { message: "Acesso negado: Aluno trancado" };
+          case 'DESISTENTE':
+            permitido = false; // Se o aluno desistiu do curso, a saída é negada
+            return { message: "Acesso negado: Aluno desistente" };
+          case 'CANCELADO':
+            permitido = false; // Se o aluno foi cancelado, a saída é negada
+            return { message: "Acesso negado: Aluno cancelado" };
           default:
             permitido = true; // Se o aluno está ativo, a entrada é permitida
             mensagem = "Acesso autorizado: Entrada permitida para aluno ativo";
@@ -149,14 +260,15 @@ async function criarAcesso(dados) {
         mensagem = "Acesso autorizado: Saída permitida para não-alunos";
         break;
       }
+      
+      /*ATE PARA OS MAIORES DE IDADE É EXIGIDO PERMISSÃO*/
+      // if (idadePessoa >= 18) {
+      //   permitido = true;
+      //   mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - ${idadePessoa} anos`;
+      //   break;
+      // } 
 
-      if (idadePessoa >= 18) {
-        permitido = true;
-        mensagem = `Acesso autorizado: Saída permitida para aluno maior de idade - ${idadePessoa} anos`;
-        break;
-      }
-
-      // Aluno menor de idade - Verificar horários das aulas
+      // Verificar horários das aulas
       const hoje = new Date();
       const diaSemana = hoje.getDay(); // 0 = domingo, 1 = segunda, etc.
 
@@ -178,12 +290,13 @@ async function criarAcesso(dados) {
 
       const agora = hoje.toTimeString().split(' ')[0]; // HH:MM:SS
 
-      if (agora < primeiraAula.inicio) {
-        // Antes da primeira aula, pode sair sem problemas
-        permitido = true;
-        mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
-        break;
-      }
+      /*INDEPENDENTE SE COMEÇOU A PRIMEIRA AULA DO DIA OU NÃO, A PARTIR DO MOMENTO EM QUE O ALUNO ENTRA NA ESCOLA, SÓ PODERÁ SAIR NO SEU HORÁRIO DE SAÍDA*/
+      // if (agora < primeiraAula.inicio) {
+      //   // Antes da primeira aula, pode sair sem problemas
+      //   permitido = true;
+      //   mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
+      //   break;
+      // }
 
       if (agora >= ultimaAula.fim) {
         // Após o fim da última aula, pode sair sem problemas
@@ -225,7 +338,7 @@ async function criarAcesso(dados) {
 
             if (mesmaData) {
               permitido = true;
-              mensagem = `Acesso autorizado: Solicitação aprovada - Aluno com ${idadePessoa} anos - MENOR DE IDADE`;
+              mensagem = `Acesso autorizado: Solicitação aprovada - Aluno com ${idadePessoa} anos`;
               break;
             } else {
               permitido = false;

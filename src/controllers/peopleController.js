@@ -1,10 +1,14 @@
 // PESSOA N TEM COMO GENERALIZAR, ELA TEM FUNCOES MTO ESPECIFICAS EM SEU CRUD
 const peopleService = require('../services/peopleService');
+const controlIdService = require('../services/controlIdService');
 const { buscarTodasPessoas, buscarPorId, atualizarPessoaCompleta, removerPessoa } = require('../utils/people-db-utils');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/database');
+const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
+const { buscarPessoaBase } = require('../utils/people-db-utils');
+const { sincronizarTodasPessoasNasCatracas } = require('../utils/syncAll');
 
 const listar = async (req, res) => {
   try {
@@ -16,13 +20,48 @@ const listar = async (req, res) => {
   }
 };
 
+// SE NÃO CRIAR NA CATRACA TAMBÉM NÃO CRIA NO BANCO - ID NÃO ESTÁ SENDO PASSADO POIS É AUTOINCREMENT, SO É GERADO QUANDO É CRIADO NO BANCO
+// PORTANTO, PRECISA CRIAR NO BANCO PRIMEIRO E DEPOIS NA CATRACA
 const criar = async (req, res) => {
   try {
-    const novaPessoa = await peopleService.criarPessoaCompleta(req.body);
-    res.status(201).json({ message: 'Pessoa criada com sucesso', pessoa: novaPessoa });
+    // 1. Salva no banco
+    const pessoaCriada = await peopleService.criarPessoaCompleta(req.body);
+
+    const id = pessoaCriada.idPessoa;
+    //buscar no banco a pessoa criada
+    const pessoa = await buscarPessoaBase(id);
+
+    // 2. Monta o objeto completo para a catraca
+    const novaPessoaParaCatraca = {
+      id: pessoa.id,
+      nome: pessoa.nome,
+      cartao_rfid: pessoa.cartao_rfid,
+      qrcode: pessoa.qr_code
+      // outros campos que a catraca espera
+    };
+
+    // 3. Sincroniza com catraca
+    let resultados = [];
+    try {
+      if (pessoa.tipo !== 'RESPONSAVEL')
+        resultados = await controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca);
+    } catch (errorCatraca) {
+      console.error('Erro ao sincronizar com catraca:', errorCatraca);
+    }
+
+    res.status(201).json({
+      message: 'Pessoa criada com sucesso',
+      pessoa: pessoaCriada,
+      sincronizacao: resultados
+    });
+
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao criar pessoa:', error: error.message });
+    res.status(400).json({
+      message: 'Falha ao criar pessoa',
+      erro: error.message,
+      detalhes: error.detalhes
+    });
   }
 };
 
@@ -73,18 +112,28 @@ const editar = async (req, res) => {
   try {
     const id = req.params.id;
     await atualizarPessoaCompleta(id, req.body);
-    res.json({ message: 'Pessoa atualizada com sucesso' });
+    if (req.body.nome !== null && req.body.cartao_rfid !== null){
+      const resultados = await controlIdService.editarPessoaNasCatracas(id, req.body.nome, req.body.cartao_rfid);
+      res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
+    }
+    res.json({ message: 'Pessoa atualizada com sucesso'});
   } catch (error) {
     console.error('Erro ao atualizar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao atualizar pessoa', error: error.message });
+    res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
   }
 };
 
 const deletar = async (req, res) => {
   try {
     const id = req.params.id;
+    
+    // const query = `SELECT * FROM Pessoa WHERE id = ?`;
+    // const [pessoa] = await db.query(query, [id]);
+    // if(!pessoa) return "Pessoa não encontrada";
+
+    const resultados = await controlIdService.deletarPessoaDasCatracas(id/*, pessoa[0].nome*/);
     await removerPessoa(id);
-    res.json({ message: 'Pessoa removida com sucesso' });
+    res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
     console.error('Erro ao remover pessoa:', error);
     res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
@@ -124,11 +173,39 @@ const getUrlById = async (req, res) => {
 
 const uploadFoto = async (req, res) => {
   try {
-    await peopleService.uploadFotoPessoa(req, res);
-    res.status(201).json({ message: 'Foto enviada com sucesso' });
+    await peopleService.uploadFotoPessoa(req, res); // o service envia a resposta
+    if(req.file) await criarImagemUsuario(req.params.id)
+    else return res.status(400).json({ message: 'Arquivo de foto não enviado' });
   } catch (error) {
     console.error('Erro ao enviar foto:', error);
-    res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+    }
+  }
+}
+
+const gerarQrCode = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const data = await generateQrCode(id);
+
+    const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
+    await db.query(query, [data.qrcode, id]);
+
+    res.json({ message: "QrCode gerado com sucesso para a pessoa", id });
+  } catch (error) {
+    console.error('Erro ao gerar qrcode para users:', error);
+    res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
+  }
+}
+
+const sincronizarBanco = async (req, res) => {
+  try {
+    await sincronizarTodasPessoasNasCatracas();
+    res.json({ message: "Banco sincronizado com sucesso", id });
+  } catch (error) {
+    console.error('Erro ao sincronizar banco:', error);
+    res.status(500).json({ message: 'Erro ao sincronizar banco', error: error.message });
   }
 }
 
@@ -143,5 +220,7 @@ module.exports = {
   deletar,
   getUrls,
   getUrlById,
-  uploadFoto
+  uploadFoto,
+  gerarQrCode,
+  sincronizarBanco
 };
