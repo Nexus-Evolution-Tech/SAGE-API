@@ -4,16 +4,25 @@ const controlId = require('../utils/controlId-utils');
 const { verificaSeFotoUserExiste, deletarFotoUserPorId } = require('../utils/photo-user-utils');
 const gerarCardValue = require('../utils/gerarCardValue');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
+const db = require('../config/database');
 
 // Função para inserir na tabela sync_pendente caso ocorra um erro na sincronização
 const registrarSyncPendente = async (pessoaId, dispositivoId, action) => {
   try {
-    await db.query('INSERT INTO sync_pendente (pessoa_id, dispositivo_id, actions) VALUES (?, ?, ?)', [pessoaId, dispositivoId, action]);
+    await db.query('INSERT INTO sync_pendente (pessoa_id, dispositivo_id, action) VALUES (?, ?, ?)', [pessoaId, dispositivoId, action]);
     console.log(`Registro de sincronização pendente inserido para pessoa ${pessoaId} e dispositivo ${dispositivoId}`);
   } catch (err) {
     console.error('Erro ao registrar sincronização pendente:', err);
   }
 };
+
+async function existeRegistroPendente(id, acao) {
+  const resultado = await db.query(
+    'SELECT COUNT(*) as total FROM sync_pendente WHERE id = ? AND action = ?',
+    [id, acao]
+  );
+  return resultado[0].total > 0;
+}
 
 // OBS: TA CRIANDO, MAS QUANDO O CARTAO RFID É O MESMO ELE NÃO DA EXCEÇÃO, SIMPLESMENTE NÃO CRIA ATRIBUI O CARTÃO À PESSOA, DEVERIA TER PELO MENOS UM AVISO DE QUE NÃO PÔDE SER CRIADO
 // O PROBLEMA DISSO É QUE EU NÃO CONSIGO VER SE A VERIFICAÇÃO ESTÁ PENDENTE, SE ESTIVER, PROVAVELMENTE VOU PRECISAR SALVAR O ID DA PESSOA EM UMA TABELA A PARTE
@@ -22,21 +31,27 @@ const registrarSyncPendente = async (pessoaId, dispositivoId, action) => {
 // se der excecao em cada uma dessas funções eu preciso inserir o id da pessoa na tabela sync_pendente
 const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(novaPessoa.id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
+  const todosDispositivos = await listarTodos();
+  const dispositivos = dispositivoId !== null
+    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)]
+    : todosDispositivos;
+  console.log('dispositivoId:', dispositivoId, typeof dispositivoId);
+  console.log('todosDispositivos:', todosDispositivos.map(d => ({ id: d.id, tipo: typeof d.id })));
 
   const resultados = [];
   const qrcode = novaPessoa.qrcode !== null && novaPessoa.qrcode?.length === 8 ? Number(novaPessoa.qrcode) : gerarNumero8Digitos();
 
   for (const dispositivo of dispositivos) {
+    console.log(dispositivos)
     const link = linkCatraca(dispositivo);
     const session = await obterSessao(link, dispositivo);
 
-    if (!session) {
-      // Registra a falha na tabela de pendente
-      await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'Sessão inválida');
-      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
-      continue;
-    }
+    // if (!session) {
+    //   // Registra a falha na tabela de pendente
+    //   await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE');
+    //   resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
+    //   continue;
+    // }
 
     try {
       // 1. Criar usuário
@@ -74,19 +89,22 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
 
 const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
+  const todosDispositivos = await listarTodos();
+  const dispositivos = dispositivoId !== null
+    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)]
+    : todosDispositivos;
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
     const link = linkCatraca(dispositivo);
     const session = await obterSessao(link, dispositivo);
 
-    if (!session) {
-      // Registra falha na tabela de pendente
-      await registrarSyncPendente(id, dispositivo.id, 'Sessão inválida');
-      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
-      continue;
-    }
+    // if (!session) {
+    //   // Registra falha na tabela de pendente
+    //   await registrarSyncPendente(id, dispositivo.id, 'UPDATE');
+    //   resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
+    //   continue;
+    // }
 
     try {
       await controlId.editarUsuario(catracaUserId, nome, link, session, dispositivo, resultados);
@@ -101,9 +119,20 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = nu
         await controlId.deletarCartao(catracaUserId, link, session, dispositivo, resultados);
       }
     } catch (error) {
-      // Se erro ocorrer, registra na tabela de pendente
-      await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message || 'Erro desconhecido');
-      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: error.message || 'Erro desconhecido' });
+      // Verifica se já existe um pendente com ação 'CREATE' para esse ID
+      const jaExisteCriacaoPendente = await existeRegistroPendente(id, 'CREATE');
+
+      if (!jaExisteCriacaoPendente) {
+        // Se não existe, registra como pendente de 'UPDATE'
+        await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message || 'Erro desconhecido');
+      }
+
+      // Sempre adiciona ao resultado, independente de registrar ou não o pendente
+      resultados.push({
+        dispositivo: dispositivo.nome,
+        sucesso: false,
+        erro: error.message || 'Erro desconhecido'
+      });
     }
   }
 
@@ -122,19 +151,22 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = nu
 // OBS: TA DELETANDO, MAS MESMO QUANDO O ID NÃO EXISTE DA TRUE NAS DUAS CATRACAS
 const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
+  const todosDispositivos = await listarTodos();
+  const dispositivos = dispositivoId !== null
+    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)]
+    : todosDispositivos;
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
     const link = linkCatraca(dispositivo);
     const session = await obterSessao(link, dispositivo);
 
-    if (!session) {
-      // Registra falha na tabela de pendente
-      await registrarSyncPendente(id, dispositivo.id, 'Sessão inválida');
-      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
-      continue;
-    }
+    // if (!session) {
+    //   // Registra falha na tabela de pendente
+    //   await registrarSyncPendente(id, dispositivo.id, 'DELETE');
+    //   resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
+    //   throw new Error("Não é possível deletar este usuário");
+    // }
 
     try {
       // 1. Deletar usuário
@@ -167,9 +199,10 @@ const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
 
 const criarImagemUsuario = async (id, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
-
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
-
+  const todosDispositivos = await listarTodos();
+  const dispositivos = dispositivoId
+    ? [todosDispositivos.find(d => d.id === dispositivoId)]
+    : todosDispositivos; 
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
