@@ -90,8 +90,8 @@ const criarUsuario = async (catracaUserId, novaPessoa, link, session, dispositiv
     userId = response.data.ids?.[0] ?? novaPessoa.id; // fallback pro ID local
     resultados.push({ dispositivo: dispositivo.nome, sucesso: true, catracaId: userId });
   } catch (error) {
-    console.warn(`Erro ao criar usuário na catraca ${dispositivo.nome}:`, error.response?.data || error.message);
     resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: error.response?.data || error.message });
+    throw new Error(`Erro ao criar usuário na catraca ${dispositivo.nome}:`, error.response?.data || error.message);
   }
 }
 
@@ -160,7 +160,7 @@ const criarCartao = async (id, value, link, session, dispositivo, resultados) =>
   try {
     await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, cardPayload, { headers: { "Content-Type": "application/json" } });
   } catch (err) {
-    console.warn(`Não foi possível criar cartão na catraca ${dispositivo.nome}:`, err.message);
+    throw new Error(`Não foi possível criar cartão na catraca ${dispositivo.nome}:`, err.message);
   }
 }
 
@@ -219,7 +219,7 @@ const criarGrupo = async (id, link, session, dispositivo, resultados) => {
     try {
       await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, groupPayload, { headers: { "Content-Type": "application/json" } });
     } catch (err) {
-      console.warn(`Não foi possível criar grupo na catraca ${dispositivo.nome}:`, err.message);
+      throw new Error(`Não foi possível criar grupo na catraca ${dispositivo.nome}:`, err.message);
     }
 }
 

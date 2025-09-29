@@ -26,13 +26,16 @@ async function sincronizarTodasPessoasNasCatracas() {
 async function verificarSyncPendentes(dispositivo) {
   try {
     // 1. Obter registros da tabela sync_pendente
-    const pendentes = await db.query('SELECT * FROM sync_pendente WHERE dispositivo_id = ?', [dispositivo.id]);
+    const pendentes = await global.db('sync_pendente').select('*').where('dispositivo_id', dispositivo.id);
 
     // 2. Para cada registro pendente, chama a função correspondente
     for (const registro of pendentes) {
       try {
         // A consulta agora retorna um array, então acessamos o primeiro item diretamente
-        const pessoa = (await db.query('SELECT * FROM Pessoa WHERE id = ?', [registro.pessoa_id]))[0];
+        const pessoa = await global.db('Pessoa')
+          .select('*')
+          .where('id', registro.pessoa_id)
+          .first();
         
         // Checar a ação (CREATE, UPDATE, DELETE)
         if (registro.action === 'CREATE') {
@@ -47,7 +50,7 @@ async function verificarSyncPendentes(dispositivo) {
         }
 
         // Após a sincronização bem-sucedida, removemos da tabela de pendentes
-        await db('sync_pendente').where('id', registro.id).del();
+        await global.db('sync_pendente').where('id', registro.id).del();
         console.log(`Registro de sincronização de ${pessoa.nome} removido da tabela sync_pendente.`);
       } catch (erro) {
         console.error(`Erro ao processar o registro pendente para a pessoa ID ${registro.pessoa_id}:`, erro.message);
@@ -55,21 +58,6 @@ async function verificarSyncPendentes(dispositivo) {
     }
   } catch (error) {
     console.error('Erro ao verificar sincronização pendente:', error.message);
-  }
-}
-
-// Função de obtenção da sessão
-async function obterSessao(linkCatraca, dispositivo) {
-  try {
-    const response = await axios.post(`http://${linkCatraca}/login.fcgi`, {
-      login: dispositivo.usuario,
-      password: dispositivo.senha
-    });
-    console.log(`Sessão obtida para ${dispositivo.nome}:`, response.data.session);
-    return response.data.session;
-  } catch (error) {
-    console.error(`Erro ao obter sessão para ${dispositivo?.nome}:`, error.message);
-    return null;
   }
 }
 
