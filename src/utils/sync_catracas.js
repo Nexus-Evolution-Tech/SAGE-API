@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { criarNovaPessoaNasCatracas, editarPessoaNasCatracas, deletarPessoaDasCatracas } = require('../services/controlIdService');
+const { criarNovaPessoaNasCatracas, editarPessoaNasCatracas, deletarPessoaDasCatracas } = require('../services/controlIdService'); // DEPENDÊNCIA CIRCULAR?
 
 async function sincronizarTodasPessoasNasCatracas() {
   try {

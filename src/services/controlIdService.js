@@ -1,4 +1,4 @@
-const dispositivosService = require('./deviceService');
+const dispositivosService = require('./deviceService'); // DEPEDÊNCIA CIRCULAR - AQUI ESTÁ O ERRO
 const controlId = require('../utils/controlId-utils');
 const { verificaSeFotoUserExiste, deletarFotoUserPorId } = require('../utils/photo-user-utils');
 const gerarCardValue = require('../utils/gerarCardValue');

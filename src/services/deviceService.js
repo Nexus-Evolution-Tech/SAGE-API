@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { verificarSyncPendentes } = require('../utils/sync_catracas');
+const { verificarSyncPendentes } = require('../utils/sync_catracas'); // DEPENDÊNCIA CIRCULAR
 
 async function listarTodos() {
   try {
