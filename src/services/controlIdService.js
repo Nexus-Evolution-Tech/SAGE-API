@@ -1,4 +1,5 @@
-const dispositivosService = require('./deviceService'); // DEPEDÊNCIA CIRCULAR - AQUI ESTÁ O ERRO
+const { listarTodos, linkCatraca } = require('../utils/deviceUtils');
+const { obterSessao } = require('../utils/catracaSession');
 const controlId = require('../utils/controlId-utils');
 const { verificaSeFotoUserExiste, deletarFotoUserPorId } = require('../utils/photo-user-utils');
 const gerarCardValue = require('../utils/gerarCardValue');
@@ -21,14 +22,14 @@ const registrarSyncPendente = async (pessoaId, dispositivoId, action) => {
 // se der excecao em cada uma dessas funções eu preciso inserir o id da pessoa na tabela sync_pendente
 const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(novaPessoa.id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await dispositivosService.listarTodos();
+  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
 
   const resultados = [];
   const qrcode = novaPessoa.qrcode !== null && novaPessoa.qrcode?.length === 8 ? Number(novaPessoa.qrcode) : gerarNumero8Digitos();
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       // Registra a falha na tabela de pendente
@@ -73,12 +74,12 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
 
 const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await dispositivosService.listarTodos();
+  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       // Registra falha na tabela de pendente
@@ -121,12 +122,12 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = nu
 // OBS: TA DELETANDO, MAS MESMO QUANDO O ID NÃO EXISTE DA TRUE NAS DUAS CATRACAS
 const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await dispositivosService.listarTodos();
+  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       // Registra falha na tabela de pendente
@@ -167,13 +168,13 @@ const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
 const criarImagemUsuario = async (id, dispositivoId = null) => {
   const catracaUserId = 110000000 + Number(id);
 
-  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await dispositivosService.listarTodos();
+  const dispositivos = dispositivoId ? [dispositivos.find(d => d.id === dispositivoId)] : await listarTodos();
 
   const resultados = [];
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
@@ -198,15 +199,15 @@ const criarImagemUsuario = async (id, dispositivoId = null) => {
 const generateQrCode = async (id) => {
   const catracaUserId = 110000000 + Number(id);
 
-  const dispositivos = await dispositivosService.listarTodos();
+  const dispositivos = await listarTodos();
   const resultados = [];
 
   const value = gerarNumero8Digitos(); //8 dígitos, mesmo id do user
   const tipo = 'QRCODE';
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
@@ -235,15 +236,15 @@ const generateQrCode = async (id) => {
 const generateRFID = async (id, cartao_rfid) => {
   const catracaUserId = 110000000 + Number(id);
 
-  const dispositivos = await dispositivosService.listarTodos();
+  const dispositivos = await listarTodos();
   const resultados = [];
 
   const value = await gerarCardValue(cartao_rfid);
   const tipo = 'RFID';
 
   for (const dispositivo of dispositivos) {
-    const link = dispositivosService.linkCatraca(dispositivo);
-    const session = await dispositivosService.obterSessao(link, dispositivo);
+    const link = linkCatraca(dispositivo);
+    const session = await obterSessao(link, dispositivo);
 
     if (!session) {
       resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
