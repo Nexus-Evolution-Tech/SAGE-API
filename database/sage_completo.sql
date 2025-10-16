@@ -121,8 +121,12 @@ CREATE TABLE IF NOT EXISTS Atraso (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pessoa_id INT NOT NULL,
     data DATE NOT NULL,
+    dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    status ENUM('PRESENTE', 'AUSENTE', 'SEM AULA', 'NAO SE APLICA') NOT NULL,
+    aulas_perdidas INT NOT NULL,
     horario_previsto TIME,
     horario_chegada TIME,
+    atrasado BOOLEAN,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 
@@ -265,6 +269,16 @@ CREATE TABLE IF NOT EXISTS SolicitacaoAcesso (
     data_hora_resposta DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     observacao_resposta VARCHAR(255),
     FOREIGN KEY (aluno_id) REFERENCES Aluno(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS sync_pendente (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  pessoa_id INT NOT NULL,
+  dispositivo_id INT NOT NULL,
+  data_tentativa TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  action ENUM ('CREATE', 'UPDATE', 'DELETE'),
+  FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id),
+  FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id)
 );
 
 DELIMITER $$

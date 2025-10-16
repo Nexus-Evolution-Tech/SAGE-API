@@ -76,29 +76,69 @@ async function criarPessoaCompleta(dados) {
   return { idPessoa, tipoCriado: tipo };
 }
 
-async function verificarPessoaPresenteEAtrasada(id) {
-  const inicioDia = new Date();
-  inicioDia.setHours(0, 0, 0, 0);
-  const fimDia = new Date();
-  fimDia.setHours(23, 59, 59, 999);
+// Converte "HH:mm" para minutos
+function horaParaMinutos(horaStr) {
+  const [hora, minuto] = horaStr.split(':').map(Number);
+  return hora * 60 + minuto;
+}
 
-  const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+// Define horário Date a partir de "HH:mm"
+function definirHorario(horaStr) {
+  const [hora, minuto] = horaStr.split(':').map(Number);
+  const data = new Date();
+  data.setHours(hora, minuto, 0, 0);
+  return data;
+}
+
+// Formata hora para string SQL "HH:MM:SS"
+function formatarHoraParaSQL(date) {
+  return date.toTimeString().slice(0, 8);
+}
+
+// Formata hora para exibição em "pt-BR"
+function formatarHora(date) {
+  return date.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+// Calcula quantas aulas foram perdidas com base na hora de entrada
+function calcularAulasPerdidas(aulas, entradaDate) {
+  const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
+  return aulas.filter(aula => {
+    const [hora, minuto] = aula.inicio.split(':').map(Number);
+    const minutosAula = hora * 60 + minuto;
+    return minutosAula < minutosEntrada;
+  }).length;
+}
+
+// Calcula quantas aulas foram perdidas com base na hora de entrada
+function calcularAulasPerdidas(aulas, entradaDate) {
+  const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
+  return aulas.filter(aula => {
+    const [hora, minuto] = aula.inicio.split(':').map(Number);
+    const minutosAula = hora * 60 + minuto;
+    return minutosAula < minutosEntrada;
+  }).length;
+}
+
+async function verificarPessoaPresenteEAtrasada(id) {
   const hoje = new Date();
+  const inicioDia = new Date(hoje); inicioDia.setHours(0, 0, 0, 0);
+  const fimDia = new Date(hoje); fimDia.setHours(23, 59, 59, 999);
+  const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
   const diaSemana = diasSemanaEnum[hoje.getDay()];
   const toleranciaMinutos = 15;
 
-  const pessoa = await global.db('Pessoa')
-    .where('id', id)
-    .select('id', 'nome', 'tipo')
-    .first();
+  const pessoa = await global.db('Pessoa').where('id', id).first(['id', 'nome', 'tipo']);
+  if (!pessoa) throw new Error(`Pessoa com id ${id} não encontrada`);
 
-  if (!pessoa) {
-    throw new Error(`Pessoa com id ${id} não encontrada`);
-  }
-
+  let entrada = null;
   let entradaPrevista = null;
   let atrasado = false;
-  let entrada = null;
   let aulasPerdidas = 0;
 
   const acesso = await global.db('Acesso')
@@ -109,292 +149,101 @@ async function verificarPessoaPresenteEAtrasada(id) {
     .orderBy('data_hora', 'asc')
     .first();
 
-  if (acesso) {
-    entrada = acesso.data_hora;
-  }
+  if (acesso) entrada = acesso.data_hora;
 
-  let primeiraAula = null;
+  let aulasHoje = [];
 
   if (pessoa.tipo === 'ALUNO') {
     const aluno = await global.db('Aluno').where('id', pessoa.id).first(['turma_id', 'divisao']);
     if (aluno) {
-      const condicoesDivisao = aluno.divisao === 'DIV A' ? ['DIV A', 'DIV A/B'] : ['DIV B', 'DIV A/B'];
-
-      const aulasHoje = await global.db('Aula')
+      const divisoes = aluno.divisao === 'DIV A' ? ['DIV A', 'DIV A/B'] : ['DIV B', 'DIV A/B'];
+      aulasHoje = await global.db('Aula')
         .where('turma_id', aluno.turma_id)
         .andWhere('dia_semana', diaSemana)
-        .whereIn('divisao', condicoesDivisao)
+        .whereIn('divisao', divisoes)
         .orderBy('inicio', 'asc')
         .select('inicio');
-
-      const totalAulas = aulasHoje.length;
-      primeiraAula = aulasHoje[0]?.inicio || null;
-
-      if (primeiraAula) {
-        const [hora, minuto] = primeiraAula.split(':').map(Number);
-        entradaPrevista = new Date();
-        entradaPrevista.setHours(hora, minuto, 0, 0);
-      }
-
-      if (entrada === null) {
-        aulasPerdidas = totalAulas;
-      } else {
-        const entradaDate = new Date(entrada);
-        const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
-
-        aulasPerdidas = aulasHoje.filter(aula => {
-          const [hora, minuto] = aula.inicio.split(':').map(Number);
-          const minutosAula = hora * 60 + minuto;
-          return minutosAula < minutosEntrada;
-        }).length;
-      }
+      if (aulasHoje.length > 0) entradaPrevista = definirHorario(aulasHoje[0].inicio);
     }
 
-  } else if (pessoa.tipo === 'PROFESSOR' || pessoa.tipo === 'PROFADM') {
-    const aulasHoje = await global.db('Aula')
+  } else if (['PROFESSOR', 'PROFADM'].includes(pessoa.tipo)) {
+    aulasHoje = await global.db('Aula')
       .where({ professor_id: pessoa.id, dia_semana: diaSemana })
       .orderBy('inicio', 'asc')
       .select('inicio');
 
-    const totalAulas = aulasHoje.length;
-    primeiraAula = aulasHoje[0]?.inicio || null;
+    if (aulasHoje.length > 0) entradaPrevista = definirHorario(aulasHoje[0].inicio);
 
-    if (primeiraAula) {
-      const [hora, minuto] = primeiraAula.split(':').map(Number);
-      entradaPrevista = new Date();
-      entradaPrevista.setHours(hora, minuto, 0, 0);
-    }
-
-    if (entrada === null) {
-      aulasPerdidas = totalAulas;
-    } else {
-      const entradaDate = new Date(entrada);
-      const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
-
-      aulasPerdidas = aulasHoje.filter(aula => {
-        const [hora, minuto] = aula.inicio.split(':').map(Number);
-        const minutosAula = hora * 60 + minuto;
-        return minutosAula < minutosEntrada;
-      }).length;
-    }
-
-  } else {
+  } else if (pessoa.tipo !== 'RESPONSAVEL') {
     const funcionario = await global.db(pessoa.tipo)
       .where('id', pessoa.id)
       .first('entrada');
 
-    if (funcionario && funcionario.entrada) {
-      const [hora, minuto] = funcionario.entrada.split(':').map(Number);
-      entradaPrevista = new Date();
-      entradaPrevista.setHours(hora, minuto, 0, 0);
+    if (funcionario?.entrada) {
+      entradaPrevista = definirHorario(funcionario.entrada);
     }
   }
 
-  if (entrada && entradaPrevista) {
-    const entradaDate = new Date(entrada);
-    const horarioTolerancia = new Date(entradaPrevista.getTime() + toleranciaMinutos * 60 * 1000);
-    atrasado = entradaDate > horarioTolerancia;
+  if (aulasHoje.length > 0) {
+    if (entrada && entradaPrevista) {
+      const entradaDate = new Date(entrada);
+      const tolerancia = new Date(entradaPrevista.getTime() + toleranciaMinutos * 60000);
+      atrasado = entradaDate > tolerancia;
+      aulasPerdidas = calcularAulasPerdidas(aulasHoje, entradaDate);
+    } else {
+      // Pessoa não veio, usa hora atual para calcular quantas aulas ela perdeu
+      const agora = new Date();
+      aulasPerdidas = calcularAulasPerdidas(aulasHoje, agora);
+    }
+  }
+
+  let status = 'AUSENTE';
+  if (['ALUNO', 'PROFESSOR', 'PROFADM'].includes(pessoa.tipo) && aulasHoje.length === 0) {
+    status = 'SEM AULA';
+  } else if (entrada) {
+    status = 'PRESENTE';
+  } else if (pessoa.tipo === 'RESPONSAVEL') {
+    status = 'NAO SE APLICA';
+  }
+
+  // Inserir no banco apenas se PRESENTE ou AUSENTE
+  if (['PRESENTE', 'AUSENTE'].includes(status)) {
+    await global.db('Atraso').insert({
+      pessoa_id: pessoa.id,
+      data: hoje.toISOString().split('T')[0],
+      dia_semana: diaSemana,
+      status,
+      aulas_perdidas: aulasPerdidas,
+      horario_previsto: entradaPrevista ? formatarHoraParaSQL(entradaPrevista) : null,
+      horario_chegada: entrada ? formatarHoraParaSQL(new Date(entrada)) : null,
+      atrasado: entrada && entradaPrevista ? atrasado : null
+    });
   }
 
   return {
     id: pessoa.id,
     nome: pessoa.nome,
     tipo: pessoa.tipo,
-    status: entrada ? "PRESENTE" : "AUSENTE",
-    hoje: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    dia: hoje.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
     dia_semana: diaSemana,
+    status,
     aulas_perdidas: aulasPerdidas,
-    horario_entrada_prevista: entradaPrevista ? entradaPrevista.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null,
-    horario_entrada_real: entrada ? new Date(entrada).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null,
-    atrasado: entrada ? atrasado : null
+    horario_entrada_prevista: entradaPrevista ? formatarHora(entradaPrevista) : null,
+    horario_entrada_real: entrada ? formatarHora(new Date(entrada)) : null,
+    atrasado: entrada && entradaPrevista ? atrasado : null
   };
 }
 
 async function verificarTodasPessoasPresentesEAtrasadas() {
-  const inicioDia = new Date();
-  inicioDia.setHours(0, 0, 0, 0);
-  const fimDia = new Date();
-  fimDia.setHours(23, 59, 59, 999);
-
-  const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
-  const hoje = new Date();
-  const diaSemana = diasSemanaEnum[hoje.getDay()];
-  const toleranciaMinutos = 15;
-
-  const pessoas = await global.db('Pessoa').select('id', 'nome', 'tipo');
+  const pessoas = await global.db('Pessoa').select('id');
   const resultados = [];
 
-  for (const pessoa of pessoas) {
-    let entrada = null;
-    let entradaPrevista = null;
-    let atrasado = false;
-    let aulasPerdidas = 0;
-
-    // Busca o primeiro acesso do dia para a pessoa
-    const acesso = await global.db('Acesso')
-      .where('pessoa_id', pessoa.id)
-      .andWhere('status', 'ENTRADA')
-      .andWhere('data_hora', '>=', inicioDia)
-      .andWhere('data_hora', '<=', fimDia)
-      .orderBy('data_hora', 'asc')
-      .first();
-
-    if (acesso) {
-      entrada = acesso.data_hora;
-    }
-
-    if (pessoa.tipo === 'ALUNO') {
-      const aluno = await global.db('Aluno').where('id', pessoa.id).first(['turma_id', 'divisao']);
-      if (aluno) {
-        const condicoesDivisao = aluno.divisao === 'DIV A' ? ['DIV A', 'DIV A/B'] : ['DIV B', 'DIV A/B'];
-
-        const aulasHoje = await global.db('Aula')
-          .where('turma_id', aluno.turma_id)
-          .andWhere('dia_semana', diaSemana)
-          .whereIn('divisao', condicoesDivisao)
-          .orderBy('inicio', 'asc')
-          .select('inicio');
-
-        const totalAulas = aulasHoje.length;
-        const primeiraAula = aulasHoje[0] ? aulasHoje[0].inicio : null;
-
-        if (primeiraAula) {
-          const [hora, minuto] = primeiraAula.split(':').map(Number);
-          entradaPrevista = new Date();
-          entradaPrevista.setHours(hora, minuto, 0, 0);
-        }
-
-        if (entrada === null) {
-          aulasPerdidas = totalAulas; // sem entrada, todas as aulas são perdidas
-        } else {
-          const entradaDate = new Date(entrada);
-          const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
-
-          aulasPerdidas = aulasHoje.filter(aula => {
-            const [hora, minuto] = aula.inicio.split(':').map(Number);
-            const minutosAula = hora * 60 + minuto;
-            return minutosAula < minutosEntrada; // aula já começou antes da entrada
-          }).length;
-        }
-      }
-
-    } else if (pessoa.tipo === 'PROFESSOR' || pessoa.tipo === 'PROFADM') {
-      const aulasHoje = await global.db('Aula')
-        .where({ professor_id: pessoa.id, dia_semana: diaSemana })
-        .orderBy('inicio', 'asc')
-        .select('inicio');
-
-      const totalAulas = aulasHoje.length;
-      const primeiraAula = aulasHoje[0] ? aulasHoje[0].inicio : null;
-
-      if (primeiraAula) {
-        const [hora, minuto] = primeiraAula.split(':').map(Number);
-        entradaPrevista = new Date();
-        entradaPrevista.setHours(hora, minuto, 0, 0);
-      }
-
-      if (entrada === null) {
-        aulasPerdidas = totalAulas; // sem entrada, todas as aulas são perdidas
-      } else {
-        const entradaDate = new Date(entrada);
-        const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
-
-        aulasPerdidas = aulasHoje.filter(aula => {
-          const [hora, minuto] = aula.inicio.split(':').map(Number);
-          const minutosAula = hora * 60 + minuto;
-          return minutosAula < minutosEntrada; // aula já começou antes da entrada
-        }).length;
-      }
-
-    } else {
-      // Para outros tipos, buscar a entrada prevista na tabela respectiva
-      const funcionario = await global.db(pessoa.tipo)
-        .where('id', pessoa.id)
-        .first('entrada');
-
-      if (funcionario && funcionario.entrada) {
-        const [hora, minuto] = funcionario.entrada.split(':').map(Number);
-        entradaPrevista = new Date();
-        entradaPrevista.setHours(hora, minuto, 0, 0);
-      }
-    }
-
-    // Calcula atraso somente se a pessoa entrou e tem horário previsto
-    if (entrada && entradaPrevista) {
-      const entradaDate = new Date(entrada);
-      const horarioTolerancia = new Date(entradaPrevista.getTime() + toleranciaMinutos * 60 * 1000);
-      atrasado = entradaDate > horarioTolerancia;
-    }
-
-    //AQUI SERÁ A LÓGICA DE ATRASOS
-
-    resultados.push({
-      id: pessoa.id,
-      nome: pessoa.nome,
-      tipo: pessoa.tipo,
-      status: entrada ? "PRESENTE" : "AUSENTE",
-      hoje: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-      dia_semana: diaSemana,
-      aulas_perdidas: aulasPerdidas || 0,
-      horario_entrada_prevista: entradaPrevista ? entradaPrevista.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null,
-      horario_entrada_real: entrada ? new Date(entrada).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null,
-      atrasado: entrada ? atrasado : null
-    });
+  for (const { id } of pessoas) {
+    const resultado = await verificarPessoaPresenteEAtrasada(id);
+    resultados.push(resultado);
   }
 
   return resultados;
-}
-
-async function calcularAulasPerdidasPorProfessor(id) {
-  // 1. Buscar todos os registros de aula do professor (para cada dia da semana)
-  const aulas = await global.db('Aula')
-    .where('professor_id', id)
-    .select('dia_semana', 'inicio');
-
-  // 2. Buscar todos os acessos (entrada) do professor
-  const acessos = await global.db('Acesso')
-    .where('pessoa_id', id)
-    .andWhere('status', 'ENTRADA')
-    .select('data_hora');
-
-  // Agrupar acessos por data (ano-mês-dia)
-  const entradasPorData = {};
-  acessos.forEach(a => {
-    const data = new Date(a.data_hora).toISOString().slice(0, 10);
-    if (!entradasPorData[data]) entradasPorData[data] = [];
-    entradasPorData[data].push(new Date(a.data_hora));
-  });
-  Object.values(entradasPorData).forEach(list => list.sort((a, b) => a - b));
-
-  let totalPerdidas = 0;
-
-  // 3. Inferir datas dos últimos 30 dias (ou um período fixo/dinâmico)
-  const diasParaCalcular = 30;
-  for (let offset = 0; offset < diasParaCalcular; offset++) {
-    const dia = new Date();
-    dia.setDate(dia.getDate() - offset);
-    const diaSemana = ['DOMINGO','SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO'][dia.getDay()];
-    const dataStr = dia.toISOString().slice(0, 10);
-    const entradasHoje = entradasPorData[dataStr] || [];
-
-    // aulas do dia da semana
-    const aulasDoDia = aulas.filter(a => a.dia_semana === diaSemana);
-    if (aulasDoDia.length === 0) continue;
-
-    // no acesso: todas perdidas
-    if (entradasHoje.length === 0) {
-      totalPerdidas += aulasDoDia.length;
-    } else {
-      const minutosEntrada = entradasHoje[0].getHours() * 60 + entradasHoje[0].getMinutes();
-      aulasDoDia.forEach(a => {
-        const [hora, min] = a.inicio.split(':').map(Number);
-        const minutosAula = hora * 60 + min;
-        if (minutosAula < minutosEntrada) totalPerdidas++;
-      });
-    }
-  }
-
-  return { professor_id: id, aulas_perdidas_ultimos_30_dias: totalPerdidas };
 }
 
 async function buscarPessoasPorTipo(tipo) {
@@ -554,6 +403,5 @@ module.exports = {
   verificarTodasPessoasPresentesEAtrasadas,
   buscarPessoasPorTipo,
   uploadFotoPessoa,
-  removerFotoPessoa,
-  calcularAulasPerdidasPorProfessor
+  removerFotoPessoa
 };
