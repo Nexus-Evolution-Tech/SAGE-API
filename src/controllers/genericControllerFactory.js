@@ -1,6 +1,7 @@
 const crud = require('../utils/generic-db-utils');
 const { hashSenha } = require('../utils/criptografia');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
+const db = require('../config/database');
 
 function capitalize(text) {
   if (!text) return '';
@@ -31,9 +32,24 @@ function getGeneroTexto(classe, acao) {
 function gerarController(tabela, campos, entidadeNome) {
   return {
     async listar(req, res) {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 50;
+      const offset = (page - 1) * limit;
+
       try {
-        const registros = await crud.buscarTodos(tabela, campos);
-        res.json(ajustarFusoHorarioBrasil(registros));
+        // Busca paginada dos registros
+        const registros = await crud.buscarTodos(tabela, campos, limit, offset);
+
+        // Total de registros para calcular totalPages
+        const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM ${tabela}`);
+
+        res.json({
+          data: ajustarFusoHorarioBrasil(registros),
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        });
       } catch (error) {
         console.error(`Erro ao listar ${entidadeNome}:`, error);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });

@@ -11,9 +11,21 @@ const { buscarPessoaBase } = require('../utils/people-db-utils');
 const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
 
 const listar = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
+
   try {
-    const pessoas = await buscarTodasPessoas();
-    res.json(ajustarFusoHorarioBrasil(pessoas));
+    const pessoas = await buscarTodasPessoas(limit, offset);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa');
+
+    res.json({
+      data: ajustarFusoHorarioBrasil(pessoas),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
     res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
@@ -100,14 +112,26 @@ const listarPorId = async (req, res) => {
 
 const listarPorTipo = async (req, res) => {
   const tipo = req.params.tipo;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
+
   try {
-    const pessoas = await peopleService.buscarPessoasPorTipo(tipo);
-    res.json(ajustarFusoHorarioBrasil(pessoas));
+    const pessoas = await peopleService.buscarPessoasPorTipo(tipo, limit, offset);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE tipo = ?', [tipo]);
+
+    res.json({
+      data: ajustarFusoHorarioBrasil(pessoas),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Erro ao listar pessoas por tipo:', error);
     res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error: error.message });
   }
-}
+};
 
 const editar = async (req, res) => {
   try {

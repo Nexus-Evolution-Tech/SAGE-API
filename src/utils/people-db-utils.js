@@ -183,8 +183,8 @@ async function criarProfAdm(pessoaId, dados) {
 }
 
 // 📌 Buscar todas as pessoas
-async function buscarTodasPessoas() {
-  const [pessoas] = await db.query('SELECT * FROM Pessoa');
+async function buscarTodasPessoas(limit, offset) {
+  const [pessoas] = await db.query('SELECT * FROM Pessoa LIMIT ? OFFSET ?', [limit, offset]);
 
   const resultado = [];
 
@@ -264,7 +264,6 @@ async function buscarPorId(id) {
     ...dadosEspecificos
   };
 }
-
 
 // 🔎 Buscar o tipo da pessoa
 async function buscarTipoPessoa(id) {

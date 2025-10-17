@@ -246,9 +246,12 @@ async function verificarTodasPessoasPresentesEAtrasadas() {
   return resultados;
 }
 
-async function buscarPessoasPorTipo(tipo) {
-  const [pessoas] = await db.query('SELECT * FROM Pessoa WHERE tipo = ?', [tipo]);
-  
+async function buscarPessoasPorTipo(tipo, limit = 50, offset = 0) {
+  const [pessoas] = await db.query(
+    'SELECT * FROM Pessoa WHERE tipo = ? LIMIT ? OFFSET ?',
+    [tipo, limit, offset]
+  );
+
   const resultado = [];
 
   for (const pessoa of pessoas) {
@@ -257,6 +260,9 @@ async function buscarPessoasPorTipo(tipo) {
     switch (pessoa.tipo) {
       case 'ALUNO':
         dadosEspecificos = await buscarAluno(pessoa.id);
+        break;
+      case 'RESPONSAVEL':
+        dadosEspecificos = await buscarResponsavel(pessoa.id);
         break;
       case 'PROFESSOR':
         dadosEspecificos = await buscarProfessor(pessoa.id);
@@ -271,7 +277,6 @@ async function buscarPessoasPorTipo(tipo) {
         dadosEspecificos = await buscarTerceirizado(pessoa.id);
         break;
       default:
-        // Tipo inválido ou desconhecido, pode logar ou apenas ignorar os extras
         break;
     }
 
@@ -280,6 +285,7 @@ async function buscarPessoasPorTipo(tipo) {
       ...dadosEspecificos
     });
   }
+
   return resultado;
 }
 

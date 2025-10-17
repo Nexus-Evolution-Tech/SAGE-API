@@ -792,16 +792,46 @@ paths:
   /pessoas:
     get:
       tags: [Pessoas]
-      summary: Lista todas as pessoas
+      summary: Lista todas as pessoas com paginação
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Número da página (começa em 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+          description: Número de registros por página
       responses:
         '200':
-          description: Lista de pessoas
+          description: Lista paginada de pessoas
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pessoa'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pessoa'
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 1234
+                  totalPages:
+                    type: integer
+                    example: 25
     post:
       tags: [Pessoas]
       summary: Cria uma nova pessoa (Aluno, Responsável, Professor, Administrador, ProfAdm ou Terceirizado)
@@ -945,15 +975,52 @@ paths:
     get:
       tags: [Pessoas]
       summary: Lista pessoas por tipo (ALUNO, RESPONSAVEL, PROFESSOR, ADMINISTRADOR, PROFADM ou TERCEIRIZADO)
+      parameters:
+        - in: path
+          name: tipo
+          required: true
+          schema:
+            type: string
+            enum: [ALUNO, RESPONSAVEL, PROFESSOR, ADMINISTRADOR, PROFADM, TERCEIRIZADO]
+          description: Tipo da pessoa
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Número da página (começa em 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+          description: Número de registros por página
       responses:
         '200':
-          description: Lista de pessoas do tipo especificado
+          description: Lista paginada de pessoas do tipo especificado
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Pessoa'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pessoa'
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 200
+                  totalPages:
+                    type: integer
+                    example: 4
 
   /pessoas/status:
     get:
@@ -1483,16 +1550,46 @@ paths:
   /acessos:
     get:
       tags: [Acessos]
-      summary: Lista todos os acessos
+      summary: Lista todos os acessos com paginação
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Número da página (começa em 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+          description: Número de registros por página
       responses:
         '200':
-          description: Lista de acessos
+          description: Lista paginada de acessos
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Acesso'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Acesso'
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 1500
+                  totalPages:
+                    type: integer
+                    example: 30
     post:
       tags: [Acessos]
       summary: Cria um novo acesso
@@ -1793,16 +1890,46 @@ paths:
   /atrasos:
     get:
       tags: [Atrasos]
-      summary: Lista todos os horários
+      summary: Lista todos os horários (atrasos) com paginação
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Número da página (começa em 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+          description: Número de registros por página
       responses:
         '200':
-          description: Lista de horários
+          description: Lista paginada de horários (atrasos)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Atraso'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Atraso'
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 50
+                  total:
+                    type: integer
+                    example: 240
+                  totalPages:
+                    type: integer
+                    example: 5
 
   /atrasos/{id}:
     parameters:
