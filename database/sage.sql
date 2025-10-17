@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     CONSTRAINT chk_telefone CHECK (REGEXP_LIKE(telefone, '^[0-9]{10,11}$')),
     email VARCHAR(100)  COMMENT 'Email de contato, em caso de alunos é o institucional',
     unidade_id INT,
-    qr_code VARCHAR(255) NOT NULL COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
-    cartao_rfid VARCHAR(8) NOT NULL COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
+    qr_code VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
+    cartao_rfid VARCHAR(8) COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
     CONSTRAINT chk_rfid CHECK (REGEXP_LIKE(cartao_rfid, '^[0-9]{3}[0-9]{5}$')),
     senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',
     data_nascimento DATE ,
@@ -119,10 +119,14 @@ CREATE TABLE IF NOT EXISTS Horario (
 
 CREATE TABLE IF NOT EXISTS Atraso (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    pessoa_id INT ,
-    data DATE ,
+    pessoa_id INT NOT NULL,
+    data DATE NOT NULL,
+    dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    status ENUM('PRESENTE', 'AUSENTE', 'SEM AULA', 'NAO SE APLICA') NOT NULL,
+    aulas_perdidas INT NOT NULL,
     horario_previsto TIME,
     horario_chegada TIME,
+    atrasado BOOLEAN,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 
@@ -174,20 +178,7 @@ CREATE TABLE IF NOT EXISTS Materia (
 
 CREATE TABLE IF NOT EXISTS Administrador (
     id INT PRIMARY KEY,
-    cargo ENUM ('DIRETOR',
-	  'VICE_DIRETOR',
-	  'COORDENADOR_PEDAGOGICO',
-	  'SECRETARIO_ESCOLAR',
-	  'TESOUREIRO',
-	  'SUPERVISOR_ADMINISTRATIVO',
-	  'AUXILIAR_ADMINISTRATIVO',
-	  'TECNICO_ADMINISTRATIVO',
-	  'ORIENTADOR_EDUCACIONAL',
-	  'COORDENADOR_DE_CURSO',
-	  'RESPONSAVEL_FINANCEIRO',
-	  'ALMOXARIFE',
-	  'BIBLIOTECARIO',
-	  'OUTRO') ,
+    cargo VARCHAR(50),
     FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE
 );
 
@@ -214,7 +205,7 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
     id INT PRIMARY KEY,
     empresa_id INT,
     funcao ENUM ('VIGILANTE',
-	  'AUXILIZAR_LIMPEZA',
+	  'AUXILIAR_LIMPEZA',
 	  'SEGURANCA',
 	  'SERVICOS_GERAIS',
 	  'TECNICO_MANUTENCAO',
