@@ -16,11 +16,11 @@ DB_CONFIG = {
     'host': 'localhost',
     'port': 3306, 
     'user': 'root',
-    'password': 'etec',
+    'password': 'root',
     'database': 'sage'
 }
 
-EXCEL_FILE = "PlanilhaDadosEscolares.xlsx"
+# EXCEL_FILE = "PlanilhaDadosEscolares.xlsx"
 
 # ----------------------------
 # Utilitários
@@ -154,7 +154,8 @@ def inserir_pessoa(cursor, conn, row, tipo, rfid_raw, unidade_id_default):
 # ----------------------------
 # Main
 # ----------------------------
-def main():
+def main(excel_file, unidade_id_default=None):
+    EXCEL_FILE = excel_file
     # conectar DB
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -163,7 +164,7 @@ def main():
         sys.exit(1)
 
     cursor = conn.cursor(buffered=True)
-    print("✅ Conexão com o banco de dados MySQL bem-sucedida!\n")
+    print("Conexão com o banco de dados MySQL bem-sucedida!\n")
 
     # CORREÇÃO ANTI-FLOAT DO PANDAS: Define todas as colunas de ID/números como string
     # Isso impede que números grandes (CPF, RG, Cartão) sejam lidos como float (com o ".0")
@@ -200,156 +201,9 @@ def main():
         return
 
     # ----------------------------
-    # 1) Escola -> UnidadeEscolar (IMPORTANTE: Define unidade_id_default)
-    # ----------------------------
-    unidade_id_default = None # <--- CRUCIAL para evitar NameError - isso precisa buscar um valor na tabela antes de comecar, pois não criarei escola, apenas consultarei a que ja existe
-    print("📑 Processando aba: Escola")
-    if "Escola" in all_sheets:
-        df = all_sheets["Escola"].fillna("")
-        for idx, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            if not nome:
-                print(f"  ❌ Escola linha {idx} sem nome. Ignorada.")
-                continue
-            numero_unidade = limpar_valor(r.get("Número Unidade") or r.get("Numero Unidade") or "")
-            numero_unidade = str(numero_unidade).zfill(3) if numero_unidade else "001"
-            cnpj = pad_digits(r.get("CNPJ") or r.get("Cnpj"), 14)
-            logradouro = limpar_valor(r.get("Logradouro")) or None
-            numero = limpar_valor(r.get("Número") or r.get("Numero")) or None
-            complemento = limpar_valor(r.get("Complemento"))
-            bairro = limpar_valor(r.get("Bairro")) or None
-            cidade = limpar_valor(r.get("Cidade")) or None
-            estado = limpar_valor(r.get("Estado")) or None
-            cep = pad_digits(r.get("Cep") or r.get("CEP"), 8)
-            telefone_contato = pad_digits(r.get("Telefone Contato") or r.get("Telefone") or r.get("telefone"), 11)
-            login = limpar_valor(r.get("Login")) or "admin"  # DB exige NOT NULL
-            senha = limpar_valor(r.get("Senha")) or "admin"  # idem
-
-            try:
-                cursor.execute("SELECT id FROM UnidadeEscolar WHERE nome = %s OR cnpj = %s", (nome, cnpj))
-                found = cursor.fetchone()
-                if found:
-                    unidade_id = found[0]
-                    print(f"  - Unidade '{nome}' já existe (id {unidade_id}).")
-                else:
-                    cursor.execute("""
-                        INSERT INTO UnidadeEscolar
-                        (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """, (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, None))
-                    conn.commit()
-                    unidade_id = cursor.lastrowid
-                    print(f"  + Unidade '{nome}' inserida com id {unidade_id}.")
-                if unidade_id_default is None:
-                    unidade_id_default = unidade_id
-            except mysql.connector.Error as err:
-                conn.rollback()
-                print(f"  ❌ Erro ao inserir/consultar Unidade '{nome}': {err}")
-    else:
-        print("  - Aba 'Escola' não encontrada.")
-
-    # se ainda sem unidade_default, tentar pegar do db
-    if unidade_id_default is None:
-        cursor.execute("SELECT id FROM UnidadeEscolar LIMIT 1")
-        row = cursor.fetchone()
-        if row:
-            unidade_id_default = row[0]
-            print(f"  ℹ️ Usando unidade existente id={unidade_id_default} como padrão.")
-        else:
-            print("  ❗ Nenhuma UnidadeEscolar encontrada. Crie uma no DB ou na planilha 'Escola'. Encerrando.")
-            cursor.close()
-            conn.close()
-            return
-            
-    # ----------------------------
-    # 2) Cursos
-    # ----------------------------
-    print("\n📑 Processando aba: Cursos")
-    if "Cursos" in all_sheets:
-        df = all_sheets["Cursos"].fillna("")
-        for _, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            dur = r.get("Duração (Horas)") or r.get("Duracao (Horas)") or r.get("Duração") or r.get("Duracao")
-            if not nome:
-                continue
-            try:
-                cursor.execute("SELECT id FROM Curso WHERE nome = %s", (nome,))
-                if cursor.fetchone():
-                    print(f"  - Curso '{nome}' já existe. Pulando.")
-                    continue
-                # Garante que dur_val seja INT ou None
-                dur_val = int(somente_numeros(dur)) if (dur is not None and str(dur).strip() != "") else None
-                cursor.execute("INSERT INTO Curso (nome, duracao) VALUES (%s, %s)", (nome, dur_val))
-                conn.commit()
-                print(f"  + Curso '{nome}' inserido.")
-            except Exception as e:
-                conn.rollback()
-                print(f"  ❌ Erro ao inserir curso '{nome}': {e}")
-    else:
-        print("  - Aba 'Cursos' não encontrada.")
-
-    # ----------------------------
-    # 3) Turmas
-    # ----------------------------
-    print("\n📑 Processando aba: Turmas")
-    if "Turmas" in all_sheets:
-        df = all_sheets["Turmas"].fillna("")
-        for _, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            turno = limpar_valor(r.get("Turno"))
-            if not nome:
-                continue
-            try:
-                cursor.execute("SELECT id FROM Turma WHERE nome = %s", (nome,))
-                if cursor.fetchone():
-                    print(f"  - Turma '{nome}' já existe. Pulando.")
-                    continue
-                cursor.execute("INSERT INTO Turma (nome, turno, unidade_id) VALUES (%s, %s, %s)",
-                               (nome, turno if turno else None, unidade_id_default))
-                conn.commit()
-                print(f"  + Turma '{nome}' inserida.")
-            except Exception as e:
-                conn.rollback()
-                print(f"  ❌ Erro ao inserir turma '{nome}': {e}")
-    else:
-        print("  - Aba 'Turmas' não encontrada.")
-
-    # ----------------------------
-    # 4) Catracas -> Dispositivo
-    # ----------------------------
-    print("\n📑 Processando aba: Catracas")
-    if "Catracas" in all_sheets:
-        df = all_sheets["Catracas"].fillna("")
-        for _, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            modelo = limpar_valor(r.get("Modelo"))
-            endereco = limpar_valor(r.get("Endereço") or r.get("Endereco"))
-            porta = limpar_valor(r.get("Porta"))
-            usuario = limpar_valor(r.get("Usuário") or r.get("Usuario"))
-            senha = limpar_valor(r.get("Senha"))
-            numero_serial = limpar_valor(r.get("Número Serial") or r.get("Numero Serial"))
-            if not nome or not numero_serial: # Serial é essencial para catraca
-                continue
-            try:
-                cursor.execute("SELECT id FROM Dispositivo WHERE numero_serial = %s", (numero_serial,))
-                if cursor.fetchone():
-                    print(f"  - Catraca '{nome}' (serial {numero_serial}) já existe. Pulando.")
-                    continue
-                cursor.execute("""INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial)
-                                     VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-                                   (nome, modelo, endereco, porta, usuario, senha, numero_serial))
-                conn.commit()
-                print(f"  + Catraca '{nome}' inserida.")
-            except Exception as e:
-                conn.rollback()
-                print(f"  ❌ Erro ao inserir catraca '{nome}': {e}")
-    else:
-        print("  - Aba 'Catracas' não encontrada.")
-
-    # ----------------------------
     # 5) ALUNO
     # ----------------------------
-    print("\n📑 Processando aba: ALUNO")
+    print("\nProcessando aba: ALUNO")
     if "ALUNO" in all_sheets:
         df = all_sheets["ALUNO"].fillna("")
         for idx, r in df.iterrows():
@@ -373,6 +227,8 @@ def main():
                     divisao = "DIV A"
                 elif dd in ("B","DIV B","DIVB"):
                     divisao = "DIV B"
+                elif dd in ("INT"):
+                    divisao = "INT"
             status = limpar_valor(r.get("Status")) or "EM CURSO"
             try:
                 cursor.execute("SELECT id FROM Aluno WHERE id = %s", (pessoa_id,))
@@ -382,17 +238,17 @@ def main():
                 cursor.execute("INSERT INTO Aluno (id, ra, rm, turma_id, divisao, status) VALUES (%s,%s,%s,%s,%s,%s)",
                                (pessoa_id, ra, rm, turma_id, divisao, status))
                 conn.commit()
-                print(f"  + Aluno '{nome}' inserido (pessoa id {pessoa_id}).")
+                print(f"+ Aluno '{nome}' inserido (pessoa id {pessoa_id}).")
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Erro (Aluno idx {idx}): {e}")
+                print(f"Erro (Aluno idx {idx}): {e}")
     else:
-        print("  - Aba 'ALUNO' não encontrada.")
+        print("Aba 'ALUNO' não encontrada.")
 
     # ----------------------------
     # 6) RESPONSÁVEL
     # ----------------------------
-    print("\n📑 Processando aba: RESPONSAVEL")
+    print("\nProcessando aba: RESPONSAVEL")
     sheet_name_resp = None
     for candidate in ("RESPONSÁVEL", "RESPONSAVEL", "Responsaveis", "Responsáveis", "RESPONSAVEIS"):
         if candidate in all_sheets:
@@ -420,17 +276,17 @@ def main():
                         aluno_id = row[0]
                 cursor.execute("INSERT INTO Responsavel (id, aluno_id) VALUES (%s, %s)", (pessoa_id, aluno_id))
                 conn.commit()
-                print(f"  + Responsável '{r.get('Nome')}' inserido (pessoa id {pessoa_id}).")
+                print(f"+ Responsável '{r.get('Nome')}' inserido (pessoa id {pessoa_id}).")
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Erro ao inserir responsável: {e}")
+                print(f"Erro ao inserir responsável: {e}")
     else:
         print("  - Aba 'RESPONSÁVEL' / 'RESPONSAVEL' não encontrada.")
 
     # ----------------------------
     # 7) PROFESSOR
     # ----------------------------
-    print("\n📑 Processando aba: PROFESSOR")
+    print("\nProcessando aba: PROFESSOR")
     if "PROFESSOR" in all_sheets:
         df = all_sheets["PROFESSOR"].fillna("")
         for _, r in df.iterrows():
@@ -469,17 +325,17 @@ def main():
                         cursor.execute("INSERT INTO Administrador (id) VALUES (%s)", (pessoa_id,))
                         conn.commit()
                         
-                print(f"  + Professor '{r.get('Nome')}' garantido no sistema (pessoa id {pessoa_id}).")
+                print(f"+ Professor '{r.get('Nome')}' garantido no sistema (pessoa id {pessoa_id}).")
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Erro ao inserir professor (pessoa id {pessoa_id}): {e}")
+                print(f"Erro ao inserir professor (pessoa id {pessoa_id}): {e}")
     else:
         print("  - Aba 'PROFESSOR' não encontrada.")
 
     # ----------------------------
     # 8) ADMINISTRADOR
     # ----------------------------
-    print("\n📑 Processando aba: ADMINISTRADOR")
+    print("\nProcessando aba: ADMINISTRADOR")
     if "ADMINISTRADOR" in all_sheets:
         df = all_sheets["ADMINISTRADOR"].fillna("")
         for _, r in df.iterrows():
@@ -519,22 +375,22 @@ def main():
                 cargo = limpar_valor(r.get("Cargo")) or None
                 cursor.execute("SELECT id FROM Administrador WHERE id = %s", (pessoa_id,))
                 if cursor.fetchone():
-                    print(f"  - Administrador (pessoa id {pessoa_id}) já existe. Pulando.")
+                    print(f"Administrador (pessoa id {pessoa_id}) já existe. Pulando.")
                     continue
                 
                 cursor.execute("INSERT INTO Administrador (id, cargo) VALUES (%s, %s)", (pessoa_id, cargo))
                 conn.commit()
-                print(f"  + Administrador '{nome}' garantido (pessoa id {pessoa_id}).")
+                print(f"+ Administrador '{nome}' garantido (pessoa id {pessoa_id}).")
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Erro ao inserir administrador (pessoa id {pessoa_id}): {e}")
+                print(f"Erro ao inserir administrador (pessoa id {pessoa_id}): {e}")
     else:
-        print("  - Aba 'ADMINISTRADOR' não encontrada.")
+        print("Aba 'ADMINISTRADOR' não encontrada.")
 
     # ----------------------------
     # 9) TERCEIRIZADO
     # ----------------------------
-    print("\n📑 Processando aba: TERCEIRIZADO")
+    print("\nProcessando aba: TERCEIRIZADO")
     if "TERCEIRIZADO" in all_sheets:
         df = all_sheets["TERCEIRIZADO"].fillna("")
         for _, r in df.iterrows():
@@ -562,20 +418,30 @@ def main():
                 if not cursor.fetchone():
                     cursor.execute("INSERT INTO Terceirizado (id, empresa_id, funcao) VALUES (%s,%s,%s)", (pessoa_id, None, funcao))
                     conn.commit()
-                print(f"  + Terceirizado '{r.get('Nome')}' garantido (pessoa id {pessoa_id}).")
+                print(f"+ Terceirizado '{r.get('Nome')}' garantido (pessoa id {pessoa_id}).")
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Erro ao inserir terceirizado (pessoa id {pessoa_id}): {e}")
+                print(f" Erro ao inserir terceirizado (pessoa id {pessoa_id}): {e}")
     else:
-        print("  - Aba 'TERCEIRIZADO' não encontrada.")
+        print("- Aba 'TERCEIRIZADO' não encontrada.")
 
     # ----------------------------
     # Finalização
     # ----------------------------
-    print("\n✅ Importação finalizada. Fechando conexão.")
+    print("\nImportação finalizada. Fechando conexão.")
     cursor.close()
     conn.close()
 
-
 if __name__ == "__main__":
-    main()
+    import sys
+
+    # Primeiro argumento = path do arquivo
+    excel_file = sys.argv[1] if len(sys.argv) > 1 else None
+    if not excel_file:
+        print("Nenhum arquivo Excel informado.")
+        sys.exit(1)
+
+    # Segundo argumento opcional = ID da unidade
+    unidade_id = int(sys.argv[2]) if len(sys.argv) > 2 else None
+
+    main(excel_file=excel_file, unidade_id_default=unidade_id)

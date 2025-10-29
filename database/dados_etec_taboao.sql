@@ -1,12 +1,32 @@
-/*UNIDADE*/
+/*UNIDADE - Não funciona porque não criptografa a senha com padrão bcrypt*/
 INSERT INTO sage.unidadeescolar (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo) VALUES 
 ("ETEC Taboão da Serra", 293, "62823257029344", "etec", "etec123", "Praça Miguel Ortega", "135", "Prédio Principal", "Parque Assunção", "Taboão da Serra", "SP", "06754160", "1147011856", "etec.png");
 
 /*CURSOS*/
 INSERT INTO sage.curso (nome, duracao) VALUES
-("Desenvolvimento de Sistemas", 100),
-("Informática para Internet", 100),
-("Modular", 100);
+("MTec - Desenvolvimento de Sistemas", 3600),
+("MTec - Informática para Internet", 3600),
+("MTec - Informática", 3600),
+("Técnico em Informática", 1500),
+("Técnico em Desenvolvimento de Sistemas", 1500);
+
+/*TURMAS*/
+INSERT INTO sage.turma (nome, turno, curso_id, unidade_id) VALUES
+("1º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("1º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("2º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("2º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("3º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("3º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
+("1º A - MTec-N Informática para Internet", "NOTURNO", 2, 1),
+("2º A - MTec-N Informática para Internet", "NOTURNO", 2, 1),
+("1º A - MTec-N Informática", "NOTURNO", 3, 1),
+("1º A - TI-N - Informática", "NOTURNO", 4, 1),
+("3º A - TDS-N Desenvolvimento de Sistemas", "NOTURNO", 5, 1);
+
+INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial) VALUES
+("Catraca 01", "IDBlock", "192.168.0.126", "80", "admin", "admin", "0K0410/0011BC"),
+("Catraca 02", "IDBlock", "192.168.0.127", "82", "admin", "admin", "0K0410/00177E");
 
 /*MATERIAS*/
 -- DS
@@ -72,20 +92,6 @@ INSERT INTO sage.materia (nome, sigla, curso_id) VALUES
 ('D.D. Móveis?', 'DDM', 2),
 ('Banco de Dados', 'BD', 2),
 ('Sistemas WEB', 'SWEB', 2);
-
-/*TURMAS*/
-INSERT INTO sage.turma (nome, turno, curso_id, unidade_id) VALUES
-("1º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("1º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("2º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("2º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("3º A - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("3º B - MTec-PI Desenvolvimento de Sistemas", "INTEGRAL", 1, 1),
-("1º A - MTec-N Informática para Internet", "NOTURNO", 2, 1),
-("1º B - MTec-N Informática para Internet", "NOTURNO", 2, 1),
-("2º A - MTec-N Informática para Internet", "NOTURNO", 2, 1),
-("2º Módulo DS", "NOTURNO", 1, 1),
-("3º Módulo DS", "NOTURNO", 1, 1);
 
 -- SOURCE D:\mywork\javascript\SGC-API\database\pessoas_etec.sql;
 
