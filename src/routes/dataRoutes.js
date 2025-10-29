@@ -4,6 +4,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const db = require('../config/database');
 const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
+const autenticar = require('../middlewares/autenticar');
 
 const router = express.Router();
 const upload = multer({ dest: 'src/uploads/' });
@@ -11,7 +12,7 @@ const upload = multer({ dest: 'src/uploads/' });
 // -------------------------------------------------------
 // 1️⃣ Baixar planilha modelo
 // -------------------------------------------------------
-router.get('/dados/planilha-modelo', (req, res) => {
+router.get('/dados/planilha-modelo', autenticar, (req, res) => {
   const modeloPath = path.resolve('./models/PlanilhaPessoas-Modelo.xlsx');
   res.download(modeloPath, 'PlanilhaPessoas.xlsx');
 });
@@ -19,7 +20,7 @@ router.get('/dados/planilha-modelo', (req, res) => {
 // -------------------------------------------------------
 // 2️⃣ Importar planilha preenchida
 // -------------------------------------------------------
-router.post('/dados/importar', upload.single('planilha'), async (req, res) => {
+router.post('/dados/importar', autenticar, upload.single('planilha'), async (req, res) => {
   try {
     const filePath = req.file.path;
     const unidade_id_default = req.body.unidade_id || 1;
@@ -53,7 +54,7 @@ router.post('/dados/importar', upload.single('planilha'), async (req, res) => {
 // -------------------------------------------------------
 // 3️⃣ Exportar dados do banco no formato da planilha
 // -------------------------------------------------------
-router.get('/dados/exportar', async (req, res) => {
+router.get('/dados/exportar', autenticar, async (req, res) => {
   try {
     // define o caminho completo do arquivo de saída
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
