@@ -8,6 +8,8 @@ servers:
   - url: http://localhost:3000
 
 tags:
+  - name: Dados
+    description: Exportação/Importação de Dados para o Sistema
   - name: Cursos
     description: Operações relacionadas aos cursos
   - name: Escolas
@@ -38,6 +40,57 @@ tags:
     description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
 
 paths:
+  /dados/planilha-modelo:
+    get:
+      tags: [Dados]
+      summary: Baixa a planilha modelo para preenchimento
+      responses:
+        '200':
+          description: Planilha modelo baixada com sucesso
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /dados/importar:
+    post:
+      tags: [Dados]
+      summary: Importa os dados da planilha preenchida para o banco de dados
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                planilha:
+                  type: string
+                  format: binary
+                  description: Arquivo da planilha preenchida
+              required:
+                - planilha
+      responses:
+        '200':
+          description: Dados importados com sucesso
+        '400':
+          description: Erro na requisição (arquivo ausente ou inválido)
+        '500':
+          description: Erro interno ao processar a planilha
+  /dados/exportar:
+    get:
+      tags: [Dados]
+      summary: Exporta os dados do banco de dados para uma planilha no formato da planilha modelo
+      responses:
+        '200':
+          description: Planilha exportada com sucesso
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '500':
+          description: Erro interno ao gerar a planilha
+
   /cursos:
     get:
       tags: [Cursos]

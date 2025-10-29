@@ -3,7 +3,7 @@ const mysql = require('mysql2');
 const pool = mysql.createPool({
   host: 'localhost', // Ou o endereço IP do seu servidor MySQL
   user: 'root',
-  password: 'etec',
+  password: 'root',
   database: 'sage',
   timezone: '-03:00',
   waitForConnections: true,
