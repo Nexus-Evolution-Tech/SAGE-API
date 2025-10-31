@@ -2,12 +2,13 @@ const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const accessController = require('../controllers/accessController');
 const { sincronizarAcessos, sincronizarTodosAcessos } = require('../services/accessService');
+const autenticar = require('../middlewares/autenticar');
 
 const router = gerarRotas(accessController, 'acessos');
 const routerExtra = express.Router();
 
-routerExtra.post('/acessos', accessController.criar);
-router.post('/acessos/sincronizar/:dispositivo_id', async (req, res) => {
+routerExtra.post('/acessos', autenticar, accessController.criar);
+router.post('/acessos/sincronizar/:dispositivo_id', autenticar, async (req, res) => {
   try {
     const dispositivo = await global.db('Dispositivo').where('id', req.params.dispositivo_id).first();
 

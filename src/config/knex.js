@@ -5,7 +5,7 @@ const config = {
   connection: {
     host: 'localhost',
     user: 'root',
-    password: 'etec',
+    password: 'root',
     database: 'sage',
     timezone: '-03:00'
   }

@@ -1,0 +1,5 @@
+Antes de rodar o bot, é necessário ter no banco:
+- escola cadastrada
+- todos os cursos atribuído à escola
+- todas as turmas atribuídas à escola
+- todas as catracas cadastradas da escola

@@ -1,4 +1,5 @@
 const deviceService = require('./deviceService');
+const {verificarEAtribuirAtraso} = require('../utils/computarAtrasos');
 
 function mapearMetodo(value) {
   if (value.length === 8) return 'QRCODE';
@@ -65,6 +66,8 @@ async function sincronizarAcessos(dispositivo) {
       });
 
       acessosSincronizados++;
+
+      // await verificarEAtribuirAtraso(pessoa_id, data_hora);
     }
   }
 

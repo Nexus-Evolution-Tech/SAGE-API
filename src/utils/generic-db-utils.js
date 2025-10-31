@@ -1,8 +1,8 @@
 const db = require('../config/database');
 
-async function buscarTodos(tabela, campos = ['*']) {
-  const query = `SELECT ${campos.join(', ')} FROM ${tabela}`;
-  const [result] = await db.query(query);
+async function buscarTodos(tabela, campos = ['*'], limit = 50, offset = 0) {
+  const query = `SELECT ${campos.join(', ')} FROM ${tabela} LIMIT ? OFFSET ?`;
+  const [result] = await db.query(query, [limit, offset]);
   return result;
 }
 
