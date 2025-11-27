@@ -69,7 +69,7 @@ const criar = async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao criar pessoa:', error);
-    res.status(400).json({
+    res.status(500).json({
       message: 'Falha ao criar pessoa',
       erro: error.message,
       detalhes: error.detalhes

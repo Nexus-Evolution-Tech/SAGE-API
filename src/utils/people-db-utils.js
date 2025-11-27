@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const verificarDuplicidade = require('../utils/verificarDuplicidade');
 
 // 🔎 Buscar dados base da Pessoa
 async function buscarPessoaBase(id) {
@@ -70,6 +71,20 @@ async function buscarProfAdm(id) {
 
 // 📌 Criar Pessoa base
 async function criarPessoaBase(dados) {
+  // Verificar duplicidades antes de atualizar
+  // await verificarDuplicidade("nome", nome, id);
+  // await verificarDuplicidade("telefone", telefone, id);
+  // await verificarDuplicidade("email", email, id);
+
+  //  // CPF e RG só se vierem preenchidos
+  // if (updates.cpf && updates.cpf.trim() !== "") {
+  //   await verificarDuplicidade("cpf", updates.cpf, id);
+  // }
+
+  // if (updates.rg && updates.rg.trim() !== "") {
+  //   await verificarDuplicidade("rg", updates.rg, id);
+  // }
+  
   const query = `
     INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, tipo)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -316,6 +331,20 @@ async function atualizarPessoaCompleta(id, updates) {
   // Não permitir alterar tipo
   delete updates.tipo;
   delete updates.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
+
+  // Verificar duplicidades antes de atualizar
+  // await verificarDuplicidade("nome", updates.nome, id);
+  // await verificarDuplicidade("telefone", updates.telefone, id);
+  await verificarDuplicidade("email", updates.email, id);
+
+  // CPF e RG só se vierem preenchidos
+  if (updates.cpf && updates.cpf.trim() !== "") {
+    await verificarDuplicidade("cpf", updates.cpf, id);
+  }
+
+  if (updates.rg && updates.rg.trim() !== "") {
+    await verificarDuplicidade("rg", updates.rg, id);
+  }
 
   // Buscar o tipo da pessoa para saber quais tabelas atualizar
   const tipo = await buscarTipoPessoa(id);

@@ -19,11 +19,70 @@ const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
 
+// NÃO USAR TRY-CATCH AQUI, DEIXAR PROPAGAR O ERRO PARA O CONTROLLER
 async function criarPessoaCompleta(dados) {
   const {
-    nome, foto, rg, cpf, telefone, email, data_nascimento,
+    nome, foto, rg, cpf, qr_code, cartao_rfid, telefone, email, data_nascimento,
     genero, tipo, ...camposExtras
   } = dados;
+
+  // Verifica duplicação por telefone
+
+  // Verifica duplicação por email
+  if (email) {
+    const [rows] = await db.query(
+      "SELECT id FROM Pessoa WHERE email = ? LIMIT 1",
+      [email]
+    );
+    if (rows.length > 0) {
+      throw new Error("Já existe uma pessoa com este email.");
+    }
+  }
+
+  // Verifica duplicação por CPF (se não for vazio)
+  if (cpf && cpf.trim() !== "") {
+    const [rows] = await db.query(
+      "SELECT id FROM Pessoa WHERE cpf = ? LIMIT 1",
+      [cpf]
+    );
+    if (rows.length > 0) {
+      throw new Error("Já existe uma pessoa com este CPF.");
+    }
+  }
+
+  // Verifica duplicação por RG (se não for vazio)
+  if (rg && rg.trim() !== "") {
+    const [rows] = await db.query(
+      "SELECT id FROM Pessoa WHERE rg = ? LIMIT 1",
+      [rg]
+    );
+    if (rows.length > 0) {
+      throw new Error("Já existe uma pessoa com este RG.");
+    }
+  }
+
+  // Verifica duplicação por QR Code (se não for vazio)
+  if (qr_code && qr_code.trim() !== "") {
+    const [rows] = await db.query(
+      "SELECT id FROM Pessoa WHERE qr_code = ? LIMIT 1",
+      [qr_code]
+    );
+    if (rows.length > 0) {
+      throw new Error("Já existe uma pessoa com este QR Code.");
+    }
+  }
+
+  // Verifica duplicação por Cartão RFID (se não for vazio)
+  if (cartao_rfid && cartao_rfid.trim() !== "") {
+    const [rows] = await db.query(
+      "SELECT id FROM Pessoa WHERE cartao_rfid = ? LIMIT 1",
+      [cartao_rfid]
+    );
+    if (rows.length > 0) {
+      throw new Error("Já existe uma pessoa com este Cartão RFID.");
+    }
+  }
+
 
   // 1. Criar Pessoa
   const pessoa = await criarPessoaBase({
