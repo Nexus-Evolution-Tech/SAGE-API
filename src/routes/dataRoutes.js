@@ -40,7 +40,7 @@ router.post('/dados/importar', autenticar, upload.single('planilha'), async (req
       console.log(`Bot de importação finalizado com código ${code}`);
 
       // após inserir no banco, sincroniza pessoas nas catracas
-      await sincronizarTodasPessoasNasCatracas();
+      //await sincronizarTodasPessoasNasCatracas();
 
       res.json({ message: 'Importação concluída e sincronização executada com sucesso!' });
     });

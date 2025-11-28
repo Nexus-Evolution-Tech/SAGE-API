@@ -22,7 +22,7 @@ def exportar_dados(caminho_saida):
             host='localhost',
             port=3306,
             user='root',
-            password='root',
+            password='douglas',
             database='sage'
         )
         cursor = conn.cursor(dictionary=True, buffered=True)

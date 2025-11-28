@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const SECRET = 'sua_chave_super_secreta'; // ideal usar variável de ambiente
 
 function gerarToken(payload) {
-  return jwt.sign(payload, SECRET, { expiresIn: '1h' }); // expira em 1 hora
+  return jwt.sign(payload, SECRET, { expiresIn: '10m' }); // expira em 1 hora
 }
 
 function verificarToken(token) {
