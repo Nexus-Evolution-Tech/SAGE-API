@@ -23,6 +23,14 @@ async function existeRegistroPendente(id, acao) {
   );
   return resultado[0].total > 0;
 }
+// Função para verificar se já existe um registro pendente para a pessoa e ação específica
+async function verificaUserRegistrado(id, acao) {
+  const resultado = await db.query(
+    'SELECT COUNT(*) as total FROM sync_pendente WHERE id = ? AND action = ?',
+    [id, acao]
+  );
+  return resultado[0].total > 0;
+}
 
 // OBS: TA CRIANDO, MAS QUANDO O CARTAO RFID É O MESMO ELE NÃO DA EXCEÇÃO, SIMPLESMENTE NÃO CRIA ATRIBUI O CARTÃO À PESSOA, DEVERIA TER PELO MENOS UM AVISO DE QUE NÃO PÔDE SER CRIADO
 // O PROBLEMA DISSO É QUE EU NÃO CONSIGO VER SE A VERIFICAÇÃO ESTÁ PENDENTE, SE ESTIVER, PROVAVELMENTE VOU PRECISAR SALVAR O ID DA PESSOA EM UMA TABELA A PARTE

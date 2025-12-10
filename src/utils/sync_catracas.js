@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { criarNovaPessoaNasCatracas, editarPessoaNasCatracas, deletarPessoaDasCatracas } = require('../services/controlIdService'); // DEPENDÊNCIA CIRCULAR?
 
+// PRECISA CRIAR UM METODO PRA RODAR DEPOIS DA IMPORTAÇÃO
 async function sincronizarTodasPessoasNasCatracas() {
   try {
     const [pessoas] = await db.query('SELECT * FROM Pessoa') // ou `await db.query(...)` se for mysql2
