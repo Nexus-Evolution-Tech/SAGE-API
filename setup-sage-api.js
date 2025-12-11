@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * setup-sage-api.js (v6 - Setup Seguro, Direto e Estável)
+ * setup-sage-api.js (v7 - Setup Estável com Inserção SQL Segura)
  * * Script de configuração que:
  * 1. Prepara o banco de dados.
  * 2. Cria o hash BCRYPT da senha padrão dinamicamente.
- * 3. Insere a Unidade Escolar (ETEC Taboão) diretamente via SQL de forma segura.
+ * 3. Insere a Unidade Escolar (ETEC Taboão) diretamente via SQL,
+ * enviando a query limpa via STDIN para evitar erros de shell.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
-const bcrypt = require('bcrypt'); // Necessário para hashing
+const bcrypt = require('bcrypt'); // Necessário: npm install bcrypt
 
 const platform = os.platform();
 
@@ -54,7 +55,7 @@ function readEnvFile() {
   return env;
 }
 
-// ----- FUNÇÕES DE SETUP SQL -----
+// ----- FUNÇÕES DE SETUP SQL (Mantidas) -----
 
 function getMySQLCommand() {
     const paths = platform === 'win32'
@@ -70,79 +71,81 @@ function getMySQLCommand() {
       } catch (e) {}
     }
     return null;
-  }
+}
   
-  function checkMySQLRunning(mysqlCmd, user = 'root', password = '') {
-    try {
-      const passwordFlag = password ? `-p${password}` : ''; 
-      const cmd = `"${mysqlCmd}" -h localhost -u ${user} ${passwordFlag} -e "SELECT 1"`;
-      execSync(cmd, { 
-        stdio: 'pipe',
-        encoding: 'utf-8'
-      });
-      return true;
-    } catch (error) {
+function checkMySQLRunning(mysqlCmd, user = 'root', password = '') {
+  try {
+    const passwordFlag = password ? `-p${password}` : ''; 
+    const cmd = `"${mysqlCmd}" -h localhost -u ${user} ${passwordFlag} -e "SELECT 1"`;
+    execSync(cmd, { 
+      stdio: 'pipe',
+      encoding: 'utf-8'
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+  
+function createDatabase(user, password) {
+  try {
+    log(colors.blue, '   Criando banco de dados "sage"...');
+    
+    const sqlCommands = `
+      CREATE DATABASE IF NOT EXISTS sage;
+      USE sage;
+      SET time_zone = '-03:00';
+    `;
+    
+    execSync(
+      `mysql -h localhost -u ${user} -p${password} -e "${sqlCommands.replace(/\n/g, ' ')}"`,
+      { stdio: 'pipe' }
+    );
+    
+    log(colors.green, '   Banco de dados criado com sucesso!');
+    return true;
+  } catch (error) {
+    log(colors.red, `   Erro ao criar banco: ${error.message}`);
+    return false;
+  }
+}
+  
+function createTables(user, password) {
+  try {
+    log(colors.blue, '   Criando tabelas...');
+    
+    const schemaPath = path.join(__dirname, 'database', 'sage.sql');
+    if (!checkFileExists(schemaPath)) {
+      log(colors.yellow, '   ⚠️  Schema SQL não encontrado em database/sage.sql');
       return false;
     }
+    
+    execSync(
+      `mysql -h localhost -u ${user} -p${password} sage < "${schemaPath}"`,
+      { stdio: 'pipe' }
+    );
+    
+    log(colors.green, '   Tabelas criadas com sucesso!');
+    return true;
+  } catch (error) {
+    log(colors.red, `   Erro ao criar tabelas: ${error.message}`);
+    return false;
   }
-  
-  function createDatabase(user, password) {
-    try {
-      log(colors.blue, '   Criando banco de dados "sage"...');
-      
-      const sqlCommands = `
-        CREATE DATABASE IF NOT EXISTS sage;
-        USE sage;
-        SET time_zone = '-03:00';
-      `;
-      
-      execSync(
-        `mysql -h localhost -u ${user} -p${password} -e "${sqlCommands.replace(/\n/g, ' ')}"`,
-        { stdio: 'pipe' }
-      );
-      
-      log(colors.green, '   Banco de dados criado com sucesso!');
-      return true;
-    } catch (error) {
-      log(colors.red, `   Erro ao criar banco: ${error.message}`);
-      return false;
-    }
-  }
-  
-  function createTables(user, password) {
-    try {
-      log(colors.blue, '   Criando tabelas...');
-      
-      const schemaPath = path.join(__dirname, 'database', 'sage.sql');
-      if (!checkFileExists(schemaPath)) {
-        log(colors.yellow, '   ⚠️  Schema SQL não encontrado em database/sage.sql');
-        return false;
-      }
-      
-      execSync(
-        `mysql -h localhost -u ${user} -p${password} sage < "${schemaPath}"`,
-        { stdio: 'pipe' }
-      );
-      
-      log(colors.green, '   Tabelas criadas com sucesso!');
-      return true;
-    } catch (error) {
-      log(colors.red, `   Erro ao criar tabelas: ${error.message}`);
-      return false;
-    }
-  }
+}
 
-  function checkDatabaseExists(user, password) {
-    try {
-      const cmd = `mysql -h localhost -u ${user} -p${password} -e "USE sage;"`;
-      execSync(cmd, { stdio: 'pipe' });
-      log(colors.green, '   Banco de dados "sage" já existe.');
-      return true;
-    } catch (error) {
-      log(colors.yellow, '   Banco de dados "sage" não encontrado. Será criado automaticamente.');
-      return false;
-    }
+function checkDatabaseExists(user, password) {
+  try {
+    const cmd = `mysql -h localhost -u ${user} -p${password} -e "USE sage;"`;
+    execSync(cmd, { stdio: 'pipe' });
+    log(colors.green, '   Banco de dados "sage" já existe.');
+    return true;
+  } catch (error) {
+    log(colors.yellow, '   Banco de dados "sage" não encontrado. Será criado automaticamente.');
+    return false;
   }
+}
+
+// --- FUNÇÃO DE INSERÇÃO CORRIGIDA ---
 
 async function createDefaultUser(user, password) {
     const senhaTextoClaro = 'etec123'; 
@@ -152,44 +155,38 @@ async function createDefaultUser(user, password) {
         log(colors.blue, '   Gerando hash BCRYPT...');
         const senhaHashed = await bcrypt.hash(senhaTextoClaro, saltRounds); 
         
-        // Não é mais necessário escapar '$' ou aspas simples, pois a query não passará pelo shell.
-        
-        // 1. A query é construída de forma limpa (sem escapes extras)
-// Apenas altere o SQL dentro de createDefaultUser
-
+        // 1. A QUERY É CONSTRUÍDA COM CORREÇÃO DE SINTAXE SQL (PONTO E VÍRGULA REMOVIDO)
         const sqlQuery = `
             INSERT INTO sage.UnidadeEscolar 
             (id, nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo) 
             VALUES 
             (1, 'ETEC Taboão da Serra', '293', '62823257029344', 'etec', '${senhaHashed}', 'Praça Miguel Ortega', '135', 'Prédio Principal', 'Parque Assunção', 'Taboão da Serra', 'SP', '06754160', '1147011856', 'logo_etec.png')
-            ON DUPLICATE KEY UPDATE id=id
-        `; // <-- Ponto e vírgula (;) removido daqui!
-        
-        // O comando shell agora apenas chama o MySQL, sem o '-e'
+            ON DUPLICATE KEY UPDATE id=id;
+        `; // <-- O ponto e vírgula é mantido aqui, pois é o final do comando SQL.
+
+        // O comando shell apenas invoca o cliente MySQL para o banco 'sage'
         const baseShellCommand = `mysql -h localhost -u ${user} -p${password} sage`;
 
         log(colors.blue, '   Executando inserção via STDIN...');
         
-        // EXECUÇÃO FINAL: O Node.js executa o comando e envia a string SQL para ele.
+        // 2. EXECUÇÃO FINAL: Envia a string SQL para o stdin do cliente MySQL
         execSync(baseShellCommand, { 
           stdio: 'pipe',
-          input: sqlQuery // <-- O comando SQL limpo é enviado como input.
+          input: sqlQuery 
         });
         
         log(colors.green, `   ✅ Unidade Escolar criada com sucesso! (Login: etec | Senha: ${senhaTextoClaro})`);
         return true;
 
     } catch (error) {
-        log(colors.red, `   ❌ Erro ao criar Unidade Escolar. Verifique a sintaxe SQL e se o DB está rodando.`);
-        
-        // O erro real pode ser lido aqui, mas vamos manter a saída limpa
-        // console.error(error.output.toString()); 
-        
+        log(colors.red, `   ❌ Erro ao criar Unidade Escolar. Verifique os logs do MySQL.`);
+        // Em caso de falha, o erro real do MySQL (que não é mais de shell) pode ser complexo,
+        // mas o retorno de false é o suficiente para o main lidar com o exit.
         return false;
     }
 }
 
-// --- FUNÇÃO MAIN ---
+// --- FUNÇÃO MAIN REVISADA PARA LIDAR COM ERROS ---
 
 async function main() {
   log(colors.bright + colors.blue, '\n╔════════════════════════════════════════════════════════════╗');
@@ -230,7 +227,12 @@ async function main() {
   
   // Passo 4: Criar o usuário padrão (Unidade Escolar)
   log(colors.bright, '\n4. Inserindo dados iniciais (Unidade Escolar)...');
-  await createDefaultUser(env.DB_USER, env.DB_PASSWORD); 
+  const userCreated = await createDefaultUser(env.DB_USER, env.DB_PASSWORD);
+
+  if (!userCreated) {
+    log(colors.red, '\n ❌ Setup ABORTADO: Falha na criação da Unidade Escolar. Verifique o schema SQL (database/sage.sql) e tente novamente.');
+    process.exit(1); // Força a saída com erro
+  }
 
   log(colors.green, '\n Setup concluído com sucesso! Você pode iniciar o servidor com "npm start".\n');
 }
