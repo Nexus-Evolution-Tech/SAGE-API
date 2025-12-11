@@ -3,7 +3,9 @@
     "axios": "^1.9.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^5.1.0",
+    "extract-zip": "^2.0.1",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "multer": "^2.0.1",
@@ -16,6 +18,45 @@
     "nodemon": "^3.1.10"
   },
   "scripts": {
-    "start": "nodemon index.js"
+    "start": "node start-sage.js",
+    "dev": "nodemon index.js",
+    "setup": "node setup-sage-api.js",
+    "run": "node run.js",
+    "setup-installer": "node install.js",
+    "reset-db": "rm .env .setup-complete 2>/dev/null; node setup-sage-api.js",
+    "build": "pkg . --targets win-x64,macos-x64,linux-x64 --output sage-api",
+    "build:windows": "pkg . --targets win-x64 --output SAGE-API-INSTALLER",
+    "build:macos": "pkg . --targets macos-x64 --output SAGE-API",
+    "build:linux": "pkg . --targets linux-x64 --output sage-api",
+    "postinstall": "node setup-sage-api.js"
+  },
+  "pkg": {
+    "scripts": [
+      "index.js",
+      "start-sage.js",
+      "setup-sage-api.js",
+      "install.js",
+      "run.js"
+    ],
+    "assets": [
+      "package.json",
+      "config.json",
+      "database/**/*",
+      "src/**/*",
+      "docs/**/*",
+      "resources/**/*"
+    ],
+    "targets": [
+      "win-x64"
+    ],
+    "outputPath": "dist",
+    "compress": "Brotli"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "node_modules",
+      "uploads",
+      ".git"
+    ]
   }
 }

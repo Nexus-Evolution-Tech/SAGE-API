@@ -1,13 +1,15 @@
 const knex = require('knex');
+const env = require('./environment');
 
 const config = {
   client: 'mysql2',
   connection: {
-    host: 'localhost',
-    user: 'root',
-    password: 'douglas',
-    database: 'sage',
-    timezone: '-03:00'
+    host: env.db.host,
+    port: env.db.port,
+    user: env.db.user,
+    password: env.db.password,
+    database: env.db.database,
+    timezone: env.db.timezone
   }
 };
 

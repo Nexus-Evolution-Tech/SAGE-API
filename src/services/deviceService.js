@@ -1,13 +1,12 @@
 const axios = require('axios');
-const { verificarSyncPendentes } = require('../utils/sync_catracas'); // DEPENDÊNCIA CIRCULAR
+const { verificarSyncPendentes } = require('./syncService');
 
 async function listarTodos() {
   try {
-    // global.db é o Knex, então podemos fazer:
     const dispositivos = await global.db('Dispositivo').select('*');
-    return dispositivos; // retorna array de objetos
+    return dispositivos;
   } catch (error) {
-    console.error('Erro ao listar dispositivos:', error.message);
+    console.error('❌ Erro ao listar dispositivos:', error.message);
     return [];
   }
 }

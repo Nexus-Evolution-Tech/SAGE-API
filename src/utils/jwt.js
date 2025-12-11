@@ -1,13 +1,13 @@
 const jwt = require('jsonwebtoken');
-const SECRET = 'sua_chave_super_secreta'; // ideal usar variável de ambiente
+const env = require('../config/environment');
 
 function gerarToken(payload) {
-  return jwt.sign(payload, SECRET, { expiresIn: '10m' }); // expira em 1 hora
+  return jwt.sign(payload, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
 }
 
 function verificarToken(token) {
   try {
-    return jwt.verify(token, SECRET);
+    return jwt.verify(token, env.jwt.secret);
   } catch (err) {
     return null; // token inválido ou expirado
   }

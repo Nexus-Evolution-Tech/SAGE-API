@@ -1,0 +1,91 @@
+{
+  "app": {
+    "name": "SAGE-API",
+    "version": "1.0.0",
+    "description": "Sistema de Gestão Escolar - Monitoramento e Automações",
+    "author": "Equipe ETEC",
+    "school": "ETEC Taboão da Serra"
+  },
+  "database": {
+    "type": "mysql",
+    "location": "LOCAL",
+    "portable": {
+      "enabled": true,
+      "path": "./mysql-portable",
+      "version": "8.0.44",
+      "autoStart": true
+    },
+    "credentials": {
+      "host": "localhost",
+      "port": 3306,
+      "user": "root",
+      "password": "sage_admin_2024_etec",
+      "database": "sage",
+      "timezone": "-03:00"
+    },
+    "sync": {
+      "enabled": false,
+      "mode": "OFFLINE_FIRST",
+      "description": "Dados sempre locais. Sincronização futura com servidor CPS é opcional.",
+      "server": null,
+      "apiKey": null,
+      "frequency": "hourly",
+      "retryOnFail": true
+    }
+  },
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "environment": "production",
+    "cors": {
+      "origins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "https://editor.swagger.io"
+      ]
+    }
+  },
+  "security": {
+    "jwtExpire": "10m",
+    "hashAlgorithm": "sha256",
+    "encryptionEnabled": true,
+    "description": "Credenciais de banco encriptadas no executável"
+  },
+  "paths": {
+    "appRoot": ".",
+    "database": "./database",
+    "schema": "./database/sage.sql",
+    "logs": "./logs",
+    "uploads": "./src/uploads"
+  },
+  "installation": {
+    "type": "LOCAL_EXECUTABLE",
+    "platform": "win32",
+    "installPath": "C:\\Program Files\\SAGE-API",
+    "dataPath": "C:\\ProgramData\\SAGE-API",
+    "autoStart": true,
+    "description": "Sistema instalado localmente. Dados sempre permanecem no PC da escola."
+  },
+  "features": {
+    "catraca": {
+      "enabled": false,
+      "integration": "MQTT"
+    },
+    "monitoring": {
+      "enabled": true
+    },
+    "automation": {
+      "enabled": true
+    },
+    "reporting": {
+      "enabled": true
+    }
+  },
+  "notes": {
+    "offlineFirst": "Este sistema funciona 100% offline. Sincronização com CPS é opcional e futura.",
+    "dataProtection": "Todos os dados sensíveis são encriptados e armazenados localmente no PC da escola.",
+    "updates": "Atualizações de MySQL: substitua a pasta mysql-portable pela versão mais recente.",
+    "support": "Contate a equipe de desenvolvimento da ETEC para suporte e atualizações."
+  }
+}
