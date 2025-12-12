@@ -38,7 +38,7 @@ module.exports = {
   // JWT
   jwt: {
     secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRE || '10m'
+    expiresIn: process.env.JWT_EXPIRE || '1m'
   },
 
   // Server

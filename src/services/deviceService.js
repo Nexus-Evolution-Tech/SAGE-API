@@ -23,7 +23,7 @@ async function obterSessao(linkCatraca, dispositivo) {
       password: dispositivo.senha
     });
     console.log(`Sessão obtida para ${dispositivo.nome}:`, response.data.session);
-    await verificarSyncPendentes(dispositivo); // TODA VEZ QUE EU OBTER UMA SESSÃO NOVA DE CONEXÃO, VOU CHECAR SE TODOS OS REGISTROS PENDENTES JÁ ESTÃO SINCRONIZADOS, ALÉM DISSO É PRECISO FAZER ISSO PRA CADA DISPOSITIVO INDIVIDUALMENTE
+    // await verificarSyncPendentes(dispositivo); // TODA VEZ QUE EU OBTER UMA SESSÃO NOVA DE CONEXÃO, VOU CHECAR SE TODOS OS REGISTROS PENDENTES JÁ ESTÃO SINCRONIZADOS, ALÉM DISSO É PRECISO FAZER ISSO PRA CADA DISPOSITIVO INDIVIDUALMENTE
     return response.data.session;
   } catch (error) {
     console.error(`Erro ao obter sessão para ${dispositivo?.nome}:`, error.message);
