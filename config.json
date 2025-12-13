@@ -47,7 +47,7 @@
     }
   },
   "security": {
-    "jwtExpire": "10m",
+    "jwtExpire": "1m",
     "hashAlgorithm": "sha256",
     "encryptionEnabled": true,
     "description": "Credenciais de banco encriptadas no executável"
