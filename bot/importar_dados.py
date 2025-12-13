@@ -1,447 +1,264 @@
-# inserir_dados.py
-# Versão final — integra planilha -> banco 'sage'
-# Requisitos: pandas, openpyxl, mysql-connector-python
-# pip install pandas openpyxl mysql-connector-python
+# inserir_dados_pymysql.py
+# Versão Segura (Driver Pure Python) - Corrige erro 3221225477
+# Requisitos: pip install pandas openpyxl pymysql
 
 import pandas as pd
-import mysql.connector
+import pymysql # TROCAMOS O DRIVER AQUI
 import re
 from datetime import datetime
 import sys
+import time
 
 # ----------------------------
-# Configuração do banco (ajuste aqui se necessário)
+# Configuração do banco
 # ----------------------------
 DB_CONFIG = {
     'host': 'localhost',
     'port': 3306, 
     'user': 'root',
     'password': 'douglas',
-    'database': 'sage'
+    'database': 'sage',
+    'cursorclass': pymysql.cursors.Cursor # Cursor padrão
 }
 
-# EXCEL_FILE = "PlanilhaDadosEscolares.xlsx"
+# ----------------------------
+# Utilitários de Log
+# ----------------------------
+def log(msg):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] {msg}", flush=True)
 
 # ----------------------------
-# Utilitários
+# Utilitários de Tratamento
 # ----------------------------
 def limpar_valor(v):
-    if pd.isna(v):
+    if pd.isna(v) or v is None:
         return None
-    return str(v).strip().replace('"', '').replace("'", "")
-
+    s = str(v).strip().replace('"', '').replace("'", "")
+    return s if s else None
 
 def somente_numeros(v):
-    v = limpar_valor(v)
-    if not v:
-        return ""
-    # Remove todos os caracteres não-dígitos
-    return re.sub(r'\D', '', str(v))
+    if v is None: return ""
+    v_str = str(v)
+    if not v_str: return ""
+    return re.sub(r'\D', '', v_str)
 
 def pad_digits(v, size):
-    # CORREÇÃO: Aplica somente_numeros antes de preencher, garantindo que IDs grandes
-    # não causem erro (ex: '123456789.0' vira '123456789')
     s = somente_numeros(v) 
-    if s == "":
-        return None
-    if len(s) >= size:
-        return s[:size]
+    if not s: return None
+    if len(s) > size: return s[:size]
     return s.zfill(size)
 
 def validar_email(v):
     v = limpar_valor(v)
-    if not v:
-        return None
-    if re.match(r'^[^@]+@[^@]+\.[^@]+$', v):
+    if not v: return None
+    if len(v) < 5 or '@' not in v: return None
+    if re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
         return v.lower()
     return None
 
 def parse_date(v):
     v = limpar_valor(v)
-    if not v:
-        return None
-    # if it's already a Timestamp
+    if not v: return None
+    if isinstance(v, (pd.Timestamp, datetime)):
+        return v.strftime("%Y-%m-%d")
     try:
-        if isinstance(v, (pd.Timestamp, datetime)):
-            return v.strftime("%Y-%m-%d")
-    except Exception:
-        pass
-    # Tenta pandas parse (agora sem dayfirst=True para evitar warning)
-    try:
-        dt = pd.to_datetime(v, errors='coerce', format='mixed')
+        dt = pd.to_datetime(v, errors='coerce', dayfirst=True)
         if not pd.isna(dt):
             return dt.strftime("%Y-%m-%d")
-    except Exception:
+    except:
         pass
-    # fallback few formats
-    for fmt in ("%d/%m/%Y","%d-%m-%Y","%Y-%m-%d","%d\\%m\\%Y","%m/%d/%Y"):
-        try:
-            dt = datetime.strptime(str(v), fmt)
-            return dt.strftime("%Y-%m-%d")
-        except Exception:
-            continue
     return None
 
 # ----------------------------
-# DB helper functions
+# Funções de Banco de Dados
 # ----------------------------
-def get_unidade_by_nome(cursor, nome):
-    if not nome:
-        return None
-    cursor.execute("SELECT id FROM UnidadeEscolar WHERE nome = %s", (nome,))
-    r = cursor.fetchone()
-    return r[0] if r else None
-
 def find_turma_by_name(cursor, nome):
-    if not nome:
-        return None
-    cursor.execute("SELECT id FROM Turma WHERE nome = %s", (nome,))
+    if not nome: return None
+    cursor.execute("SELECT id FROM Turma WHERE nome = %s LIMIT 1", (nome,))
     r = cursor.fetchone()
     return r[0] if r else None
 
 def find_pessoa_by_cpf(cursor, cpf):
-    if not cpf:
-        return None
-    cursor.execute("SELECT id FROM Pessoa WHERE cpf = %s", (cpf,))
+    if not cpf: return None
+    cursor.execute("SELECT id FROM Pessoa WHERE cpf = %s LIMIT 1", (cpf,))
     r = cursor.fetchone()
     return r[0] if r else None
 
-# ----------------------------
-# Inserir Pessoa (sempre tenta criar Pessoa e retorna pessoa_id)
-# ----------------------------
 def inserir_pessoa(cursor, conn, row, tipo, rfid_raw, unidade_id_default):
-    # Colunas possíveis: Nome, RG, CPF, Telefone, Email, Número do Cartão, Data Nascimento
     nome = limpar_valor(row.get("Nome") or row.get("nome"))
-    if not nome:
-        return None
+    if not nome: return None
 
-    # pegar cpf/rg/telefone/email/Número do Cartão/data
-    cpf_raw = row.get("CPF") or row.get("Cpf") or row.get("cpf")
-    cpf = pad_digits(cpf_raw, 11)
-    rg_raw = row.get("RG") or row.get("Rg") or row.get("rg")
-    rg = pad_digits(rg_raw, 9)
-    telefone_raw = row.get("Telefone") or row.get("Telefone Contato") or row.get("telefone")
-    telefone = pad_digits(telefone_raw, 11)
+    cpf = pad_digits(row.get("CPF") or row.get("Cpf") or row.get("cpf"), 11)
+    rg = pad_digits(row.get("RG") or row.get("Rg") or row.get("rg"), 9)
+    telefone = pad_digits(row.get("Telefone") or row.get("Telefone Contato") or row.get("telefone"), 11)
     email = validar_email(row.get("Email") or row.get("email"))
-    
-    # CORREÇÃO DEFINITIVA DO RFID: Garante que é somente número
     rfid = somente_numeros(rfid_raw) or None
-    
+    if rfid == "": rfid = None
     data_nasc = parse_date(row.get("Data Nascimento") or row.get("Data Nasc") or row.get("data_nascimento"))
 
-    # Se CPF presente e já existe pessoa -> usa existente
     if cpf:
-        try:
-            existing = find_pessoa_by_cpf(cursor, cpf)
-        except Exception:
-            existing = None
-        if existing:
-            return existing
+        existing_id = find_pessoa_by_cpf(cursor, cpf)
+        if existing_id: return existing_id
 
-    # Inserir pessoa (quaisquer campos vazios viram NULL)
     try:
-        cursor.execute("""
-            INSERT INTO Pessoa (nome, rg, cpf, telefone, email, unidade_id, data_nascimento, tipo, cartao_rfid)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (nome, rg, cpf, telefone, email, unidade_id_default, data_nasc, tipo, rfid))
+        sql = """INSERT INTO Pessoa (nome, rg, cpf, telefone, email, unidade_id, data_nascimento, tipo, cartao_rfid)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        vals = (nome, rg, cpf, telefone, email, unidade_id_default, data_nasc, tipo, rfid)
+        cursor.execute(sql, vals)
         conn.commit()
         return cursor.lastrowid
-    except mysql.connector.Error as err:
-        conn.rollback()
-        print(f"  ❌ Erro ao inserir Pessoa ({nome}): {err}")
+    except pymysql.MySQLError as err:
+        # Erro 1062 é duplicidade no PyMySQL
+        if err.args[0] == 1062: 
+            cursor.execute("SELECT id FROM Pessoa WHERE nome = %s LIMIT 1", (nome,))
+            r = cursor.fetchone()
+            if r: return r[0]
+        log(f" ❌ Erro SQL ao inserir Pessoa ({nome}): {err}")
         return None
+
+# ----------------------------
+# Processamento
+# ----------------------------
+def processar_aluno(df, cursor, conn, unidade_id_default):
+    log(f"Processando {len(df)} ALUNOS...")
+    for idx, r in df.iterrows():
+        try:
+            pessoa_id = inserir_pessoa(cursor, conn, r, "ALUNO", r.get("Número do Cartão"), unidade_id_default)
+            if not pessoa_id: continue
+
+            ra = pad_digits(r.get("RA"), 14)
+            rm = pad_digits(r.get("RM"), 11)
+            turma_nome = limpar_valor(r.get("Turma"))
+            turma_id = find_turma_by_name(cursor, turma_nome)
+            
+            divisao = None
+            div_raw = limpar_valor(r.get("Divisão") or r.get("Divisao"))
+            if div_raw:
+                div_upper = div_raw.upper()
+                if "A" in div_upper: divisao = "DIV A"
+                elif "B" in div_upper: divisao = "DIV B"
+                elif "INT" in div_upper: divisao = "INT"
+            
+            status = limpar_valor(r.get("Status")) or "EM CURSO"
+
+            cursor.execute("SELECT id FROM Aluno WHERE id = %s", (pessoa_id,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO Aluno (id, ra, rm, turma_id, divisao, status) VALUES (%s,%s,%s,%s,%s,%s)",
+                               (pessoa_id, ra, rm, turma_id, divisao, status))
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            log(f"Erro Aluno linha {idx}: {e}")
+
+def processar_responsavel(df, cursor, conn, unidade_id_default):
+    log(f"Processando {len(df)} RESPONSÁVEIS...")
+    for idx, r in df.iterrows():
+        try:
+            pessoa_id = inserir_pessoa(cursor, conn, r, "RESPONSAVEL", r.get("Número do Cartão"), unidade_id_default)
+            if not pessoa_id: continue
+
+            cursor.execute("SELECT id FROM Responsavel WHERE id = %s", (pessoa_id,))
+            if cursor.fetchone(): continue
+
+            aluno_nome = limpar_valor(r.get("Nome do Aluno") or r.get("Aluno"))
+            aluno_id = None
+            if aluno_nome:
+                cursor.execute("SELECT p.id FROM Pessoa p JOIN Aluno a ON p.id=a.id WHERE p.nome = %s LIMIT 1", (aluno_nome,))
+                res = cursor.fetchone()
+                if res: aluno_id = res[0]
+            
+            cursor.execute("INSERT INTO Responsavel (id, aluno_id) VALUES (%s, %s)", (pessoa_id, aluno_id))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+
+def processar_professor(df, cursor, conn, unidade_id_default):
+    log(f"Processando {len(df)} PROFESSORES...")
+    for idx, r in df.iterrows():
+        try:
+            eh_admin = str(r.get("Administrador")).lower() == "true"
+            tipo = "PROFADM" if eh_admin else "PROFESSOR"
+            
+            pessoa_id = inserir_pessoa(cursor, conn, r, tipo, r.get("Número do Cartão"), unidade_id_default)
+            if not pessoa_id: continue
+
+            matricula = pad_digits(r.get("Matrícula") or r.get("Matrícula (Nº)"), 6)
+            dt_adm = parse_date(r.get("Data Admissão"))
+            dt_saida = parse_date(r.get("Data Saída"))
+            contrato = limpar_valor(r.get("Tipo Contrato"))
+
+            cursor.execute("SELECT id FROM Funcionario WHERE id = %s", (pessoa_id,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato) VALUES (%s,%s,%s,%s,%s)",
+                               (pessoa_id, matricula, dt_adm, dt_saida, contrato))
+                conn.commit()
+            
+            cursor.execute("SELECT id FROM Professor WHERE id = %s", (pessoa_id,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO Professor (id) VALUES (%s)", (pessoa_id,))
+                conn.commit()
+            
+            if eh_admin:
+                cursor.execute("SELECT id FROM Administrador WHERE id = %s", (pessoa_id,))
+                if not cursor.fetchone():
+                    cursor.execute("INSERT INTO Administrador (id) VALUES (%s)", (pessoa_id,))
+                    conn.commit()
+        except Exception as e:
+            conn.rollback()
 
 # ----------------------------
 # Main
 # ----------------------------
 def main(excel_file, unidade_id_default=None):
-    EXCEL_FILE = excel_file
-    # conectar DB
+    log(f"Iniciando script para arquivo: {excel_file}")
+    
+    # CONEXÃO SEGURA COM PYMYSQL
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-    except mysql.connector.Error as e:
-        print(f"Erro ao conectar no MySQL: {e}")
-        sys.exit(1)
-
-    cursor = conn.cursor(buffered=True)
-    print("Conexão com o banco de dados MySQL bem-sucedida!\n")
-
-    # CORREÇÃO ANTI-FLOAT DO PANDAS: Define todas as colunas de ID/números como string
-    # Isso impede que números grandes (CPF, RG, Cartão) sejam lidos como float (com o ".0")
-    colunas_para_string = {
-        "CPF": str, 
-        "Cpf": str, 
-        "cpf": str,
-        "RG": str,
-        "Rg": str,
-        "rg": str,
-        "Número do Cartão": str, 
-        "Numero do Cartao": str,
-        "RA": str,
-        "RM": str,
-        "Matrícula": str,
-        "Matricula": str,
-        "Matrícula (Nº)": str,
-        "Matricula (Nº)": str,
-        "Matrícula (específica)": str
-    }
-
-    # ler todas as sheets
-    try:
-        all_sheets = pd.read_excel(EXCEL_FILE, sheet_name=None, engine="openpyxl", dtype=colunas_para_string)
-    except FileNotFoundError:
-        print(f"Arquivo Excel não encontrado: {EXCEL_FILE}")
-        cursor.close()
-        conn.close()
-        return
+        conn = pymysql.connect(**DB_CONFIG)
+        cursor = conn.cursor() # PyMySQL não usa buffered=True aqui da mesma forma
+        log("DB conectado com sucesso (PyMySQL).")
     except Exception as e:
-        print(f"Erro ao ler Excel: {e}")
-        cursor.close()
-        conn.close()
+        log(f"FATAL: Erro de conexão com banco: {e}")
         return
 
-    # ----------------------------
-    # 5) ALUNO
-    # ----------------------------
-    print("\nProcessando aba: ALUNO")
-    if "ALUNO" in all_sheets:
-        df = all_sheets["ALUNO"].fillna("")
-        for idx, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            if not nome:
-                continue
-            # Pessoa
-            pessoa_id = inserir_pessoa(cursor, conn, r, "ALUNO", r.get("Número do Cartão"), unidade_id_default)
-            if not pessoa_id:
-                continue
-            # Aluno
-            ra = pad_digits(r.get("RA"), 14) if r.get("RA") else None
-            rm = pad_digits(r.get("RM"), 11) if r.get("RM") else None
-            turma_nome = limpar_valor(r.get("Turma"))
-            turma_id = find_turma_by_name(cursor, turma_nome) if turma_nome else None
-            divisao = None
-            div_raw = limpar_valor(r.get("Divisão") or r.get("Divisao"))
-            if div_raw:
-                dd = div_raw.strip().upper()
-                if dd in ("A","DIV A","DIVA"):
-                    divisao = "DIV A"
-                elif dd in ("B","DIV B","DIVB"):
-                    divisao = "DIV B"
-                elif dd in ("INT"):
-                    divisao = "INT"
-            status = limpar_valor(r.get("Status")) or "EM CURSO"
-            try:
-                cursor.execute("SELECT id FROM Aluno WHERE id = %s", (pessoa_id,))
-                if cursor.fetchone():
-                    # print(f"  - Aluno (pessoa id {pessoa_id}) já existe na tabela Aluno. Pulando.")
-                    continue
-                cursor.execute("INSERT INTO Aluno (id, ra, rm, turma_id, divisao, status) VALUES (%s,%s,%s,%s,%s,%s)",
-                               (pessoa_id, ra, rm, turma_id, divisao, status))
-                conn.commit()
-                print(f"+ Aluno '{nome}' inserido (pessoa id {pessoa_id}).")
-            except Exception as e:
-                conn.rollback()
-                print(f"Erro (Aluno idx {idx}): {e}")
-    else:
-        print("Aba 'ALUNO' não encontrada.")
+    # Leitura Excel
+    log("Lendo arquivo Excel...")
+    try:
+        colunas_string = {
+            "CPF": str, "Cpf": str, "cpf": str, "RG": str, "Rg": str, "rg": str,
+            "Número do Cartão": str, "Numero do Cartao": str, "RA": str, "RM": str,
+            "Matrícula": str, "Matricula": str, "Matrícula (Nº)": str
+        }
+        xls = pd.ExcelFile(excel_file, engine="openpyxl")
+        sheet_names = xls.sheet_names
+        log(f"Abas: {sheet_names}")
+    except Exception as e:
+        log(f"FATAL: Erro ao abrir Excel: {e}")
+        return
 
-    # ----------------------------
-    # 6) RESPONSÁVEL
-    # ----------------------------
-    print("\nProcessando aba: RESPONSAVEL")
-    sheet_name_resp = None
-    for candidate in ("RESPONSÁVEL", "RESPONSAVEL", "Responsaveis", "Responsáveis", "RESPONSAVEIS"):
-        if candidate in all_sheets:
-            sheet_name_resp = candidate
+    if "ALUNO" in sheet_names:
+        df = pd.read_excel(xls, "ALUNO", dtype=colunas_string).fillna("")
+        processar_aluno(df, cursor, conn, unidade_id_default)
+    
+    for aba in ["RESPONSÁVEL", "RESPONSAVEL", "Responsaveis"]:
+        if aba in sheet_names:
+            df = pd.read_excel(xls, aba, dtype=colunas_string).fillna("")
+            processar_responsavel(df, cursor, conn, unidade_id_default)
             break
-    if sheet_name_resp:
-        df = all_sheets[sheet_name_resp].fillna("")
-        for _, r in df.iterrows():
-            # Pessoa
-            pessoa_id = inserir_pessoa(cursor, conn, r, "RESPONSAVEL", r.get("Número do Cartão"), unidade_id_default)
-            if not pessoa_id:
-                continue
-            # Responsavel
-            try:
-                cursor.execute("SELECT id FROM Responsavel WHERE id = %s", (pessoa_id,))
-                if cursor.fetchone():
-                    # print(f"  - Responsável (pessoa id {pessoa_id}) já existe. Pulando.")
-                    continue
-                aluno_nome = limpar_valor(r.get("Nome do Aluno") or r.get("Aluno"))
-                aluno_id = None
-                if aluno_nome:
-                    cursor.execute("SELECT p.id FROM Pessoa p JOIN Aluno a ON p.id=a.id WHERE p.nome = %s", (aluno_nome,))
-                    row = cursor.fetchone()
-                    if row:
-                        aluno_id = row[0]
-                cursor.execute("INSERT INTO Responsavel (id, aluno_id) VALUES (%s, %s)", (pessoa_id, aluno_id))
-                conn.commit()
-                print(f"+ Responsável '{r.get('Nome')}' inserido (pessoa id {pessoa_id}).")
-            except Exception as e:
-                conn.rollback()
-                print(f"Erro ao inserir responsável: {e}")
-    else:
-        print("  - Aba 'RESPONSÁVEL' / 'RESPONSAVEL' não encontrada.")
+            
+    if "PROFESSOR" in sheet_names:
+        df = pd.read_excel(xls, "PROFESSOR", dtype=colunas_string).fillna("")
+        processar_professor(df, cursor, conn, unidade_id_default)
 
-    # ----------------------------
-    # 7) PROFESSOR
-    # ----------------------------
-    print("\nProcessando aba: PROFESSOR")
-    if "PROFESSOR" in all_sheets:
-        df = all_sheets["PROFESSOR"].fillna("")
-        for _, r in df.iterrows():
-            eh_admin = limpar_valor(r.get("Administrador")) == "True"
-            # print(eh_admin)
-            tipo = "PROFADM" if eh_admin else "PROFESSOR"
-            
-            # 1. PESSOA
-            pessoa_id = inserir_pessoa(cursor, conn, r, tipo, r.get("Número do Cartão"), unidade_id_default)
-            if not pessoa_id:
-                continue
-                
-            matricula = pad_digits(r.get("Matrícula (Nº)") or r.get("Matricula (Nº)") or r.get("Matrícula") or r.get("Matricula"), 6)
-            data_adm = parse_date(r.get("Data Admissão") or r.get("Data Admissao"))
-            data_saida = parse_date(r.get("Data Saída") or r.get("Data Saida"))
-            tipo_contrato = limpar_valor(r.get("Tipo Contrato") or r.get("Tipo_Contrato")) or None
-            
-            try:
-                # 2. FUNCIONARIO (Obrigatório para Professor/Administrador)
-                cursor.execute("SELECT id FROM Funcionario WHERE id = %s", (pessoa_id,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato) VALUES (%s,%s,%s,%s,%s)",
-                                   (pessoa_id, matricula, data_adm, data_saida, tipo_contrato))
-                    conn.commit()
-                
-                # 3. PROFESSOR
-                cursor.execute("SELECT id FROM Professor WHERE id = %s", (pessoa_id,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Professor (id) VALUES (%s)", (pessoa_id,))
-                    conn.commit()
-                
-                # 4. ADMINISTRADOR (Se for PROFADM)
-                if eh_admin:
-                    cursor.execute("SELECT id FROM Administrador WHERE id = %s", (pessoa_id,))
-                    if not cursor.fetchone():
-                        cursor.execute("INSERT INTO Administrador (id) VALUES (%s)", (pessoa_id,))
-                        conn.commit()
-                        
-                print(f"+ Professor '{r.get('Nome')}' garantido no sistema (pessoa id {pessoa_id}).")
-            except Exception as e:
-                conn.rollback()
-                print(f"Erro ao inserir professor (pessoa id {pessoa_id}): {e}")
-    else:
-        print("  - Aba 'PROFESSOR' não encontrada.")
-
-    # ----------------------------
-    # 8) ADMINISTRADOR
-    # ----------------------------
-    print("\nProcessando aba: ADMINISTRADOR")
-    if "ADMINISTRADOR" in all_sheets:
-        df = all_sheets["ADMINISTRADOR"].fillna("")
-        for _, r in df.iterrows():
-            nome = limpar_valor(r.get("Nome"))
-            cpf = pad_digits(r.get("CPF"), 11) if r.get("CPF") else None
-            pessoa_id = None
-            
-            # Tenta achar a pessoa existente
-            if cpf:
-                pessoa_id = find_pessoa_by_cpf(cursor, cpf)
-            if not pessoa_id and nome:
-                cursor.execute("SELECT id FROM Pessoa WHERE nome = %s", (nome,))
-                rr = cursor.fetchone()
-                if rr:
-                    pessoa_id = rr[0]
-                    
-            if not pessoa_id:
-                # 1. PESSOA (Se não encontrar pessoa, cria nova)
-                pessoa_id = inserir_pessoa(cursor, conn, r, "ADMINISTRADOR", r.get("Número do Cartão"), unidade_id_default)
-                if not pessoa_id:
-                    continue
-            
-            # 2. FUNCIONARIO (Obrigatório para Administrador)
-            try:
-                matricula = pad_digits(r.get("Matrícula") or r.get("Matricula"), 6) or None
-                data_adm = parse_date(r.get("Data Admissão") or r.get("Data Admissao"))
-                data_saida = parse_date(r.get("Data Saída") or r.get("Data Saida"))
-                tipo_contrato = limpar_valor(r.get("Tipo Contrato")) or None
-                
-                cursor.execute("SELECT id FROM Funcionario WHERE id = %s", (pessoa_id,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato) VALUES (%s,%s,%s,%s,%s)",
-                                   (pessoa_id, matricula, data_adm, data_saida, tipo_contrato))
-                    conn.commit()
-                
-                # 3. ADMINISTRADOR
-                cargo = limpar_valor(r.get("Cargo")) or None
-                cursor.execute("SELECT id FROM Administrador WHERE id = %s", (pessoa_id,))
-                if cursor.fetchone():
-                    print(f"Administrador (pessoa id {pessoa_id}) já existe. Pulando.")
-                    continue
-                
-                cursor.execute("INSERT INTO Administrador (id, cargo) VALUES (%s, %s)", (pessoa_id, cargo))
-                conn.commit()
-                print(f"+ Administrador '{nome}' garantido (pessoa id {pessoa_id}).")
-            except Exception as e:
-                conn.rollback()
-                print(f"Erro ao inserir administrador (pessoa id {pessoa_id}): {e}")
-    else:
-        print("Aba 'ADMINISTRADOR' não encontrada.")
-
-    # ----------------------------
-    # 9) TERCEIRIZADO
-    # ----------------------------
-    print("\nProcessando aba: TERCEIRIZADO")
-    if "TERCEIRIZADO" in all_sheets:
-        df = all_sheets["TERCEIRIZADO"].fillna("")
-        for _, r in df.iterrows():
-            # 1. PESSOA
-            pessoa_id = inserir_pessoa(cursor, conn, r, "TERCEIRIZADO", r.get("Número do Cartão"), unidade_id_default)
-            if not pessoa_id:
-                continue
-                
-            matricula = pad_digits(r.get("Matrícula (específica)") or r.get("Matrícula (Nº)") or r.get("Matricula"), 6)
-            data_adm = parse_date(r.get("Data Admissão") or r.get("Data Admissao"))
-            data_saida = parse_date(r.get("Data Saída") or r.get("Data Saida"))
-            tipo_contrato = limpar_valor(r.get("Tipo Contrato")) or None
-            funcao = limpar_valor(r.get("Função") or r.get("Funcao")) or None
-            
-            try:
-                # 2. FUNCIONARIO (Obrigatório para Terceirizado)
-                cursor.execute("SELECT id FROM Funcionario WHERE id = %s", (pessoa_id,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato) VALUES (%s,%s,%s,%s,%s)",
-                                   (pessoa_id, matricula, data_adm, data_saida, tipo_contrato))
-                    conn.commit()
-                
-                # 3. TERCEIRIZADO
-                cursor.execute("SELECT id FROM Terceirizado WHERE id = %s", (pessoa_id,))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO Terceirizado (id, empresa_id, funcao) VALUES (%s,%s,%s)", (pessoa_id, None, funcao))
-                    conn.commit()
-                print(f"+ Terceirizado '{r.get('Nome')}' garantido (pessoa id {pessoa_id}).")
-            except Exception as e:
-                conn.rollback()
-                print(f" Erro ao inserir terceirizado (pessoa id {pessoa_id}): {e}")
-    else:
-        print("- Aba 'TERCEIRIZADO' não encontrada.")
-
-    # ----------------------------
-    # Finalização
-    # ----------------------------
-    print("\nImportação finalizada. Fechando conexão.")
+    log("Finalizado com sucesso.")
     cursor.close()
     conn.close()
 
 if __name__ == "__main__":
-    import sys
-
-    # Primeiro argumento = path do arquivo
-    excel_file = sys.argv[1] if len(sys.argv) > 1 else None
-    if not excel_file:
-        print("Nenhum arquivo Excel informado.")
-        sys.exit(1)
-
-    # Segundo argumento opcional = ID da unidade
-    unidade_id = int(sys.argv[2]) if len(sys.argv) > 2 else None
-
-    main(excel_file=excel_file, unidade_id_default=unidade_id)
+    if len(sys.argv) > 1:
+        excel_file = sys.argv[1]
+        unidade_id = int(sys.argv[2]) if len(sys.argv) > 2 else None
+        main(excel_file, unidade_id)
+    else:
+        print("Erro: Informe o arquivo xlsx")
