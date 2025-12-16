@@ -19,7 +19,7 @@ router.post('/acessos/sincronizar/:dispositivo_id', autenticar, async (req, res)
     const resultado = await sincronizarAcessos(dispositivo);
     res.json(resultado);
   } catch (error) {
-    console.error('Erro ao sincronizar acessos:', error);
+
     res.status(500).json({ message: 'Erro ao sincronizar acessos' });
   }
 });
@@ -28,7 +28,7 @@ router.post('/acessos/sincronizar-todos', async (req, res) => {
     const resultados = await sincronizarTodosAcessos();
     res.json({ message: 'Sincronização concluída', resultados });
   } catch (error) {
-    console.error('Erro ao sincronizar todos os acessos:', error);
+
     res.status(500).json({ message: 'Erro ao sincronizar todos os acessos' });
   }
 });

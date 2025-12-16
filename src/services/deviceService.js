@@ -1,50 +1,59 @@
-const axios = require('axios');
-const { verificarSyncPendentes } = require('../utils/sync_catracas'); // DEPENDÊNCIA CIRCULAR
+const axiosInstance = require('../config/axios');
+const logger = require('../config/logger');
 
 async function listarTodos() {
   try {
-    // global.db é o Knex, então podemos fazer:
     const dispositivos = await global.db('Dispositivo').select('*');
-    return dispositivos; // retorna array de objetos
+    logger.debug(`${dispositivos.length} dispositivos encontrados`);
+    return dispositivos;
   } catch (error) {
-    console.error('Erro ao listar dispositivos:', error.message);
+    logger.errorWithStack('Erro ao listar dispositivos', error);
     return [];
   }
 }
 
-// **NEW**: BUSCAR O NÚMERO TOTAL DE GIROS
 function linkCatraca(dispositivo) {
   return `${dispositivo.endereco}:${dispositivo.porta}`;
 }
 
-async function obterSessao(linkCatraca, dispositivo) {
+async function obterSessao(linkCatraca, dispositivo, forceNew = false) {
   try {
-    const response = await axios.post(`http://${linkCatraca}/login.fcgi`, {
+    // Criar nova sessão (sem cache, performance aceitável)
+    logger.debug(` Criando nova sessão: ${dispositivo.nome}`);
+    const response = await axiosInstance.post(`http://${linkCatraca}/login.fcgi`, {
       login: dispositivo.usuario,
       password: dispositivo.senha
     });
-    console.log(`Sessão obtida para ${dispositivo.nome}:`, response.data.session);
-    await verificarSyncPendentes(dispositivo); // TODA VEZ QUE EU OBTER UMA SESSÃO NOVA DE CONEXÃO, VOU CHECAR SE TODOS OS REGISTROS PENDENTES JÁ ESTÃO SINCRONIZADOS, ALÉM DISSO É PRECISO FAZER ISSO PRA CADA DISPOSITIVO INDIVIDUALMENTE
-    return response.data.session;
+
+    const session = response.data?.session;
+    if (!session) {
+      throw new Error('Sessão não retornada pela catraca');
+    }
+
+    logger.info(` Sessão criada: ${dispositivo.nome}`);
+    
+    return session;
   } catch (error) {
-    console.error(`Erro ao obter sessão para ${dispositivo?.nome}:`, error.message);
+    logger.error(` Erro ao obter sessão ${dispositivo.nome}: ${error.message}`);
     return null;
   }
 }
 
 async function verificarSessao(session, linkCatraca) {
   try {
-    const response = await axios.post(`http://${linkCatraca}/session_is_valid.fcgi?session=${session}`);
-    return response.data.session_is_valid;
+    const response = await axiosInstance.post(
+      `http://${linkCatraca}/session_is_valid.fcgi?session=${session}`
+    );
+    return response.data?.session_is_valid === true;
   } catch (error) {
-    console.error('Erro ao verificar sessão:', error.message);
+    logger.debug(`Erro ao verificar sessão: ${error.message}`);
     return false;
   }
 }
 
 async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0) {
   try {
-    const response = await axios.post(
+    const response = await axiosInstance.post(
       `http://${linkCatraca}/load_objects.fcgi?session=${session}`,
       {
         object: 'access_logs'
@@ -56,9 +65,10 @@ async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0) {
     // Filtra logs com timestamp maior que timestampInicial
     const logsFiltrados = logs.filter(log => log.time > timestampInicial);
 
+    logger.debug(`${logsFiltrados.length} logs obtidos da catraca`);
     return logsFiltrados;
   } catch (error) {
-    console.error('Erro ao obter logs da catraca:', error.message);
+    logger.errorWithStack('Erro ao obter logs da catraca', error);
     return [];
   }
 }
@@ -66,33 +76,32 @@ async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0) {
 async function testarConexaoCatraca(dispositivo) {
   const link = linkCatraca(dispositivo);
   
-  // Verificar se o dispositivo está acessível
   try {
-    // Passo 1: Verificar se o dispositivo está na lista
+    // Verificar se o dispositivo está na lista
     const dispositivos = await listarTodos();
     if (!dispositivos.some(d => d.endereco === dispositivo.endereco && d.porta === dispositivo.porta)) {
-      console.log('Dispositivo não encontrado na base de dados.');
+      logger.warn('Dispositivo não encontrado na base de dados');
       return false;
     }
   
-    // Passo 2: Tentar obter a sessão
+    // Tentar obter a sessão
     const session = await obterSessao(link, dispositivo);
     if (!session) {
-      console.log('Falha ao obter sessão.');
+      logger.warn('Falha ao obter sessão');
       return false;
     }
   
-    // Passo 3: Verificar se a sessão é válida
+    // Verificar se a sessão é válida
     const sessaoValida = await verificarSessao(session, link);
     if (!sessaoValida) {
-      console.log('Sessão inválida.');
+      logger.warn('Sessão inválida');
       return false;
     }
   
-    console.log('Conexão com a catraca bem-sucedida!');
+    logger.info(` Conexão com catraca ${dispositivo.nome} bem-sucedida`);
     return true;
   } catch (error) {
-    console.error('Erro ao testar conexão com catraca:', error.message);
+    logger.errorWithStack('Erro ao testar conexão com catraca', error);
     return false;
   }
 }

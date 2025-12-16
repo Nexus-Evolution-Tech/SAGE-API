@@ -14,7 +14,6 @@ function identificarAcesso(portal_id) {
 async function sincronizarAcessos(dispositivo) {
   const link = deviceService.linkCatraca(dispositivo);
   const session = await deviceService.obterSessao(link, dispositivo);
-  console.log(`Sessão obtida: ${session}`);
 
   if (!session) {
     return { sucesso: false, message: `Erro ao obter sessão com a catraca ${dispositivo.nome}` };
@@ -84,6 +83,11 @@ async function sincronizarAcessos(dispositivo) {
 async function sincronizarTodosAcessos() {
   const dispositivos = await global.db('Dispositivo');
   const resultados = [];
+
+  // Verificar se existem dispositivos
+  if (!dispositivos || dispositivos.length === 0) {
+    return resultados;
+  }
 
   const resultado = await sincronizarAcessos(dispositivos[0]);
   resultados.push(resultado);

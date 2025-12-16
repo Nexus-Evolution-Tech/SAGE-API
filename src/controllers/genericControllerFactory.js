@@ -2,6 +2,7 @@ const crud = require('../utils/generic-db-utils');
 const { hashSenha } = require('../utils/criptografia');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const db = require('../config/database');
+const logger = require('../config/logger');
 
 function capitalize(text) {
   if (!text) return '';
@@ -51,7 +52,7 @@ function gerarController(tabela, campos, entidadeNome) {
           totalPages: Math.ceil(total / limit)
         });
       } catch (error) {
-        console.error(`Erro ao listar ${entidadeNome}:`, error);
+        logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
       }
     },
@@ -62,7 +63,7 @@ function gerarController(tabela, campos, entidadeNome) {
         const registros = await crud.buscarPorId(id, tabela, campos);
         res.json(ajustarFusoHorarioBrasil(registros));
       } catch (error) {
-        console.error(`Erro ao listar ${entidadeNome}:`, error);
+        logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
       }
     },
@@ -85,7 +86,7 @@ function gerarController(tabela, campos, entidadeNome) {
           data: novoRegistro
         });
       } catch (error) {
-        console.error(`Erro ao criar ${entidadeNome}:`, error);
+        logger.error(`Erro ao criar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao criar ${entidadeNome}`, error: error.message });
       }
     },
@@ -96,7 +97,7 @@ function gerarController(tabela, campos, entidadeNome) {
         await crud.atualizarRegistro(tabela, id, req.body);
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'atualizad')} com sucesso` });
       } catch (error) {
-        console.error(`Erro ao atualizar ${entidadeNome}:`, error);
+        logger.error(`Erro ao atualizar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao atualizar ${entidadeNome}`, error: error.message });
       }
     },
@@ -107,7 +108,7 @@ function gerarController(tabela, campos, entidadeNome) {
         await crud.removerRegistro(tabela, id);
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'removid')} com sucesso` });
       } catch (error) {
-        console.error(`Erro ao remover ${entidadeNome}:`, error);
+        logger.error(`Erro ao remover ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao remover ${entidadeNome}`, error: error.message });
       }
     }

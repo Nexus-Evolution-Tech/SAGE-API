@@ -12,280 +12,253 @@ const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas')
 
 // --- LISTAR (Sem alterações) ---
 const listar = async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 50;
-  const offset = (page - 1) * limit;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
 
-  try {
-    const pessoas = await buscarTodasPessoas(limit, offset);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa');
+  try {
+    const pessoas = await buscarTodasPessoas(limit, offset);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa');
 
-    res.json({
-      data: ajustarFusoHorarioBrasil(pessoas),
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    });
-  } catch (error) {
-    console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
-  }
+    res.json({
+      data: ajustarFusoHorarioBrasil(pessoas),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+  }
 };
 
-// --- CRIAR (Adaptado) ---
+// --- CRIAR ---
 const criar = async (req, res) => {
-  try {
-    // 1. Salva no banco (Isso funciona)
-    const pessoaCriada = await peopleService.criarPessoaCompleta(req.body);
-    const id = pessoaCriada.idPessoa;
-    const pessoa = await buscarPessoaBase(id);
+  try {
+    // 1. Salva no banco
+    const pessoaCriada = await peopleService.criarPessoaCompleta(req.body);
+    const id = pessoaCriada.idPessoa;
+    const pessoa = await buscarPessoaBase(id);
 
-    const novaPessoaParaCatraca = {
-      id: pessoa.id,
-      nome: pessoa.nome,
-      cartao_rfid: pessoa.cartao_rfid,
-      qrcode: pessoa.qr_code
-    };
+    const novaPessoaParaCatraca = {
+      id: pessoa.id,
+      nome: pessoa.nome,
+      cartao_rfid: pessoa.cartao_rfid,
+      qrcode: pessoa.qr_code
+    };
 
-    // 2. Sincroniza com catraca (Desativado para testes)
-    let resultados = { message: "Sincronização com catraca pulada (teste local)." };
-    try {
-      /*       // Bloco original comentado:
-      if (pessoa.tipo !== 'RESPONSAVEL')
-        resultados = await controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca);
-      */
-      console.log("CRIAÇÃO: Sincronização com catraca pulada (teste local).");
-    } catch (errorCatraca) {
-      console.error('Erro ao sincronizar com catraca (ignorado):', errorCatraca);
-    }
+    res.status(201).json({
+      message: 'Pessoa criada com sucesso',
+      pessoa: pessoaCriada,
+      sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' }
+    });
 
-    res.status(201).json({
-      message: 'Pessoa criada com sucesso (APENAS NO BANCO LOCAL)',
-      pessoa: pessoaCriada,
-      sincronizacao: resultados
-    });
+    // 2. Sincroniza com catraca (em background - não bloqueia resposta)
+    if (pessoa.tipo !== 'RESPONSAVEL') {
+      controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca).catch(() => {
+        // Se falhar, já está registrado em sync_pendente para retry automático
+      });
+    }
 
-  } catch (error) {
-    console.error('Erro ao criar pessoa:', error);
-    res.status(400).json({
-      message: 'Falha ao criar pessoa',
-      erro: error.message,
-      detalhes: error.detalhes
-    });
-  }
+  } catch (error) {
+    res.status(400).json({
+      message: 'Falha ao criar pessoa',
+      erro: error.message,
+      detalhes: error.detalhes
+    });
+  }
 };
 
 // --- GET STATUS (Sem alterações) ---
 const getStatus = async (req, res) => {
-  try {
-    const estaPresenteAtrasado = await peopleService.verificarTodasPessoasPresentesEAtrasadas();
-    res.json(estaPresenteAtrasado);
-  } catch (error) {
-    console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
-  }
+  try {
+    const estaPresenteAtrasado = await peopleService.verificarTodasPessoasPresentesEAtrasadas();
+    res.json(estaPresenteAtrasado);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+  }
 };
 
 // --- GET STATUS ID (Sem alterações) ---
 const getStatusId = async (req, res) => {
-  const id = req.params.id;
-  try {
-    const estaPresente = await peopleService.verificarPessoaPresenteEAtrasada(id);
-    res.json(estaPresente);
-  } catch (error) {
-    console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
-  }
+  const id = req.params.id;
+  try {
+    const estaPresente = await peopleService.verificarPessoaPresenteEAtrasada(id);
+    res.json(estaPresente);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+  }
 };
 
 // --- LISTAR POR ID (Sem alterações) ---
 const listarPorId = async (req, res) => {
-  const id = req.params.id;
-  try {
-    const pessoas = await buscarPorId(id);
-    res.json(ajustarFusoHorarioBrasil(pessoas));
-  } catch (error) {
-    console.error('Erro ao listar pessoas:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
-  }
+  const id = req.params.id;
+  try {
+    const pessoas = await buscarPorId(id);
+    res.json(ajustarFusoHorarioBrasil(pessoas));
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+  }
 };
 
 // --- LISTAR POR TIPO (Sem alterações) ---
 const listarPorTipo = async (req, res) => {
-  const tipo = req.params.tipo;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 50;
-  const offset = (page - 1) * limit;
+  const tipo = req.params.tipo;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
 
-  try {
-    const pessoas = await peopleService.buscarPessoasPorTipo(tipo, limit, offset);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE tipo = ?', [tipo]);
+  try {
+    const pessoas = await peopleService.buscarPessoasPorTipo(tipo, limit, offset);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE tipo = ?', [tipo]);
 
-    res.json({
-      data: ajustarFusoHorarioBrasil(pessoas),
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    });
-  } catch (error) {
-    console.error('Erro ao listar pessoas por tipo:', error);
-    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error: error.message });
-  }
+    res.json({
+      data: ajustarFusoHorarioBrasil(pessoas),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error: error.message });
+  }
 };
 
-// ==========================================================
-// --- EDITAR (Adaptado conforme sua solicitação) ---
-// ==========================================================
+// --- EDITAR ---
 const editar = async (req, res) => {
-  try {
-    const id = req.params.id;
+  try {
+    const id = req.params.id;
 
-    // 1. Atualiza no banco de dados local (Isso irá funcionar)
-    await atualizarPessoaCompleta(id, req.body);
+    // 1. Atualiza no banco de dados local
+    await atualizarPessoaCompleta(id, req.body);
 
-    // 2. Bloco de sincronização com a catraca (Comentado para testes)
-    /*     if (req.body.nome !== null && req.body.cartao_rfid !== null){
-      // Esta linha tentaria editar na catraca, o que falharia
-      const resultados = await controlIdService.editarPessoaNasCatracas(id, req.body.nome, req.body.cartao_rfid);
-      res.json({ message: 'Pessoa atualizada com sucesso', catracas: resultados });
-    }
-    */
-    console.log("EDIÇÃO: Sincronização com catraca pulada (teste local).");
+    // 2. Sincronização com catraca (em background - não bloqueia resposta)
+    if (req.body.nome || req.body.cartao_rfid) {
+      buscarPessoaBase(id).then(pessoaAtualizada => {
+        return controlIdService.editarPessoaNasCatracas(id, pessoaAtualizada.nome, pessoaAtualizada.cartao_rfid);
+      }).catch(() => {
+        // Se falhar, já está registrado em sync_pendente para retry automático
+      });
+    }
 
-    // 3. Retorna sucesso (pois a atualização local funcionou)
-    res.json({ message: 'Pessoa atualizada com sucesso (APENAS NO BANCO LOCAL)'});
-  } catch (error) {
-    console.error('Erro ao atualizar pessoa:', error);
-    res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
-  }
+    // 3. Retorna sucesso imediatamente
+    res.json({ message: 'Pessoa atualizada com sucesso', sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
+  }
 };
-// ==========================================================
-// --- FIM DA ADAPTAÇÃO ---
-// ==========================================================
 
-
-// --- DELETAR (Adaptado) ---
+// --- DELETAR ---
 const deletar = async (req, res) => {
-  try {
-    const id = req.params.id;
-    
-    // 1. Remove do banco local (Isso funciona)
-    await removerPessoa(id);
+  try {
+    const id = req.params.id;
+    
+    // 1. Remove do banco local
+    await removerPessoa(id);
 
-    // 2. Sincronização com catraca (Desativado para testes)
-    // const resultados = await controlIdService.deletarPessoaDasCatracas(id); // Comentado
-    const resultados = { message: "Sincronização com catraca pulada (teste local)." };
-    console.log("DELETE: Sincronização com catraca pulada (teste local).");
+    // 2. Sincronização com catraca
+    let resultados = { message: "Catraca não sincronizada" };
+    try {
+      resultados = await controlIdService.deletarPessoaDasCatracas(id);
+    } catch (errorCatraca) {
+      resultados = { error: errorCatraca.message };
+    }
 
-    res.json({ message: 'Pessoa removida com sucesso (APENAS NO BANCO LOCAL)', catracas: resultados });
-  } catch (error) {
-    console.error('Erro ao remover pessoa:', error);
-    res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
-  }
+    res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
+  }
 };
 
 // --- GET URLS (Sem alterações) ---
 const getUrls = async (req, res) => {
-  try {
-    const pessoas = await buscarTodasPessoas();
+  try {
+    const pessoas = await buscarTodasPessoas();
 
-    if (!pessoas || pessoas.length === 0) {
-      return res.status(404).json({ message: 'Nenhuma pessoa encontrada para esta unidade' });
-    }
-    
-    const urls = pessoas.map(pessoa => ({
-      id: pessoa.id,
-      url: `http://localhost:3000/uploads/pessoas/${pessoa.foto}`,
-    }));
+    if (!pessoas || pessoas.length === 0) {
+      return res.status(404).json({ message: 'Nenhuma pessoa encontrada para esta unidade' });
+    }
+    
+    const urls = pessoas.map(pessoa => ({
+      id: pessoa.id,
+      url: `${req.protocol}://${req.get('host')}/uploads/pessoas/${pessoa.foto}`,
+    }));
 
-    res.json(urls);
-  } catch (error) {
-    console.error('Erro ao buscar URLs das pessoas:', error);
-    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error: error.message });
-  }
+    res.json(urls);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error: error.message });
+  }
 }
 
 // --- GET URL BY ID (Sem alterações) ---
 const getUrlById = async (req, res) => {
-  const id = req.params.id;
-  const [pessoa] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
-  if (!pessoa) {
-      return res.status(404).json({ message: 'Pessoa não encontrada' });
-  }
-  const url = `http://localhost:3000/uploads/pessoas/${pessoa[0].foto}`;
+  const id = req.params.id;
+  const [pessoa] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
+  if (!pessoa) {
+      return res.status(404).json({ message: 'Pessoa não encontrada' });
+  }
+const url = `${req.protocol}://${req.get('host')}/uploads/pessoas/${pessoa[0].foto}`;
 
-  res.json({ url: url });
+  res.json({ url: url });
 };
 
-// --- UPLOAD FOTO (Adaptado) ---
+// --- UPLOAD FOTO ---
 const uploadFoto = async (req, res) => {
-  try {
-    // Isso já salva a foto localmente e envia a resposta
-    await peopleService.uploadFotoPessoa(req, res); 
-    
-    // Sincronização com catraca (Desativado para testes)
-    if(req.file) {
-      // await criarImagemUsuario(req.params.id); // Comentado
-      console.log("UPLOAD FOTO: Sincronização com catraca pulada (teste local).");
-    }
-    // else return res.status(400).json({ message: 'Arquivo de foto não enviado' }); // Lógica original
-  } catch (error) {
-    console.error('Erro ao enviar foto:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
-    }
-  }
+  try {
+    await peopleService.uploadFotoPessoa(req, res); 
+    
+    // Sincronização com catraca
+    if(req.file) {
+      try {
+        await criarImagemUsuario(req.params.id);
+      } catch (errorCatraca) {
+        // Ignora erro de sincronização
+      }
+    }
+  } catch (error) {
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+    }
+  }
 }
 
-// --- GERAR QRCODE (Adaptado) ---
+// --- GERAR QRCODE ---
 const gerarQrCode = async (req, res) => {
-  const id = req.params.id;
-  try {
-    // 1. Sincronização com catraca (Desativado)
-    // const data = await generateQrCode(id); // Comentado
+  const id = req.params.id;
+  try {
+    const data = await generateQrCode(id);
 
-    // 2. Cria um QR Code FAKE apenas para teste no banco local
-    const fakeQrCode = `TEST_QR_${id}_${Date.now()}`;
-    const data = { qrcode: fakeQrCode };
-    console.log("QR CODE: Geração na catraca pulada (teste local).");
+    const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
+    await db.query(query, [data.qrcode, id]);
 
-    // 3. Salva o QR Code fake no banco
-    const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
-    await db.query(query, [data.qrcode, id]);
-
-    res.json({ message: "QrCode FAKE gerado com sucesso (APENAS NO BANCO LOCAL)", id, qr_code: data.qrcode });
-  } catch (error) {
-    console.error('Erro ao gerar qrcode para users:', error);
-    res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
-  }
+    res.json({ message: "QR Code gerado com sucesso", id, qr_code: data.qrcode });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
+  }
 }
 
-// --- SINCRONIZAR BANCO (Adaptado) ---
+// --- SINCRONIZAR BANCO ---
 const sincronizarBanco = async (req, res) => {
-  try {
-    // await sincronizarTodasPessoasNasCatracas(); // Comentado
-    console.log("SINCRONIZAÇÃO GERAL: Pulada (teste local).");
-    res.json({ message: "Sincronização com catracas pulada (teste local)." });
-  } catch (error) {
-    console.error('Erro ao sincronizar banco:', error);
-    res.status(500).json({ message: 'Erro ao sincronizar banco', error: error.message });
-  }
+  try {
+    await sincronizarTodasPessoasNasCatracas();
+    res.json({ message: "Sincronização concluída com sucesso" });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao sincronizar banco', error: error.message });
+  }
 }
 
 module.exports = {
-  listar,
-  criar,
-  getStatus,
-  getStatusId,
-  listarPorTipo,
-  listarPorId,
-  editar,
-  deletar,
-  getUrls,
-  getUrlById,
-  uploadFoto,
-  gerarQrCode,
-  sincronizarBanco
+  listar,
+  criar,
+  getStatus,
+  getStatusId,
+  listarPorTipo,
+  listarPorId,
+  editar,
+  deletar,
+  getUrls,
+  getUrlById,
+  uploadFoto,
+  gerarQrCode,
+  sincronizarBanco
 };

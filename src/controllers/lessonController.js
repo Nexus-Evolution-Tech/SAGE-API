@@ -28,7 +28,6 @@ const getHorariosPorTurma = async (req, res) => {
     try {
         let aulas;
         if (div !== 'INT'){
-            console.log(`Buscando aulas para turma_id: ${turma_id}, divisao: ${div}`);
             aulas = await global.db('Aula')
                 .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
                 .where('turma_id', turma_id)
@@ -36,7 +35,6 @@ const getHorariosPorTurma = async (req, res) => {
                     this.where('divisao', 'INT').orWhere('divisao', div);
                 });
         } else if (div === 'INT') {
-            console.log(`Buscando aulas para turma_id: ${turma_id}, divisao: ${div}`);
             aulas = await global.db('Aula')
                 .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
                 .where('turma_id', turma_id) // quando o aluno for INT não será filtrado por div, apenas por turma, uma turma que não tem divisão a e b só terá aulas INT
@@ -51,7 +49,6 @@ const getHorariosPorTurma = async (req, res) => {
 
         res.json(aulas);
     } catch (error) {
-        console.error('Erro ao buscar aulas:', error);
         res.status(500).json({ message: 'Erro ao buscar aulas do banco de dados' });
     }
 };

@@ -15,7 +15,6 @@ async function buscarHorariosPorTurma(req, res) {
 
         res.json(aulas);
     } catch (error) {
-        console.error('Erro ao buscar aulas:', error);
         res.status(500).json({ message: 'Erro ao buscar aulas do banco de dados' });
     }
 }

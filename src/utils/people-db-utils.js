@@ -1,24 +1,24 @@
 const db = require('../config/database');
 
-// 🔎 Buscar dados base da Pessoa
+// Buscar dados base da Pessoa
 async function buscarPessoaBase(id) {
   const [result] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
   return result.length ? result[0] : null;
 }
 
-// 🔎 Buscar Aluno
+// Buscar Aluno
 async function buscarAluno(id) {
   const [result] = await db.query('SELECT * FROM Aluno WHERE id = ?', [id]);
   return result.length ? result[0] : {};
 }
 
-// 🔎 Buscar Responsavel
+// Buscar Responsavel
 async function buscarResponsavel(id) {
   const [result] = await db.query('SELECT * FROM Responsavel WHERE id = ?', [id]);
   return result.length ? result[0] : {};
 }
 
-// 🔎 Buscar Funcionario
+// Buscar Funcionario
 async function buscarFuncionario(id) {
   const [result] = await db.query('SELECT * FROM Funcionario WHERE id = ?', [id]);
   const funcData = result.length ? result[0] : {};
@@ -39,28 +39,28 @@ function formatarDatasFuncionario(funcData) {
   };
 }
 
-// 🔎 Buscar Professor
+// Buscar Professor
 async function buscarProfessor(id) {
   const funcData = await buscarFuncionario(id);
   const [result] = await db.query('SELECT * FROM Professor WHERE id = ?', [id]);
   return { ...funcData, ...(result.length ? result[0] : {}) };
 }
 
-// 🔎 Buscar Administrador
+// Buscar Administrador
 async function buscarAdministrador(id) {
   const funcData = await buscarFuncionario(id);
   const [result] = await db.query('SELECT * FROM Administrador WHERE id = ?', [id]);
   return { ...funcData, ...(result.length ? result[0] : {}) };
 }
 
-// 🔎 Buscar Terceirizado
+// Buscar Terceirizado
 async function buscarTerceirizado(id) {
   const funcData = await buscarFuncionario(id);
   const [result] = await db.query('SELECT * FROM Terceirizado WHERE id = ?', [id]);
   return { ...funcData, ...(result.length ? result[0] : {}) };
 }
 
-// 🔎 Buscar ProfAdm (Professor + Administrador)
+// Buscar ProfAdm (Professor + Administrador)
 async function buscarProfAdm(id) {
   const funcData = await buscarFuncionario(id);
   const professor = await buscarProfessor(id);
@@ -68,7 +68,7 @@ async function buscarProfAdm(id) {
   return { ...funcData, ...professor, ...administrador };
 }
 
-// 📌 Criar Pessoa base
+// Criar Pessoa base
 async function criarPessoaBase(dados) {
   const query = `
     INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, tipo)
@@ -92,32 +92,33 @@ async function criarPessoaBase(dados) {
   return { id: result.insertId };
 }
 
-// 📌 Criar Aluno
+// Criar Aluno
 async function criarAluno(pessoaId, dados) {
   const query = `
     INSERT INTO Aluno (id, ra, rm, turma_id, divisao, status)
-    VALUES (?, ?, ?, ?, ?, 'EM CURSO')
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
   const values = [
     pessoaId,
     dados.ra,
     dados.rm,
     dados.turma_id,
-    dados.divisao
+    dados.divisao,
+    dados.status || 'EM CURSO'
   ];
   await db.query(query, values);
 }
 
-// 📌 Criar Responsavel
-async function criarResponsavel(pessoaId) {
+// Criar Responsavel
+async function criarResponsavel(pessoaId, dados) {
   const query = `
-    INSERT INTO Responsavel (id)
-    VALUES (?)
+    INSERT INTO Responsavel (id, aluno_id)
+    VALUES (?, ?)
   `;
-  await db.query(query, [pessoaId]);
+  await db.query(query, [pessoaId, dados?.aluno_id || null]);
 }
 
-// 📌 Criar Funcionario base
+// Criar Funcionario base
 async function criarFuncionarioBase(pessoaId, dados) {
   const query = `
     INSERT INTO Funcionario (id, matricula, data_admissao, data_saida, tipo_contrato)
@@ -134,7 +135,7 @@ async function criarFuncionarioBase(pessoaId, dados) {
   return { id: result.insertId };
 }
 
-// 📌 Criar Professor
+// Criar Professor
 async function criarProfessor(pessoaId, dados) {
   // await criarFuncionarioBase(pessoaId, dados);
   const query = `
@@ -144,7 +145,7 @@ async function criarProfessor(pessoaId, dados) {
   await db.query(query, [pessoaId]);
 }
 
-// 📌 Criar Administrador
+// Criar Administrador
 async function criarAdministrador(pessoaId, dados) {
   // await criarFuncionarioBase(pessoaId, dados);
   const query = `
@@ -154,7 +155,7 @@ async function criarAdministrador(pessoaId, dados) {
   await db.query(query, [pessoaId, dados.cargo]);
 }
 
-// 📌 Criar Terceirizado
+// Criar Terceirizado
 async function criarTerceirizado(pessoaId, dados) {
   // await criarFuncionarioBase(pessoaId, dados);
   const query = `
@@ -169,7 +170,7 @@ async function criarTerceirizado(pessoaId, dados) {
   await db.query(query, values);
 }
 
-// 📌 Criar Professor Administrador
+// Criar Professor Administrador
 async function criarProfAdm(pessoaId, dados) {
   // Cria apenas uma vez na tabela Funcionario
   // await criarFuncionarioBase(pessoaId, dados);
@@ -182,7 +183,7 @@ async function criarProfAdm(pessoaId, dados) {
   await db.query(queryAdministrador, [pessoaId, dados.cargo]);
 }
 
-// 📌 Buscar todas as pessoas
+// Buscar todas as pessoas
 async function buscarTodasPessoas(limit, offset) {
   const [pessoas] = await db.query('SELECT * FROM Pessoa LIMIT ? OFFSET ?', [limit, offset]);
 
@@ -265,14 +266,14 @@ async function buscarPorId(id) {
   };
 }
 
-// 🔎 Buscar o tipo da pessoa
+// Buscar o tipo da pessoa
 async function buscarTipoPessoa(id) {
   const [result] = await db.query('SELECT tipo FROM Pessoa WHERE id = ?', [id]);
   if (result.length === 0) throw new Error('Pessoa não encontrada');
   return result[0].tipo;
 }
 
-// 🔨 Atualizar a tabela
+// Atualizar a tabela
 async function atualizarTabela(tabela, campos, id) {
   const setClauses = [];
   const values = [];
@@ -289,7 +290,7 @@ async function atualizarTabela(tabela, campos, id) {
   await db.query(query, values);
 }
 
-// 🛠️ Atualizar apenas se houver campos válidos
+// Atualizar apenas se houver campos válidos
 async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
   const camposFiltrados = {};
 
@@ -304,7 +305,7 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
   }
 }
 
-// 🚀 Função principal do PATCH
+//  Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates) {
   // Campos específicos por tabela
   const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento'];
@@ -359,7 +360,7 @@ async function atualizarPessoaCompleta(id, updates) {
   }
 }
 
-// 📌 Remover pessoa (incluindo nas tabelas filhas)
+// Remover pessoa (incluindo nas tabelas filhas)
 async function removerPessoa(id) {
   await db.query('DELETE FROM Aluno WHERE id = ?', [id]);
   await db.query('DELETE FROM Professor WHERE id = ?', [id]);

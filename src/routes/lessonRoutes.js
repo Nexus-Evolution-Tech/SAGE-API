@@ -7,10 +7,10 @@ const router = gerarRotas(lessonController, 'aulas');
 
 const routerExtra = express.Router();
 
-// 👉 Adiciona primeiro a rota específica - essa primeiro pra não entrar em conflito com /dispositivos/:id
+// Adiciona primeiro a rota específica para evitar conflito com /dispositivos/:id
 routerExtra.get('/aulas/horarios/:turma_id/:divisao', autenticar, lessonController.getHorariosPorTurma);
 
-// 👉 Depois monta o restante das rotas (inclui /:id, etc.)
+// Depois monta o restante das rotas (inclui /:id, etc.)
 routerExtra.use(router);
 
 module.exports = routerExtra;

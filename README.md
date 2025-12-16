@@ -1,34 +1,29 @@
-# 🎓 SGC-API | Sistema de Gestão e Controle de Acesso
+# SAGE-API — Guia Único
 
 <div align="center">
 
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
-
-**API robusta para gestão escolar integrada com sistemas de controle de acesso**
+API para gestão escolar integrada com sistemas de controle de acesso.
 
 </div>
 
 ---
 
-## 📖 Sobre o Projeto
+## Sobre o Projeto
 
 Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza**, integrando informações acadêmicas com controle de acesso através de catracas **Control iD**. A API gerencia desde dados básicos de pessoas até registros detalhados de entrada e saída.
 
-### 🎯 Principais Funcionalidades
+### Principais Funcionalidades
 
-- 👥 **Gestão de Pessoas**: Alunos, professores, administradores e responsáveis
-- 🏫 **Controle Acadêmico**: Escolas, cursos, turmas, disciplinas e aulas
-- 🔐 **Controle de Acesso**: Integração com catracas Control iD
-- 📊 **Relatórios**: Registros de entrada/saída e frequência
-- 🛡️ **Validações**: Sistema robusto de validação de dados
-- 🔄 **Pool de Conexões**: Gerenciamento eficiente de conexões MySQL
+- Gestão de Pessoas: Alunos, professores, administradores e responsáveis
+- Controle Acadêmico: Escolas, cursos, turmas, disciplinas e aulas
+- Controle de Acesso: Integração com catracas Control iD
+- Relatórios: Registros de entrada/saída e frequência
+- Validações: regras básicas para dados
+- Pool de Conexões: MySQL
 
 ---
 
-## �️ Stack Tecnológica
+## Stack Tecnológica
 
 ### Backend
 - **Runtime**: Node.js
@@ -49,7 +44,7 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 
 ---
 
-## 🗂️ Arquitetura do Projeto
+## Arquitetura do Projeto
 
 ```
 📦 SGC-API/
@@ -87,25 +82,25 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 
 ---
 
-## 🚀 Instalação e Configuração
+## Instalação e Configuração
 
 ### Pré-requisitos
 - Node.js 16+ 
 - MySQL 8.0+
 - Git
 
-### 1️⃣ Clone o repositório
+### 1. Clone o repositório
 ```bash
 git clone <repository-url>
 cd SGC-API
 ```
 
-### 2️⃣ Instale as dependências
+### 2. Instale as dependências
 ```bash
 npm install
 ```
 
-### 3️⃣ Configure o banco de dados
+### 3. Configure o banco de dados
 ```bash
 # Execute o script SQL para criar o schema
 mysql -u root -p < database/checklydb.sql
@@ -114,7 +109,7 @@ mysql -u root -p < database/checklydb.sql
 mysql -u root -p checkly < database/dados_etec_taboao.sql
 ```
 
-### 4️⃣ Configure as variáveis de ambiente
+### 4. Configure as variáveis de ambiente
 Edite `src/config/database.js` com suas credenciais:
 ```javascript
 const pool = mysql.createPool({
@@ -126,18 +121,18 @@ const pool = mysql.createPool({
 });
 ```
 
-### 5️⃣ Inicie o servidor
+### 5. Inicie o servidor
 ```bash
 npm start
 ```
 
-🎉 **API rodando em** `http://localhost:3000`
+API rodando em `http://localhost:3000`.
 
 ---
 
-## 📚 Documentação da API
+## Documentação da API
 
-### 🔗 Endpoints Principais
+### Endpoints Principais
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
@@ -148,17 +143,17 @@ npm start
 | `GET` | `/cursos` | Lista de cursos |
 | `GET` | `/turmas` | Lista de turmas |
 
-### 📖 Swagger UI
+### Swagger UI
 Acesse a documentação interativa em: `http://localhost:3000/docs`
 
-### 📋 Collections Postman
+### Collections Postman
 12 coleções organizadas na pasta `api/` para testes completos:
-- 👥 People (Pessoas)
-- 🏫 School (Escolas) 
-- 📚 Course (Cursos)
-- 🎯 Class (Turmas)
-- 🔐 Access (Acessos)
-- 📱 Devices (Dispositivos)
+- People (Pessoas)
+- School (Escolas)
+- Course (Cursos)
+- Class (Turmas)
+- Access (Acessos)
+- Devices (Dispositivos)
 - E mais...
 
 ---
@@ -186,7 +181,7 @@ GET /dispositivos/:id/status
 
 ---
 
-# 🔍 Validações Implementadas
+## Validações Implementadas
 
 ## 🔎 Sistema de Validações
 

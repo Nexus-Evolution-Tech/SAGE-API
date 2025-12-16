@@ -7,8 +7,8 @@ async function buscarTodos(tabela, campos = ['*'], limit = 50, offset = 0) {
 }
 
 async function buscarPorId(id, tabela, campos = ['*']) {
-  const query = `SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ${id}`;
-  const [result] = await db.query(query);
+  const query = `SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`;
+  const [result] = await db.query(query, [id]);
   return result;
 }
 

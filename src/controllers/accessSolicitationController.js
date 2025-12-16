@@ -10,7 +10,6 @@ const aprovarSolicitacao = async (req, res) => {
         await crud.atualizarRegistro(tabela, id, { status: 'APROVADA' });
         res.json({ message: `Solicitação de acesso do aluno menor APROVADA com sucesso` });
     } catch (error) {
-        console.error(`Erro ao atualizar solicitação do aluno menor de idade:`, error);
         res.status(500).json({ message: `Erro ao atualizar solicitação do aluno menor de idade`, error: error.message });
     }
 };
@@ -21,7 +20,6 @@ const negarSolicitacao = async (req, res) => {
         await crud.atualizarRegistro(tabela, id, { status: 'NEGADA' });
         res.json({ message: `Solicitação de acesso do aluno menor NEGADA com sucesso` });
     } catch (error) {
-    console.error(`Erro ao atualizar solicitação do aluno menor de idade:`, error);
     res.status(500).json({ message: `Erro ao atualizar solicitação do aluno menor de idade`, error: error.message });
     }
 };

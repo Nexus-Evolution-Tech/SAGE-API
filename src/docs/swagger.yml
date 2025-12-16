@@ -58,7 +58,7 @@ paths:
   /dados/importar:
     post:
       tags: [Dados]
-      summary: Importa os dados da planilha preenchida para o banco de dados
+      summary: Importa a planilha modelo (Escola, Cursos, Turmas, Catracas e Pessoas)
       requestBody:
         required: true
         content:
@@ -70,11 +70,24 @@ paths:
                   type: string
                   format: binary
                   description: Arquivo da planilha preenchida
+                unidade_id:
+                  type: integer
+                  description: "Opcional. Força o `unidade_id` para criação das pessoas. Se omitido, usa a escola importada ou 1."
               required:
                 - planilha
       responses:
         '200':
           description: Dados importados com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Importação concluída."
+                  resultado:
+                    $ref: '#/components/schemas/ImportResult'
         '400':
           description: Erro na requisição (arquivo ausente ou inválido)
         '500':
@@ -708,6 +721,126 @@ paths:
                       type: string
                       enum: [ONLINE, OFFLINE]
   
+  /dispositivos/discover:
+    get:
+      tags: [Dispositivos]
+      summary: Descobre catracas Control iD na rede local
+      parameters:
+        - in: query
+          name: cidr
+          schema:
+            type: string
+          description: CIDR opcional para varrer (ex. 192.168.0.0/24). Se omitido, usa as sub-redes privadas locais.
+        - in: query
+          name: ports
+          schema:
+            type: string
+          description: Portas separadas por vírgula (default 80,82)
+        - in: query
+          name: timeout
+          schema:
+            type: integer
+          description: Timeout em ms por tentativa (default 1200)
+        - in: query
+          name: concurrency
+          schema:
+            type: integer
+          description: Conexões paralelas (default 64)
+      responses:
+        '200':
+          description: Dispositivos encontrados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cidrs:
+                    type: array
+                    items:
+                      type: string
+                    example: ["192.168.0.0/24"]
+                  found:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ip:
+                          type: string
+                          example: "192.168.0.126"
+                        port:
+                          type: integer
+                          example: 80
+                        vendor:
+                          type: string
+                          example: "CONTROLID"
+                        name:
+                          type: string
+                          nullable: true
+                        model:
+                          type: string
+                          nullable: true
+                        serial:
+                          type: string
+                          nullable: true
+        '500':
+          description: Erro interno
+
+  /dispositivos/quick-add:
+    post:
+      tags: [Dispositivos]
+      summary: Cria rapidamente um dispositivo a partir de IP/porta descoberto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip, port, usuario, senha]
+              properties:
+                ip:
+                  type: string
+                  example: "192.168.0.126"
+                port:
+                  type: integer
+                  example: 80
+                usuario:
+                  type: string
+                  example: "admin"
+                senha:
+                  type: string
+                  example: "admin"
+                nome:
+                  type: string
+                  example: "Catraca Entrada Principal"
+                area_id:
+                  type: integer
+                  nullable: true
+                modelo:
+                  type: string
+                  example: "IDAccess"
+                numero_serial:
+                  type: string
+      responses:
+        '201':
+          description: Dispositivo criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Dispositivo criado"
+                  data:
+                    $ref: '#/components/schemas/Dispositivo'
+                  conectado:
+                    type: boolean
+                    example: true
+        '400':
+          description: Parâmetros inválidos
+        '500':
+          description: Erro interno
+
   /dispositivos/{id}/status:
     parameters:
       - name: id
@@ -2067,6 +2200,56 @@ components:
       bearerFormat: JWT
   
   schemas:
+    ImportEntityCounts:
+      type: object
+      properties:
+        criados:
+          type: integer
+          example: 3
+        ignorados:
+          type: integer
+          example: 1
+
+    ImportPessoasCounts:
+      type: object
+      properties:
+        sucesso:
+          type: integer
+          example: 25
+        erros:
+          type: integer
+          example: 2
+
+    ImportErrorItem:
+      type: object
+      properties:
+        aba:
+          type: string
+          example: "ALUNO"
+        nome:
+          type: string
+          example: "João da Silva"
+        mensagem:
+          type: string
+          example: "Tipo de pessoa inválido"
+
+    ImportResult:
+      type: object
+      properties:
+        escolas:
+          $ref: '#/components/schemas/ImportEntityCounts'
+        cursos:
+          $ref: '#/components/schemas/ImportEntityCounts'
+        turmas:
+          $ref: '#/components/schemas/ImportEntityCounts'
+        catracas:
+          $ref: '#/components/schemas/ImportEntityCounts'
+        pessoas:
+          $ref: '#/components/schemas/ImportPessoasCounts'
+        erros:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportErrorItem'
     Curso:
       type: object
       properties:

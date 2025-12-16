@@ -1,6 +1,8 @@
+SET FOREIGN_KEY_CHECKS = 0;
+
 /*UNIDADE - Não funciona porque não criptografa a senha com padrão bcrypt*/
 INSERT INTO sage.unidadeescolar (nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo) VALUES 
-("ETEC Taboão da Serra", 293, "62823257029344", "etec", "etec123", "Praça Miguel Ortega", "135", "Prédio Principal", "Parque Assunção", "Taboão da Serra", "SP", "06754160", "1147011856", "etec.png");
+("ETEC Taboão da Serra", 293, "62823257029344", "etec", "$2b$10$4qBV8ar7D0wid4huV9EGt.UeqCQeoZcICOjjemLGOC0KCdUGyn1ie", "Praça Miguel Ortega", "135", "Prédio Principal", "Parque Assunção", "Taboão da Serra", "SP", "06754160", "1147011856", "etec.png");
 
 /*CURSOS*/
 INSERT INTO sage.curso (nome, duracao) VALUES
@@ -337,3 +339,5 @@ INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, di
 ("I. Web II - ?", NULL, 9, 44, "19:00:00", "20:40:00", "SEXTA", "DIV B"),
 ("S. Web I - Daniel", 16, 9, 44, "21:00:00", "22:40:00", "SEXTA", "DIV A"),
 ("S. Web I -", NULL, 9, 44, "21:00:00", "22:40:00", "SEXTA", "DIV B");
+
+SET FOREIGN_KEY_CHECKS = 1;

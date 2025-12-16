@@ -13,10 +13,8 @@ const obterSessaoAdmin = async (ip, usuario, senha) => {
     const session = res.data?.session;
     if (!session) throw new Error("Sessão não retornada");
 
-    console.log(`Sessão ADM ${ip}: ${session}`)
     return session;
   } catch (err) {
-    console.error("Erro ao obter sessão de admin:", err.response?.data || err.message);
     throw err;
   }
 };
@@ -45,12 +43,10 @@ const obterCartaoPorTipo = async (userId, tipo, session, deviceIp) => {
       }
     });
 
-    console.log(response.data)
 
     const cards = response.data.cards;
 
     if (!cards || cards.length === 0) {
-      console.warn(`Nenhum cartão encontrado para o usuário ${userId}.`);
       return null;
     }
 
@@ -63,7 +59,6 @@ const obterCartaoPorTipo = async (userId, tipo, session, deviceIp) => {
 
     return valoresFiltrados.at(0) || null;
   } catch (err) {
-    console.error(`Erro ao buscar cartão do usuário ${userId}:`, err.response?.data || err.message);
     return null;
   }
 };
@@ -77,8 +72,6 @@ const criarUsuario = async (catracaUserId, novaPessoa, link, session, dispositiv
       registration: '' // NÃO PODE SER NULL JAMAIS
     }]
   };
-  console.log(catracaUserId)
-  console.log(novaPessoa.nome)
 
   let userId;
   try {
@@ -135,10 +128,8 @@ const deletarUsuario = async (id, link, session, dispositivo, resultados) => {
       headers: { "Content-Type": "application/json" }
     });
     resultados.push({ dispositivo: dispositivo.nome, sucesso: true, catracaId: id });
-    console.log(`Usuário ${id} deletado com sucesso no dispositivo ${dispositivo.nome}`);
   } catch (err) {
     const detalhesErro = err.response?.data || err.message;
-    console.error('Erro ao remover pessoa:', detalhesErro);
     resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: detalhesErro });
     userSuccess = false;
   }
@@ -204,7 +195,6 @@ const deletarCartao = async (id, link, session, dispositivo, tipo) => {
       headers: { "Content-Type": "application/json" }
       });
   } catch (err) {
-      console.warn(`Não foi possível deletar cartão na catraca ${dispositivo.nome}:`, err.message);
   }
 }
 
@@ -233,7 +223,6 @@ const deletarGrupo = async (id, link, session, dispositivo) => {
         headers: { "Content-Type": "application/json" }
         });
     } catch (err) {
-        console.warn(`Não foi possível deletar grupo na catraca ${dispositivo.nome}:`, err.message);
     }
 }
 
@@ -250,8 +239,7 @@ const criarImagemUser = async (id, link, session, dispositivo, resultados) => {
 
     await axios.post(`http://${link}/user_set_image_list.fcgi?session=${session}`, imagePayload, { headers: { "Content-Type": "application/json" } });
   } catch (err) {
-    // Se não existe arquivo, apenas ignora
-    if (err.code !== 'ENOENT') console.warn(`Erro ao enviar imagem na catraca ${dispositivo.nome}:`, err.message);
+    // Ignora erros - arquivo não encontrado ou falha no upload
   }
 }
 
@@ -267,7 +255,6 @@ const deletarImagemUser = async (id, link, session, dispositivo, resultados) => 
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.warn(`Não foi possível deletar imagem na catraca ${dispositivo.nome}:`, err.message);
   }
 }
 

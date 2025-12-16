@@ -350,7 +350,6 @@ async function uploadFotoPessoa(req, res) {
     });
 
   } catch (error) {
-    console.error('Erro ao fazer upload da foto:', error);
     
     // Tentar remover arquivo temporário em caso de erro
     try {
@@ -359,7 +358,6 @@ async function uploadFotoPessoa(req, res) {
         fs.unlinkSync(arquivoTemp);
       }
     } catch (cleanupError) {
-      console.error('Erro ao limpar arquivo temporário:', cleanupError);
     }
     
     res.status(500).json({ message: 'Erro ao salvar a foto da pessoa' });
@@ -398,7 +396,6 @@ async function removerFotoPessoa(req, res) {
     });
 
   } catch (error) {
-    console.error('Erro ao remover foto:', error);
     res.status(500).json({ message: 'Erro ao remover a foto da pessoa' });
   }
 }

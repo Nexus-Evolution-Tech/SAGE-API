@@ -7,7 +7,6 @@ function loadRoutes(app, routesFolder = path.join(__dirname, '../routes')) {
       const routePath = path.join(routesFolder, file);
       const route = require(routePath);
       app.use('/', route);
-      console.log(`✔️   Rota carregada: / -> ${file}`);
     }
   });
 }

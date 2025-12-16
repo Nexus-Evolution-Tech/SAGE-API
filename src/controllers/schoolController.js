@@ -26,7 +26,6 @@ const login = async (req, res) => {
 
     res.status(200).json({ message: 'Logado com sucesso', token });
   } catch (error) {
-    console.error('Erro ao logar na escola:', error);
     res.status(500).json({ message: 'Erro interno', error: error.message });
   }
 };

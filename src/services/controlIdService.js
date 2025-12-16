@@ -9,10 +9,8 @@ const db = require('../config/database');
 // Função para inserir na tabela sync_pendente caso ocorra um erro na sincronização
 const registrarSyncPendente = async (pessoaId, dispositivoId, action) => {
   try {
-    await db.query('INSERT INTO sync_pendente (pessoa_id, dispositivo_id, action) VALUES (?, ?, ?)', [pessoaId, dispositivoId, action]);
-    console.log(`Registro de sincronização pendente inserido para pessoa ${pessoaId} e dispositivo ${dispositivoId}`);
+    await db.query('INSERT INTO sync_pendente (pessoa_id, dispositivo_id, action, data_tentativa) VALUES (?, ?, ?, NOW())', [pessoaId, dispositivoId, action]);
   } catch (err) {
-    console.error('Erro ao registrar sincronização pendente:', err);
   }
 };
 
@@ -35,23 +33,19 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
   const dispositivos = dispositivoId !== null
     ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)]
     : todosDispositivos;
-  console.log('dispositivoId:', dispositivoId, typeof dispositivoId);
-  console.log('todosDispositivos:', todosDispositivos.map(d => ({ id: d.id, tipo: typeof d.id })));
 
   const resultados = [];
   const qrcode = novaPessoa.qrcode !== null && novaPessoa.qrcode?.length === 8 ? Number(novaPessoa.qrcode) : gerarNumero8Digitos();
 
   for (const dispositivo of dispositivos) {
-    console.log(dispositivos)
     const link = linkCatraca(dispositivo);
     const session = await obterSessao(link, dispositivo);
 
-    // if (!session) {
-    //   // Registra a falha na tabela de pendente
-    //   await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE');
-    //   resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
-    //   continue;
-    // }
+    if (!session) {
+      await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE');
+      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
+      continue;
+    }
 
     try {
       // 1. Criar usuário
@@ -99,12 +93,11 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = nu
     const link = linkCatraca(dispositivo);
     const session = await obterSessao(link, dispositivo);
 
-    // if (!session) {
-    //   // Registra falha na tabela de pendente
-    //   await registrarSyncPendente(id, dispositivo.id, 'UPDATE');
-    //   resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
-    //   continue;
-    // }
+    if (!session) {
+      await registrarSyncPendente(id, dispositivo.id, 'UPDATE');
+      resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' });
+      continue;
+    }
 
     try {
       await controlId.editarUsuario(catracaUserId, nome, link, session, dispositivo, resultados);

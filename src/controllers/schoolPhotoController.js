@@ -16,7 +16,7 @@ const getUrls = async (req, res) => {
 
   const urls = fotos.map(foto => ({
     id: foto.id,
-    url: `http://localhost:3000/uploads/escolas/${foto.caminho}`,
+    url: `${req.protocol}://${req.get('host')}/uploads/escolas/${foto.caminho}`,
     descricao: foto.descricao
   }));
 
@@ -29,7 +29,7 @@ const getUrlById = async (req, res) => {
   if (!foto) {
       return res.status(404).json({ message: 'Foto não encontrada' });
   }
-  const url = `http://localhost:3000/uploads/escolas/${foto[0].caminho}`;
+  const url = `${req.protocol}://${req.get('host')}/uploads/escolas/${foto[0].caminho}`;
 
   res.json({ url: url, descricao: foto.descricao });
 };
@@ -68,8 +68,7 @@ const uploadFoto = async (req, res) => {
 
     res.status(201).json({ id: result.insertId, caminho: caminhoRelativo });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Erro ao salvar a foto' });
+    res.status(500).json({ message: 'Erro ao salvar a foto', error: error.message });
   }
 };
 

@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS Aula (
     inicio TIME ,
     fim TIME ,
     dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') ,
-    divisao ENUM ('INT', 'DIV A', 'DIV B') ,
+    divisao ENUM ('INT', 'DIV A', 'DIV B', 'DIV A/B') ,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (professor_id) REFERENCES Professor(id) ON DELETE SET NULL,
