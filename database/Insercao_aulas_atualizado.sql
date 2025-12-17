@@ -105,26 +105,32 @@ INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, di
 ("TPA - Saiz", 875, 1, 21, "09:10:00", "12:00:00", "SEGUNDA", "DIV A"),
 ("TPA - Alicia", 865, 1, 21, "09:10:00", "12:00:00", "SEGUNDA", "DIV B"),
 ("LP - Rosana", 896, 1, 1, "13:00:00", "15:30:00", "SEGUNDA", "INT"),
+
 ("APS - Heliene", 878, 1, 22, "07:30:00", "09:10:00", "TERÇA", "DIV A"),
 ("APS - Heliene", 878, 1, 22, "09:10:00", "11:10:00", "TERÇA", "DIV B"),
 ("FI - Votto", 895, 1, 24, "07:30:00", "09:10:00", "TERÇA", "DIV B"),
 ("FI - Votto", 895, 1, 24, "09:10:00", "11:10:00", "TERÇA", "DIV A"),
 ("Lab. Investigação Científica - Giancelo", 876, 1, 18, "11:10:00", "13:50:00", "TERÇA", "INT"),
 ("Matemática - Messias", 887, 1, 2, "13:50:00", "15:30:00", "TERÇA", "INT"),
-("P. Empreendedorismo - Sâmela", 897, 1, 16, "07:30:00", "09:10:00", "QUARTA", "INT"),
+
 ("Inglês - Carlindo", 866, 1, 10, "09:10:00", "11:10:00", "QUARTA", "INT"),
 ("Arte - Josiane", 880, 1, 12, "11:10:00", "13:50:00", "QUARTA", "INT"),
 ("DD - Nathane", 891, 1, 27, "13:50:00", "15:30:00", "QUARTA", "DIV A"),
 ("DD - Votto", 895, 1, 27, "13:50:00", "15:30:00", "QUARTA", "DIV B"),
-("História - Diego", 870, 1, 6, "11:10:00", "13:50:00", "QUINTA", "INT"),
-("Química - Carlindo", 866, 1, 5, "13:50:00", "15:30:00", "QUINTA", "INT"),
+
+("Química - Carlindo", 866, 1, 5, "09:10:00", "11:10:00", "QUINTA", "INT"),
+("P. Empreendedorismo - Sâmela", 897, 1, 16, "11:10:00", "13:50:00", "QUINTA", "INT"),
+("WEB I - Daniel", 868, 1, 25, "13:50:00", "15:30:00", "SEXTA", "DIV A"),
+("BD I - Daniel", 868, 1, 23, "13:50:00", "15:30:00", "SEXTA", "DIV B"),
+
 ("Física - Zollo", 888, 1, 3, "07:30:00", "09:10:00", "SEXTA", "INT"),
 ("E.A.C - Sheila", 898, 1, 14, "09:10:00", "10:00:00", "SEXTA", "DIV A"),
 ("E.A.C - Sheila", 898, 1, 14, "10:20:00", "11:10:00", "SEXTA", "DIV B"),
 ("E.A.M - Patrícia", 892, 1, 15, "09:10:00", "10:00:00", "SEXTA", "DIV B"),
 ("E.A.M - Patrícia", 892, 1, 15, "10:20:00", "11:10:00", "SEXTA", "DIV A"),
 ("WEB I - Daniel", 868, 1, 25, "11:10:00", "13:50:00", "SEXTA", "INT"),
-("BD I - Daniel", 868, 1, 23, "13:50:00", "15:30:00", "SEXTA", "INT");
+("BD I - Daniel", 868, 1, 23, "13:50:00", "15:30:00", "SEXTA", "INT"),
+("História - Diego", 870, 1, 6, "11:10:00", "13:50:00", "QUINTA", "INT"),
 
 -- 1º B - MTec-PI Desenvolvimento de Sistemas
 INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
