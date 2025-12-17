@@ -1109,6 +1109,7 @@ paths:
                   senha_acesso: null
                   data_nascimento: "2005-05-15"
                   tipo: "RESPONSAVEL"
+                  aluno_id: null
               Professor:
                 summary: Exemplo de Professor
                 value:
