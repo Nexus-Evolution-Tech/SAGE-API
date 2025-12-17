@@ -2,19 +2,37 @@
 require('dotenv').config({ debug: false });
 
 async function iniciarServidor() {
+  console.log('[BOOT] iniciarServidor()');
   const app = require('./src/app');
   const logger = require('./src/config/logger');
   const { db } = require('./src/config/queryBuilder');
   const { iniciarJobs, pararJobs } = require('./src/jobs/scheduledJobs');
+  const redis = require('./src/config/redis');
+  const { initWebSocket } = require('./src/websocket/wsServer');
+  const globalState = require('./src/state/globalState');
 
   const PORT = process.env.PORT || 3000;
   const NODE_ENV = process.env.NODE_ENV || 'development';
+  console.log(`[BOOT] PORT=${PORT} NODE_ENV=${NODE_ENV}`);
   
   // Flag de shutdown para parar requisições pendentes
   global.isShuttingDown = false;
 
+  // Inicializar Redis (async, não bloqueia)
+  console.log('[BOOT] inicializando Redis...');
+  await redis.initRedis();
+  console.log('[BOOT] Redis inicializado');
+
   // Iniciar servidor PRIMEIRO (não bloqueia por banco)
   const server = app.listen(PORT, () => {
+    console.log('[BOOT] app.listen callback');
+    
+    // Inicializar WebSocket após servidor estar listening
+    console.log('[BOOT] inicializando WebSocket...');
+    initWebSocket(server);
+    global.io = require('./src/websocket/wsServer').getIO();
+    console.log('[BOOT] WebSocket inicializado');
+
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     logger.info('✓ Servidor SAGE-API iniciado');
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -22,6 +40,8 @@ async function iniciarServidor() {
     logger.info(`  Ambiente: ${NODE_ENV}`);
     logger.info(`  Documentação: http://localhost:${PORT}/docs`);
     logger.info(`  Health Check: http://localhost:${PORT}/health`);
+    logger.info(`  WebSocket: ws://localhost:${PORT}`);
+    logger.info(`  Cache: ${redis.isEnabled() ? 'Redis' : 'LRU (in-memory)'}`);
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   });
 
@@ -44,8 +64,12 @@ async function iniciarServidor() {
   // Iniciar jobs agendados
   let jobs;
   try {
-    jobs = iniciarJobs();
-    logger.info('✓ Jobs agendados iniciados');
+    if (process.env.JOBS_ENABLED !== 'false') {
+      jobs = iniciarJobs();
+      logger.info('✓ Jobs agendados iniciados');
+    } else {
+      logger.warn('⚠ Jobs desabilitados (JOBS_ENABLED=false)');
+    }
   } catch (error) {
     logger.error(`⚠ Erro ao iniciar jobs: ${error.message}`);
   }
@@ -82,7 +106,17 @@ async function iniciarServidor() {
           process.exit(1);
         } else {
           logger.info('✓ Pool de conexões fechado');
-          process.exit(0);
+          
+          // Fechar Redis (se conectado)
+          const redisClient = redis.client();
+          if (redisClient) {
+            redisClient.quit(() => {
+              logger.info('✓ Conexão Redis fechada');
+              process.exit(0);
+            });
+          } else {
+            process.exit(0);
+          }
         }
       });
     });

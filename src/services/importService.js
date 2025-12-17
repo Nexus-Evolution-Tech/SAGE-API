@@ -2,6 +2,8 @@ const XLSX = require('xlsx');
 const peopleService = require('./peopleService');
 const db = require('../config/database');
 const { hashSenha } = require('../utils/criptografia');
+const { registrarSyncPendente } = require('./controlIdService');
+const { listarTodos: listarDispositivos } = require('./deviceService');
 
 function cleanValue(value) {
   if (value === undefined || value === null) return null;
@@ -228,7 +230,7 @@ async function upsertCatracas(sheet, summary) {
   }
 }
 
-async function processAluno(sheet, summary, unidadeIdDefault) {
+async function processAluno(sheet, summary, unidadeIdDefault, dispositivosParaSync) {
   for (const row of safeRowsFromSheet(sheet)) {
     const nome = cleanValue(row.Nome || row.nome);
     if (!nome) continue;
@@ -251,7 +253,18 @@ async function processAluno(sheet, summary, unidadeIdDefault) {
     };
 
     try {
-      await peopleService.criarPessoaCompleta(payload);
+      const criado = await peopleService.criarPessoaCompleta(payload);
+      const pessoaId = criado?.idPessoa;
+      // Enfileira para sincronismo nas catracas (ALUNO vai para catraca)
+      if (pessoaId && Array.isArray(dispositivosParaSync)) {
+        for (const disp of dispositivosParaSync) {
+          try {
+            await registrarSyncPendente(pessoaId, disp.id, 'CREATE');
+          } catch (e) {
+            // ignora erro de fila individual e segue importação
+          }
+        }
+      }
       summary.pessoas.sucesso += 1;
     } catch (error) {
       summary.pessoas.erros += 1;
@@ -288,7 +301,7 @@ async function processResponsavel(sheet, summary, unidadeIdDefault) {
   }
 }
 
-async function processProfessor(sheet, summary, unidadeIdDefault) {
+async function processProfessor(sheet, summary, unidadeIdDefault, dispositivosParaSync) {
   for (const row of safeRowsFromSheet(sheet)) {
     const nome = cleanValue(row.Nome || row.nome);
     if (!nome) continue;
@@ -315,7 +328,14 @@ async function processProfessor(sheet, summary, unidadeIdDefault) {
     };
 
     try {
-      await peopleService.criarPessoaCompleta(payload);
+      const criado = await peopleService.criarPessoaCompleta(payload);
+      const pessoaId = criado?.idPessoa;
+      // PROFESSOR/PROFADM vão para catraca
+      if (pessoaId && Array.isArray(dispositivosParaSync)) {
+        for (const disp of dispositivosParaSync) {
+          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
+        }
+      }
       summary.pessoas.sucesso += 1;
     } catch (error) {
       summary.pessoas.erros += 1;
@@ -324,7 +344,7 @@ async function processProfessor(sheet, summary, unidadeIdDefault) {
   }
 }
 
-async function processAdministrador(sheet, summary, unidadeIdDefault) {
+async function processAdministrador(sheet, summary, unidadeIdDefault, dispositivosParaSync) {
   for (const row of safeRowsFromSheet(sheet)) {
     const nome = cleanValue(row.Nome || row.nome);
     if (!nome) continue;
@@ -347,7 +367,13 @@ async function processAdministrador(sheet, summary, unidadeIdDefault) {
     };
 
     try {
-      await peopleService.criarPessoaCompleta(payload);
+      const criado = await peopleService.criarPessoaCompleta(payload);
+      const pessoaId = criado?.idPessoa;
+      if (pessoaId && Array.isArray(dispositivosParaSync)) {
+        for (const disp of dispositivosParaSync) {
+          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
+          }
+      }
       summary.pessoas.sucesso += 1;
     } catch (error) {
       summary.pessoas.erros += 1;
@@ -356,7 +382,7 @@ async function processAdministrador(sheet, summary, unidadeIdDefault) {
   }
 }
 
-async function processTerceirizado(sheet, summary, unidadeIdDefault) {
+async function processTerceirizado(sheet, summary, unidadeIdDefault, dispositivosParaSync) {
   for (const row of safeRowsFromSheet(sheet)) {
     const nome = cleanValue(row.Nome || row.nome);
     if (!nome) continue;
@@ -379,7 +405,14 @@ async function processTerceirizado(sheet, summary, unidadeIdDefault) {
     };
 
     try {
-      await peopleService.criarPessoaCompleta(payload);
+      const criado = await peopleService.criarPessoaCompleta(payload);
+      const pessoaId = criado?.idPessoa;
+      // TERCEIRIZADO também acessa catraca
+      if (pessoaId && Array.isArray(dispositivosParaSync)) {
+        for (const disp of dispositivosParaSync) {
+          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
+        }
+      }
       summary.pessoas.sucesso += 1;
     } catch (error) {
       summary.pessoas.erros += 1;
@@ -407,6 +440,14 @@ async function importarPlanilha(filePath, unidadeIdDefault = 1) {
 
   const workbook = XLSX.readFile(filePath, { cellDates: true });
 
+  // Pré-carrega dispositivos para enfileirar sync (se houver)
+  let dispositivosParaSync = [];
+  try {
+    dispositivosParaSync = await listarDispositivos();
+  } catch (e) {
+    dispositivosParaSync = [];
+  }
+
   // Infraestrutura escolar
   const escolaSheet = workbook.Sheets.Escola;
   const unidadePreferidaDaPlanilha = escolaSheet ? await upsertEscola(escolaSheet, summary) : null;
@@ -425,7 +466,7 @@ async function importarPlanilha(filePath, unidadeIdDefault = 1) {
     await upsertCatracas(catracasSheet, summary);
   }
 
-  await processAluno(workbook.Sheets.ALUNO, summary, unidadeParaPessoas);
+  await processAluno(workbook.Sheets.ALUNO, summary, unidadeParaPessoas, dispositivosParaSync);
 
   const responsavelSheet = findFirstSheet(workbook, ['RESPONSÁVEL', 'RESPONSAVEL', 'Responsaveis', 'Responsáveis', 'RESPONSAVEIS']);
   if (responsavelSheet) {
@@ -433,15 +474,15 @@ async function importarPlanilha(filePath, unidadeIdDefault = 1) {
   }
 
   if (workbook.Sheets.PROFESSOR) {
-    await processProfessor(workbook.Sheets.PROFESSOR, summary, unidadeParaPessoas);
+    await processProfessor(workbook.Sheets.PROFESSOR, summary, unidadeParaPessoas, dispositivosParaSync);
   }
 
   if (workbook.Sheets.ADMINISTRADOR) {
-    await processAdministrador(workbook.Sheets.ADMINISTRADOR, summary, unidadeParaPessoas);
+    await processAdministrador(workbook.Sheets.ADMINISTRADOR, summary, unidadeParaPessoas, dispositivosParaSync);
   }
 
   if (workbook.Sheets.TERCEIRIZADO) {
-    await processTerceirizado(workbook.Sheets.TERCEIRIZADO, summary, unidadeParaPessoas);
+    await processTerceirizado(workbook.Sheets.TERCEIRIZADO, summary, unidadeParaPessoas, dispositivosParaSync);
   }
 
   return summary;

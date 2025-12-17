@@ -3,6 +3,7 @@ const { hashSenha } = require('../utils/criptografia');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { cacheQuery, cacheMutation, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
 
 function capitalize(text) {
   if (!text) return '';
@@ -38,19 +39,28 @@ function gerarController(tabela, campos, entidadeNome) {
       const offset = (page - 1) * limit;
 
       try {
-        // Busca paginada dos registros
-        const registros = await crud.buscarTodos(tabela, campos, limit, offset);
+        const cacheKey = `${tabela}:list:page${page}:limit${limit}`;
+        const start = Date.now();
+        
+        const result = await cacheQuery(
+          cacheKey,
+          async () => {
+            const registros = await crud.buscarTodos(tabela, campos, limit, offset);
+            const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM ${tabela}`);
+            
+            return {
+              data: ajustarFusoHorarioBrasil(registros),
+              page,
+              limit,
+              total,
+              totalPages: Math.ceil(total / limit)
+            };
+          },
+          CACHE_TTL.MEDIUM
+        );
 
-        // Total de registros para calcular totalPages
-        const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM ${tabela}`);
-
-        res.json({
-          data: ajustarFusoHorarioBrasil(registros),
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit)
-        });
+        logger.debug(`[API] ${tabela}.listar page=${page} limit=${limit} -> ${result?.data?.length || 0} itens (${Date.now() - start}ms)`);
+        res.json(result);
       } catch (error) {
         logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
@@ -60,8 +70,20 @@ function gerarController(tabela, campos, entidadeNome) {
     async listarPorId(req, res) {
       const id = req.params.id;
       try {
-        const registros = await crud.buscarPorId(id, tabela, campos);
-        res.json(ajustarFusoHorarioBrasil(registros));
+        const cacheKey = `${tabela}:id:${id}`;
+        const start = Date.now();
+        
+        const registros = await cacheQuery(
+          cacheKey,
+          async () => {
+            const result = await crud.buscarPorId(id, tabela, campos);
+            return ajustarFusoHorarioBrasil(result);
+          },
+          CACHE_TTL.LONG
+        );
+        
+        logger.debug(`[API] ${tabela}.listarPorId id=${id} -> ${(registros && registros.length !== undefined) ? registros.length : 1} (${Date.now() - start}ms)`);
+        res.json(registros);
       } catch (error) {
         logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
@@ -72,15 +94,18 @@ function gerarController(tabela, campos, entidadeNome) {
       try {
         const dados = { ...req.body };
         
-        if (tabela === 'UnidadeEscolar') // não posso criptografar Dispositivo, pois a API da ControlID não aceita hash bcrypt
-          // Verificar e hashear qualquer campo que contenha "senha" no nome
+        if (tabela === 'UnidadeEscolar')
           for (const chave in dados) {
             if (chave.toLowerCase().includes('senha') && typeof dados[chave] === 'string') {
               dados[chave] = await hashSenha(dados[chave]);
             }
           }
 
-        const novoRegistro = await crud.criarRegistro(tabela, dados);
+        const novoRegistro = await cacheMutation(
+          async () => crud.criarRegistro(tabela, dados),
+          [`${tabela}:*`]
+        );
+        
         res.status(201).json({ 
           message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'criad')} com sucesso`, 
           data: novoRegistro
@@ -94,7 +119,12 @@ function gerarController(tabela, campos, entidadeNome) {
     async editar(req, res) {
       try {
         const id = req.params.id;
-        await crud.atualizarRegistro(tabela, id, req.body);
+        
+        await cacheMutation(
+          async () => crud.atualizarRegistro(tabela, id, req.body),
+          [`${tabela}:*`]
+        );
+        
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'atualizad')} com sucesso` });
       } catch (error) {
         logger.error(`Erro ao atualizar ${entidadeNome}: ${error.message}`);
@@ -105,7 +135,12 @@ function gerarController(tabela, campos, entidadeNome) {
     async deletar(req, res) {
       try {
         const id = req.params.id;
-        await crud.removerRegistro(tabela, id);
+        
+        await cacheMutation(
+          async () => crud.removerRegistro(tabela, id),
+          [`${tabela}:*`]
+        );
+        
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'removid')} com sucesso` });
       } catch (error) {
         logger.error(`Erro ao remover ${entidadeNome}: ${error.message}`);

@@ -15,6 +15,9 @@ yarn-error.log*
 # Local generated files
 exports/
 uploads/
+src/uploads/
+models/*.xlsx
+!models/*-Modelo.xlsx
 
 # OS
 .DS_Store

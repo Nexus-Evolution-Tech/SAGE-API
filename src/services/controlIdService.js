@@ -16,9 +16,29 @@ const limit = pLimit(PARALLEL_LIMIT);
 
 // ==================== HELPERS ====================
 
-// Função para inserir na tabela sync_pendente
+// Verifica duplicidade por pessoa+dispositivo+ação
+async function existeRegistroPendentePorDispositivo(pessoaId, dispositivoId, action) {
+  try {
+    const total = await global.db('sync_pendente')
+      .where('pessoa_id', pessoaId)
+      .where('dispositivo_id', dispositivoId)
+      .where('action', action)
+      .count();
+    return Number(total || 0) > 0;
+  } catch (err) {
+    logger.errorWithStack('Erro ao verificar registro pendente (por dispositivo)', err);
+    return false;
+  }
+}
+
+// Função para inserir na tabela sync_pendente (com deduplicação)
 const registrarSyncPendente = async (pessoaId, dispositivoId, action, errorMsg = null) => {
   try {
+    const jaExiste = await existeRegistroPendentePorDispositivo(pessoaId, dispositivoId, action);
+    if (jaExiste) {
+      return; // evita duplicidade na fila
+    }
+
     await global.db('sync_pendente').insert({
       pessoa_id: pessoaId,
       dispositivo_id: dispositivoId,
@@ -34,11 +54,11 @@ const registrarSyncPendente = async (pessoaId, dispositivoId, action, errorMsg =
 
 async function existeRegistroPendente(id, acao) {
   try {
-    const count = await global.db('sync_pendente')
-      .where({ pessoa_id: id, action: acao })
-      .count('* as total')
-      .first();
-    return count.total > 0;
+    const total = await global.db('sync_pendente')
+      .where('pessoa_id', id)
+      .where('action', acao)
+      .count();
+    return Number(total || 0) > 0;
   } catch (err) {
     logger.errorWithStack('Erro ao verificar registro pendente', err);
     return false;
@@ -425,5 +445,6 @@ module.exports = {
   generateQrCode,
   generateRFID,
   registrarSyncPendente,
-  existeRegistroPendente
+  existeRegistroPendente,
+  existeRegistroPendentePorDispositivo
 };

@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const logger = require('../config/logger');
-const { listarTodos } = require('../services/deviceService');
+const deviceService = require('../services/deviceService');
+const db = require('../config/database');
 
 // Job para verificar sincronizações pendentes
 const verificarSyncPendentesJob = () => {
@@ -15,7 +16,7 @@ const verificarSyncPendentesJob = () => {
 
       const pendentes = await global.db('sync_pendente')
         .select('*')
-              .orderBy('data_tentativa', 'asc')
+        .orderBy('data_tentativa', 'asc')
         .limit(parseInt(process.env.SYNC_BATCH_SIZE || '50'))
         .get();
 
@@ -26,11 +27,39 @@ const verificarSyncPendentesJob = () => {
 
       logger.info(` ${pendentes.length} sincronizações pendentes encontradas`);
 
+      // Checa conectividade das catracas envolvidas neste lote e evita repetir tentativa em catraca offline
+      const offlineDevices = new Set();
+      const dispositivosUnicos = [...new Set(pendentes.map(p => p.dispositivo_id).filter(Boolean))];
+      for (const dispositivoId of dispositivosUnicos) {
+        try {
+          const dispositivo = await global.db('Dispositivo').where('id', dispositivoId).first();
+          if (!dispositivo) continue;
+          const isOnline = await deviceService.testarConexaoCatraca(dispositivo);
+          if (!isOnline) {
+            offlineDevices.add(dispositivoId);
+            logger.warn(`Catraca ${dispositivo.nome || dispositivoId} offline, pulando pendentes deste dispositivo neste ciclo`);
+          }
+        } catch (err) {
+          offlineDevices.add(dispositivoId);
+          logger.warn(`Falha ao testar catraca ${dispositivoId}, marcando como offline neste ciclo: ${err.message}`);
+        }
+      }
+
       // Importação dinâmica para evitar dependência circular
       const controlIdService = require('../services/controlIdService');
 
       for (const registro of pendentes) {
         try {
+          if (offlineDevices.has(registro.dispositivo_id)) {
+            // incrementa tentativa e segue para próxima pessoa; evita flood em catraca offline
+            await db.query(
+              'UPDATE sync_pendente SET retry_count = retry_count + 1, last_attempt = ? WHERE id = ?',
+              [new Date(), registro.id]
+            );
+            logger.warn(`Pendência ${registro.id} pulada (catraca offline: ${registro.dispositivo_id})`);
+            continue;
+          }
+
           const pessoa = await global.db('Pessoa')
             .where('id', registro.pessoa_id)
             .first();
@@ -65,12 +94,10 @@ const verificarSyncPendentesJob = () => {
           logger.error(` Erro ao processar pendente ID ${registro.id}: ${error.message}`);
           
           // Atualizar contador de tentativas e data da última tentativa
-          await global.db('sync_pendente')
-            .where('id', registro.id)
-            .update({
-              retry_count: global.db.raw('retry_count + 1'),
-              last_attempt: new Date()
-            });
+          await db.query(
+            'UPDATE sync_pendente SET retry_count = retry_count + 1, last_attempt = ?, error_message = ? WHERE id = ?',
+            [new Date(), error.message?.slice(0, 255) || null, registro.id]
+          );
         }
       }
 

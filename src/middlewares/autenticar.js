@@ -1,4 +1,6 @@
+console.log('[BOOT-AUT] require start');
 const { verificarToken } = require('../utils/jwt');
+console.log('[BOOT-AUT] jwt util loaded');
 
 function autenticar(req, res, next) {
   const authHeader = req.headers['authorization'];

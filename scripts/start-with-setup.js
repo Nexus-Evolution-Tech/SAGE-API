@@ -87,7 +87,19 @@ verificarESetup()
     const args = ['index.js'];
     
     const child = spawn(command, args, {
-      stdio: 'inherit'
+      stdio: 'inherit',
+      detached: false // Garante que o child é kill junto com o parent
+    });
+
+    // Propagar sinais SIGINT (Ctrl+C) e SIGTERM para o child
+    process.on('SIGINT', () => {
+      child.kill('SIGINT');
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+      child.kill('SIGTERM');
+      process.exit(0);
     });
 
     child.on('exit', (code) => {

@@ -206,9 +206,12 @@ function calcularIdade(dataNascimento) {
 
 async function criarAcesso(dados) {
   let { pessoa_id, dispositivo_id, status, permitido, metodo_auth } = dados;
-
   const pessoa = await global.db('Pessoa').where('id', pessoa_id).first();
-  const idadePessoa = calcularIdade(pessoa.data_nascimento);
+  if (!pessoa) {
+    return { message: 'Acesso negado: pessoa não encontrada', error: 'PESSOA_INEXISTENTE' };
+  }
+
+  const idadePessoa = calcularIdade(pessoa.data_nascimento || new Date());
 
   // Busca o último acesso da pessoa
   const ultimoAcesso = await global.db('Acesso')
@@ -236,6 +239,9 @@ async function criarAcesso(dados) {
         break;
       } else {
         const aluno = await global.db('Aluno').where('id', pessoa_id).first();
+        if (!aluno) {
+          return { message: 'Acesso negado: aluno não encontrado', error: 'ALUNO_INEXISTENTE' };
+        }
         switch (aluno.status) {
           case 'SUSPENSO':
             permitido = false; // Se o aluno foi suspenso, a saída é negada
@@ -280,11 +286,20 @@ async function criarAcesso(dados) {
       const diaSemana = hoje.getDay(); // 0 = domingo, 1 = segunda, etc.
 
       const aluno = await global.db('Aluno').where('id', pessoa_id).first();
+      if (!aluno) {
+        return { message: 'Acesso negado: aluno não encontrado', error: 'ALUNO_INEXISTENTE' };
+      }
       const turmaId = aluno.turma_id;
 
+      if (!turmaId) {
+        return { message: 'Acesso negado: aluno sem turma associada', error: 'TURMA_NAO_DEFINIDA' };
+      }
+
       const aulasHoje = await global.db('Aula')
-        .where({ turma_id: turmaId, dia_semana: diaSemana })
-        .orderBy('inicio', 'asc');
+        .where('turma_id', turmaId)
+        .where('dia_semana', diaSemana)
+        .orderBy('inicio', 'asc')
+        .get();
 
       if (!aulasHoje || aulasHoje.length === 0) {
         permitido = true;
@@ -315,7 +330,8 @@ async function criarAcesso(dados) {
       // Busca a solicitação existente para o aluno
       const solicitacoes = await global.db('SolicitacaoAcesso')
         .where('aluno_id', pessoa.id)
-        .orderBy('data_hora_solicitacao', 'desc'); // Pega da mais recente para a mais antiga
+        .orderBy('data_hora_solicitacao', 'desc')
+        .get(); // Pega da mais recente para a mais antiga
 
       const solicitacao = solicitacoes.find(s => ['APROVADA', 'NEGADA', 'PENDENTE'].includes(s.status));
 
@@ -366,16 +382,21 @@ async function criarAcesso(dados) {
   }
 
   // Cria o registro de acesso
-  const acesso = await global.db('Acesso').insert({
+  const insertedId = await global.db('Acesso').insert({
     pessoa_id,
     dispositivo_id,
     status,
     permitido,
     metodo_auth,
-    data_hora: new Date()
-  }).returning('*');
+    data_hora: new Date(),
+    updated_at: new Date()
+  });
 
-  return { message: mensagem, acesso: acesso[0] };
+  const acesso = await global.db('Acesso')
+    .where('id', insertedId)
+    .first();
+
+  return { message: mensagem, acesso };
 }
 
 module.exports = {

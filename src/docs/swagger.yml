@@ -13,6 +13,8 @@ servers:
 tags:
   - name: Dados
     description: Exportação/Importação de Dados para o Sistema
+  - name: Monitoramento
+    description: Endpoints de observabilidade e status do sistema
   - name: Cursos
     description: Operações relacionadas aos cursos
   - name: Escolas
@@ -43,6 +45,21 @@ tags:
     description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
 
 paths:
+  /monitoring/sync-db:
+    get:
+      tags: [Monitoramento]
+      summary: Status da fila de sincronização (banco de dados)
+      description: Retorna contagem total, agrupamento por ação, registros mais antigos/novos e as últimas 50 entradas da tabela `sync_pendente`.
+      security: []
+      responses:
+        '200':
+          description: Status atual da fila
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncDbStatus'
+        '500':
+          description: Erro ao consultar a fila no banco
   /dados/planilha-modelo:
     get:
       tags: [Dados]
@@ -2622,6 +2639,73 @@ components:
           type: string
         saida:
           type: string
+
+    SyncDbByAction:
+      type: object
+      properties:
+        action:
+          type: string
+          description: Tipo de ação pendente
+          example: CREATE
+        total:
+          type: integer
+          example: 123
+
+    SyncDbItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+          example: CREATE
+        pessoa_id:
+          type: integer
+        pessoa:
+          type: string
+          nullable: true
+        dispositivo_id:
+          type: integer
+        dispositivo:
+          type: string
+          nullable: true
+        data_tentativa:
+          type: string
+          format: date-time
+        retry_count:
+          type: integer
+        last_attempt:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+
+    SyncDbStatus:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        total:
+          type: integer
+        byAction:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncDbByAction'
+        oldest:
+          type: string
+          format: date-time
+          nullable: true
+        newest:
+          type: string
+          format: date-time
+          nullable: true
+        latest:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncDbItem'
     
     Atraso:
       type: object
