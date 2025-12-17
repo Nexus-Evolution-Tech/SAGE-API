@@ -7,7 +7,8 @@ async function buscarHorariosPorTurma(req, res) {
     try {
         const aulas = await global.db('Aula')
             .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
-            .where({ turma_id, divisao: div });
+            .where({ turma_id, divisao: div })
+            .get();
 
         if (aulas.length === 0) {
             return res.status(404).json({ message: 'Nenhuma aula encontrada para a turma e divisão especificadas.' });

@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 
 async function listarTodos() {
   try {
-    const dispositivos = await global.db('Dispositivo').select('*');
+    const dispositivos = await global.db('Dispositivo').select('*').get();
     logger.debug(`${dispositivos.length} dispositivos encontrados`);
     return dispositivos;
   } catch (error) {

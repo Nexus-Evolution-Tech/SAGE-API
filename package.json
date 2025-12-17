@@ -1,4 +1,15 @@
 {
+  "name": "sage-api",
+  "version": "1.0.0",
+  "description": "API de gestão escolar com controle de acesso",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "node scripts/check-first-run.js",
+    "start": "node scripts/start-with-setup.js",
+    "dev": "nodemon index.js",
+    "prod": "NODE_ENV=production node index.js",
+    "setup:db": "node scripts/setup-database.js"
+  },
   "dependencies": {
     "axios": "^1.9.0",
     "bcrypt": "^6.0.0",
@@ -8,7 +19,6 @@
     "express": "^5.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
-    "knex": "^3.1.0",
     "multer": "^2.0.1",
     "mysql2": "^3.14.1",
     "node-cron": "^4.2.1",
@@ -21,13 +31,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  },
-  "scripts": {
-    "postinstall": "node scripts/check-first-run.js",
-    "start": "node scripts/start-with-setup.js",
-    "dev": "nodemon index.js",
-    "prod": "NODE_ENV=production node index.js",
-    "setup": "node scripts/bootstrap.js",
-    "setup:db": "node scripts/setup-database.js"
   }
 }

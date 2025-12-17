@@ -4,7 +4,8 @@ const cors = require("cors");
 const compression = require("compression");
 const loadRoutes = require("./config/loadRoutes");
 const logger = require("./config/logger");
-global.db = require("./config/knex");
+const { globalDB, db } = require("./config/queryBuilder");
+global.db = globalDB;
 const path = require("path");
 
 const swaggerUi = require("swagger-ui-express");
@@ -12,29 +13,6 @@ const YAML = require("yamljs");
 const swaggerDocument = YAML.load("./src/docs/swagger.yml");
 
 const app = express();
-
-// Inicializar sincronização de pendências ao ligar o servidor
-const inicializarSincronizacao = async () => {
-  try {
-    const { sincronizarTodasPessoasNasCatracas } = require('./utils/sync_catracas');
-    logger.info('Iniciando sincronização de pessoas pendentes...');
-    
-    // Aguarda um pouco para garantir que a conexão com o BD está pronta
-    setTimeout(async () => {
-      try {
-        await sincronizarTodasPessoasNasCatracas();
-        logger.info('Sincronização de pendências concluída com sucesso');
-      } catch (erro) {
-        logger.error('Erro ao sincronizar pendências: ' + erro.message);
-      }
-    }, 2000);
-  } catch (erro) {
-    logger.error('Erro ao inicializar sincronização: ' + erro.message);
-  }
-};
-
-// Chamar ao inicializar
-inicializarSincronizacao();
 
 // Compressão de respostas
 app.use(compression());
@@ -80,8 +58,14 @@ logger.info("Documentação Swagger disponível em: /docs");
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 logger.info("Arquivos estáticos disponíveis em: /uploads");
 
-// Rotas da aplicação
-loadRoutes(app);
+// Rotas da aplicação (com tratamento de erro)
+try {
+  loadRoutes(app);
+  logger.info('✓ Rotas carregadas com sucesso');
+} catch (error) {
+  logger.error(`✗ Erro ao carregar rotas: ${error.message}`);
+  // Continuar mesmo com erro de rotas
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -96,6 +80,11 @@ app.get('/health', (req, res) => {
 
 // Middleware de erro global
 app.use((err, req, res, next) => {
+  // Se já foi enviado response, não faz nada
+  if (res.headersSent) {
+    return next(err);
+  }
+  
   logger.errorWithStack('Erro não tratado', err);
   
   res.status(err.status || 500).json({

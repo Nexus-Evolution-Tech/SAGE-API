@@ -1,31 +1,25 @@
-const knex = require('knex');
+/**
+ * ⚠️ ARQUIVO DESCONTINUADO
+ * 
+ * Este arquivo foi substituído por:
+ * - src/config/database.js      (pool de conexões MySQL2)
+ * - src/config/queryBuilder.js  (query builder compatível)
+ * 
+ * PROBLEMAS DO CÓDIGO LEGADO:
+ * ❌ Stub retorna dados FAKE nos primeiros segundos
+ * ❌ Race conditions críticas
+ * ❌ Lazy loading anti-padrão
+ * ❌ Sem validação adequada de pool
+ * ❌ Múltiplas exportações (linha 90-92)
+ * 
+ * O arquivo agora joga erro para forçar migração
+ */
+
 const logger = require('./logger');
 
-const config = {
-  client: 'mysql2',
-  connection: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'sage',
-    timezone: process.env.DB_TIMEZONE || '-03:00'
-  },
-  pool: {
-    min: 2,
-    max: parseInt(process.env.DB_CONNECTION_LIMIT || '10')
-  }
-};
+logger.error('❌ knex.js foi descontinuado');
+logger.error('Use src/config/database.js + src/config/queryBuilder.js');
 
-const db = knex(config);
-
-// Testar conexão Knex
-db.raw('SELECT 1')
-  .then(() => {
-    logger.info('Knex conectado ao MySQL');
-  })
-  .catch((err) => {
-    logger.error(`Erro no Knex: ${err.message}`);
-  });
-
-module.exports = db;
+throw new Error(
+  'Erro: knex.js descontinuado. Veja docs/MIGRATION_KNEX_TO_MYSQL2.md'
+);

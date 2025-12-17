@@ -21,7 +21,7 @@ async function sincronizarTodasPessoasNasCatracas() {
 async function verificarSyncPendentes(dispositivo) {
   try {
     // 1. Obter registros da tabela sync_pendente
-    const pendentes = await global.db('sync_pendente').select('*').where('dispositivo_id', dispositivo.id);
+    const pendentes = await global.db('sync_pendente').select('*').where('dispositivo_id', dispositivo.id).get();
 
     // 2. Para cada registro pendente, chama a função correspondente
     for (const registro of pendentes) {

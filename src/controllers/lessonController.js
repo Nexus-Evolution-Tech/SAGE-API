@@ -33,14 +33,16 @@ const getHorariosPorTurma = async (req, res) => {
                 .where('turma_id', turma_id)
                 .andWhere(function() {
                     this.where('divisao', 'INT').orWhere('divisao', div);
-                });
+                })
+                .get();
         } else if (div === 'INT') {
             aulas = await global.db('Aula')
                 .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
                 .where('turma_id', turma_id) // quando o aluno for INT não será filtrado por div, apenas por turma, uma turma que não tem divisão a e b só terá aulas INT
                 // .andWhere(function() {
                 //     this.where('divisao', 'INT');
-                // });
+                // })
+                .get();
         }
 
         if (aulas.length === 0) {

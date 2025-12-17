@@ -16,7 +16,8 @@ const verificarSyncPendentesJob = () => {
       const pendentes = await global.db('sync_pendente')
         .select('*')
               .orderBy('data_tentativa', 'asc')
-        .limit(parseInt(process.env.SYNC_BATCH_SIZE || '50'));
+        .limit(parseInt(process.env.SYNC_BATCH_SIZE || '50'))
+        .get();
 
       if (pendentes.length === 0) {
         logger.debug(' Nenhuma sincronização pendente');
@@ -26,7 +27,7 @@ const verificarSyncPendentesJob = () => {
       logger.info(` ${pendentes.length} sincronizações pendentes encontradas`);
 
       // Importação dinâmica para evitar dependência circular
-      const controlIdService = require('../services/controlIdService.v2');
+      const controlIdService = require('../services/controlIdService');
 
       for (const registro of pendentes) {
         try {
@@ -63,11 +64,13 @@ const verificarSyncPendentesJob = () => {
         } catch (error) {
           logger.error(` Erro ao processar pendente ID ${registro.id}: ${error.message}`);
           
-          // Atualizar contador de tentativas
+          // Atualizar contador de tentativas e data da última tentativa
           await global.db('sync_pendente')
             .where('id', registro.id)
-            .increment('retry_count', 1)
-            .update('last_attempt', new Date());
+            .update({
+              retry_count: global.db.raw('retry_count + 1'),
+              last_attempt: new Date()
+            });
         }
       }
 

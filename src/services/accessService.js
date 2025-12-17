@@ -81,7 +81,7 @@ async function sincronizarAcessos(dispositivo) {
 
 // OBS: A API DA CONTROLID JÁ SINCRONIZA OS LOGS EM TODAS AS CATRACAS AUTOMATICAMENTE - NÃO TEM ENTRADA E SAÍDA ESPECÍFICA - AS CATRACAS NÃO SE CONVERSAM, PRECISA VOLTAR AO SISTEMA ANTERIOR, A ESPECULAÇÃO SERÁ APENAS PELO HORÁRIO
 async function sincronizarTodosAcessos() {
-  const dispositivos = await global.db('Dispositivo');
+  const dispositivos = await global.db('Dispositivo').get();
   const resultados = [];
 
   // Verificar se existem dispositivos

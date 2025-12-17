@@ -87,8 +87,7 @@ verificarESetup()
     const args = ['index.js'];
     
     const child = spawn(command, args, {
-      stdio: 'inherit',
-      shell: true
+      stdio: 'inherit'
     });
 
     child.on('exit', (code) => {

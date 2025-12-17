@@ -13,6 +13,13 @@ const createAxiosInstance = () => {
   // Interceptor de requisição
   instance.interceptors.request.use(
     (config) => {
+      // Se está encerrando, cancelar requisições para catraca (manter apenas DB)
+      if (global.isShuttingDown && config.url && config.url.includes('catraca')) {
+        const error = new Error('Sistema encerrando');
+        error.code = 'ESHUTDOWN';
+        return Promise.reject(error);
+      }
+      
       const url = config.url || 'unknown';
       logger.debug(`Request: ${config.method?.toUpperCase()} ${url}`);
       return config;
@@ -48,6 +55,12 @@ const createAxiosInstance = () => {
 
       // Incrementar contador
       config.__retryCount += 1;
+
+      // Não fazer retry se está encerrando
+      if (global.isShuttingDown) {
+        logger.debug(`Pulando retry durante shutdown: ${config.url}`);
+        return Promise.reject(error);
+      }
 
       // Verificar se deve fazer retry
       const shouldRetry = config.__retryCount <= maxRetries && (
