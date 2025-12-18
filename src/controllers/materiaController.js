@@ -1,0 +1,96 @@
+const db = require('../config/database');
+const logger = require('../config/logger');
+
+const materiaController = {
+  // GET /materias - Lista todas as matérias
+  async listar(req, res) {
+    try {
+      const [materias] = await db.query(
+        `SELECT id, nome, createdAt, updatedAt FROM (
+          SELECT id, nome, created_at as createdAt, updated_at as updatedAt FROM Materia
+        ) sub ORDER BY nome`
+      );
+
+      res.json(materias || []);
+    } catch (error) {
+      logger.error(`Erro ao listar matérias: ${error.message}`);
+      res.status(500).json({ message: 'Erro ao listar matérias', error: error.message });
+    }
+  },
+
+  // POST /materias - Cria nova matéria
+  async criar(req, res) {
+    const { nome } = req.body;
+
+    // Validações
+    if (!nome) {
+      return res.status(400).json({ message: 'Nome da matéria é obrigatório' });
+    }
+
+    if (nome.trim().length < 2) {
+      return res.status(400).json({ message: 'Nome da matéria deve ter no mínimo 2 caracteres' });
+    }
+
+    try {
+      // Verificar se já existe (case-insensitive)
+      const [existente] = await db.query(
+        `SELECT id FROM Materia WHERE LOWER(TRIM(nome)) = LOWER(TRIM(?))`,
+        [nome]
+      );
+
+      if (existente && existente.length > 0) {
+        return res.status(409).json({ message: 'Já existe uma matéria com esse nome' });
+      }
+
+      // Inserir nova matéria
+      const [result] = await db.query(
+        `INSERT INTO Materia (nome) VALUES (?)`,
+        [nome.trim()]
+      );
+
+      // Retornar matéria criada
+      const [materia] = await db.query(
+        `SELECT id, nome, created_at as createdAt, updated_at as updatedAt FROM Materia WHERE id = ?`,
+        [result.insertId]
+      );
+
+      res.status(201).json(materia[0]);
+    } catch (error) {
+      logger.error(`Erro ao criar matéria: ${error.message}`);
+      res.status(500).json({ message: 'Erro ao criar matéria', error: error.message });
+    }
+  },
+
+  // DELETE /materias/:id - Remove matéria
+  async deletar(req, res) {
+    const { id } = req.params;
+
+    try {
+      // Verificar se há aulas usando esta matéria
+      const [aulasUsando] = await db.query(
+        'SELECT COUNT(*) as total FROM Aula WHERE materia_id = ?',
+        [id]
+      );
+
+      if (aulasUsando[0].total > 0) {
+        return res.status(409).json({ 
+          message: `Não é possível deletar: ${aulasUsando[0].total} aula(s) ainda usa(m) esta matéria` 
+        });
+      }
+
+      // Deletar matéria
+      const [result] = await db.query('DELETE FROM Materia WHERE id = ?', [id]);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Matéria não encontrada' });
+      }
+
+      return res.status(204).send();
+    } catch (error) {
+      logger.error(`Erro ao deletar matéria: ${error.message}`);
+      res.status(500).json({ message: 'Erro ao deletar matéria', error: error.message });
+    }
+  }
+};
+
+module.exports = materiaController;

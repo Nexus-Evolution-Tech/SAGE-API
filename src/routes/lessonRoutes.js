@@ -1,16 +1,16 @@
 const express = require('express');
-const gerarRotas = require('./genericRoutesFactory');
 const lessonController = require('../controllers/lessonController');
 const autenticar = require('../middlewares/autenticar');
 
-const router = gerarRotas(lessonController, 'aulas');
+const router = express.Router();
 
-const routerExtra = express.Router();
+// Rotas de aulas (catalogo)
+router.get('/aulas', autenticar, lessonController.listar);
+router.post('/aulas', autenticar, lessonController.criar);
+router.put('/aulas/:id', autenticar, lessonController.editar);
+router.delete('/aulas/:id', autenticar, lessonController.deletar);
 
-// Adiciona primeiro a rota específica para evitar conflito com /dispositivos/:id
-routerExtra.get('/aulas/horarios/:turma_id/:divisao', autenticar, lessonController.getHorariosPorTurma);
+// Rota especifica de horarios por turma (compatibilidade)
+router.get('/aulas/horarios/:turma_id/:divisao', autenticar, lessonController.getHorariosPorTurma);
 
-// Depois monta o restante das rotas (inclui /:id, etc.)
-routerExtra.use(router);
-
-module.exports = routerExtra;
+module.exports = router;
