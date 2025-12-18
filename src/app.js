@@ -99,6 +99,25 @@ try {
   // Continuar mesmo com erro de rotas
 }
 
+// Middleware de tratamento de erros para evitar conexões fechadas sem resposta
+app.use((err, req, res, next) => {
+  try {
+    const traceId = Math.random().toString(36).slice(2, 10);
+    logger.error(`Erro não tratado [${traceId}] ${req.method} ${req.originalUrl}: ${err.message}`);
+    if (err.stack) logger.debug(err.stack);
+    // Garante resposta JSON consistente
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro interno no servidor', detalhe: err.message, traceId });
+    } else {
+      // Se headers já foram enviados, delega para Express encerrar
+      next(err);
+    }
+  } catch (e) {
+    // Último recurso: fechar com 500
+    try { res.status(500).end(); } catch {}
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   const redis = require('./config/redis');
@@ -116,6 +135,11 @@ app.get('/health', (req, res) => {
       websocket: global.io ? global.io.engine.clientsCount : 0
     }
   });
+});
+
+// 404 handler (após todas as rotas)
+app.use((req, res) => {
+  res.status(404).json({ error: 'Rota não encontrada' });
 });
 
 // Middleware de erro global

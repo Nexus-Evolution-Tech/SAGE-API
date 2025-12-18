@@ -215,15 +215,15 @@ async function executarSeeds() {
 
     // Seed: UnidadeEscolar inicial (ETEC Taboão da Serra)
     const [existingSchool] = await connection.query(
-      `SELECT id FROM UnidadeEscolar WHERE id = 1 LIMIT 1`,
+      `SELECT id, login FROM UnidadeEscolar WHERE id = 1 LIMIT 1`,
       []
     );
 
+    // Hash da senha 'etec123'
+    const senhaHashed = await bcrypt.hash('etec123', 10);
+
     if (existingSchool.length === 0) {
       logger.info('🌱 Inserindo unidade escolar inicial: ETEC Taboão da Serra');
-      
-      // Hash da senha 'etec123'
-      const senhaHashed = await bcrypt.hash('etec123', 10);
       
       const sqlQuery = `
         INSERT INTO UnidadeEscolar 
@@ -236,7 +236,12 @@ async function executarSeeds() {
       await connection.query(sqlQuery, [senhaHashed]);
       logger.info(' Unidade escolar inicial inserida com sucesso');
     } else {
-      logger.info('🏫 Unidade escolar já existe, seed não necessário');
+      // Força credenciais padrão para evitar divergência entre ambientes
+      logger.info('🏫 Unidade escolar já existe, atualizando credenciais padrão (etec/etec123)');
+      await connection.query(
+        `UPDATE UnidadeEscolar SET login = 'etec', senha = ? WHERE id = 1`,
+        [senhaHashed]
+      );
     }
 
     await connection.end();
@@ -250,6 +255,8 @@ async function executarSeeds() {
 async function setupBancoDados() {
   logger.info(' Iniciando setup do banco de dados...');
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  const migrationsDir = path.join(__dirname, '../database');
 
   // 1. Verificar conexão MySQL
   logger.info('\n1️⃣ Verificando conexão com MySQL...');
@@ -286,7 +293,6 @@ async function setupBancoDados() {
     
     // 4. Executar migrations principais
     logger.info('\n4️⃣ Executando migration única: sage.sql');
-    const migrationsDir = path.join(__dirname, '../database');
     const filePath = path.join(migrationsDir, 'sage.sql');
     try {
       await fs.access(filePath);
@@ -302,9 +308,21 @@ async function setupBancoDados() {
     }
   } else {
     logger.info('    Estrutura do banco já existe');
-    
-    // Não aplicar scripts adicionais: manter apenas sage.sql conforme requisito
-    logger.info('\n4️⃣ Nenhum script adicional será aplicado (apenas sage.sql)');
+  }
+
+  // 4.1 Aplicar melhorias incrementais (idempotente: ignora colunas/índices existentes)
+  logger.info('\n4️⃣ Aplicando melhorias incrementais (melhorias_sistema.sql)...');
+  const melhoriasPath = path.join(migrationsDir, 'melhorias_sistema.sql');
+  try {
+    await fs.access(melhoriasPath);
+    await executarMigration(melhoriasPath);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      logger.warn('   Arquivo melhorias_sistema.sql não encontrado em /database; pulando.');
+    } else {
+      logger.error(`    Erro ao executar melhorias_sistema.sql: ${error.message}`);
+      throw error;
+    }
   }
 
   // 5. Validar estrutura

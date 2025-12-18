@@ -1,9 +1,11 @@
 const XLSX = require('xlsx');
+const fs = require('fs');
 const peopleService = require('./peopleService');
 const db = require('../config/database');
 const { hashSenha } = require('../utils/criptografia');
-const { registrarSyncPendente } = require('./controlIdService');
+const { registrarSyncPendente, registrarSyncPendentesEmLote } = require('./controlIdService');
 const { listarTodos: listarDispositivos } = require('./deviceService');
+const logger = require('../config/logger');
 
 function cleanValue(value) {
   if (value === undefined || value === null) return null;
@@ -255,15 +257,9 @@ async function processAluno(sheet, summary, unidadeIdDefault, dispositivosParaSy
     try {
       const criado = await peopleService.criarPessoaCompleta(payload);
       const pessoaId = criado?.idPessoa;
-      // Enfileira para sincronismo nas catracas (ALUNO vai para catraca)
-      if (pessoaId && Array.isArray(dispositivosParaSync)) {
-        for (const disp of dispositivosParaSync) {
-          try {
-            await registrarSyncPendente(pessoaId, disp.id, 'CREATE');
-          } catch (e) {
-            // ignora erro de fila individual e segue importação
-          }
-        }
+      // Enfileira para sincronismo nas catracas (ALUNO vai para catraca) em lote
+      if (pessoaId && Array.isArray(dispositivosParaSync) && dispositivosParaSync.length > 0) {
+        await registrarSyncPendentesEmLote(pessoaId, dispositivosParaSync, 'CREATE');
       }
       summary.pessoas.sucesso += 1;
     } catch (error) {
@@ -330,11 +326,9 @@ async function processProfessor(sheet, summary, unidadeIdDefault, dispositivosPa
     try {
       const criado = await peopleService.criarPessoaCompleta(payload);
       const pessoaId = criado?.idPessoa;
-      // PROFESSOR/PROFADM vão para catraca
-      if (pessoaId && Array.isArray(dispositivosParaSync)) {
-        for (const disp of dispositivosParaSync) {
-          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
-        }
+      // PROFESSOR/PROFADM vão para catraca (lote)
+      if (pessoaId && Array.isArray(dispositivosParaSync) && dispositivosParaSync.length > 0) {
+        await registrarSyncPendentesEmLote(pessoaId, dispositivosParaSync, 'CREATE');
       }
       summary.pessoas.sucesso += 1;
     } catch (error) {
@@ -369,10 +363,8 @@ async function processAdministrador(sheet, summary, unidadeIdDefault, dispositiv
     try {
       const criado = await peopleService.criarPessoaCompleta(payload);
       const pessoaId = criado?.idPessoa;
-      if (pessoaId && Array.isArray(dispositivosParaSync)) {
-        for (const disp of dispositivosParaSync) {
-          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
-          }
+      if (pessoaId && Array.isArray(dispositivosParaSync) && dispositivosParaSync.length > 0) {
+        await registrarSyncPendentesEmLote(pessoaId, dispositivosParaSync, 'CREATE');
       }
       summary.pessoas.sucesso += 1;
     } catch (error) {
@@ -407,11 +399,9 @@ async function processTerceirizado(sheet, summary, unidadeIdDefault, dispositivo
     try {
       const criado = await peopleService.criarPessoaCompleta(payload);
       const pessoaId = criado?.idPessoa;
-      // TERCEIRIZADO também acessa catraca
-      if (pessoaId && Array.isArray(dispositivosParaSync)) {
-        for (const disp of dispositivosParaSync) {
-          try { await registrarSyncPendente(pessoaId, disp.id, 'CREATE'); } catch {}
-        }
+      // TERCEIRIZADO também acessa catraca (lote)
+      if (pessoaId && Array.isArray(dispositivosParaSync) && dispositivosParaSync.length > 0) {
+        await registrarSyncPendentesEmLote(pessoaId, dispositivosParaSync, 'CREATE');
       }
       summary.pessoas.sucesso += 1;
     } catch (error) {
@@ -429,6 +419,14 @@ function findFirstSheet(workbook, candidates) {
 }
 
 async function importarPlanilha(filePath, unidadeIdDefault = 1) {
+  const startedAt = Date.now();
+  try {
+    const stat = fs.statSync(filePath);
+    logger.info(`Importação iniciada: ${filePath} (${stat.size} bytes)`);
+  } catch (e) {
+    logger.warn(`Não foi possível obter tamanho do arquivo ${filePath}: ${e.message}`);
+  }
+
   const summary = {
     escolas: { criados: 0, ignorados: 0 },
     cursos: { criados: 0, ignorados: 0 },
@@ -485,6 +483,8 @@ async function importarPlanilha(filePath, unidadeIdDefault = 1) {
     await processTerceirizado(workbook.Sheets.TERCEIRIZADO, summary, unidadeParaPessoas, dispositivosParaSync);
   }
 
+  const elapsed = Date.now() - startedAt;
+  logger.info(`Importação concluída em ${elapsed} ms (pessoas sucesso: ${summary.pessoas.sucesso}, erros: ${summary.pessoas.erros})`);
   return summary;
 }
 

@@ -16,29 +16,15 @@ const limit = pLimit(PARALLEL_LIMIT);
 
 // ==================== HELPERS ====================
 
-// Verifica duplicidade por pessoa+dispositivo+ação
-async function existeRegistroPendentePorDispositivo(pessoaId, dispositivoId, action) {
-  try {
-    const total = await global.db('sync_pendente')
-      .where('pessoa_id', pessoaId)
-      .where('dispositivo_id', dispositivoId)
-      .where('action', action)
-      .count();
-    return Number(total || 0) > 0;
-  } catch (err) {
-    logger.errorWithStack('Erro ao verificar registro pendente (por dispositivo)', err);
-    return false;
-  }
+// Compat: alguns módulos antigos podem referenciar esta função.
+// Mantemos um stub que retorna false para evitar SELECTs de deduplicação.
+async function existeRegistroPendentePorDispositivo() {
+  return false;
 }
 
 // Função para inserir na tabela sync_pendente (com deduplicação)
 const registrarSyncPendente = async (pessoaId, dispositivoId, action, errorMsg = null) => {
   try {
-    const jaExiste = await existeRegistroPendentePorDispositivo(pessoaId, dispositivoId, action);
-    if (jaExiste) {
-      return; // evita duplicidade na fila
-    }
-
     await global.db('sync_pendente').insert({
       pessoa_id: pessoaId,
       dispositivo_id: dispositivoId,
@@ -46,9 +32,36 @@ const registrarSyncPendente = async (pessoaId, dispositivoId, action, errorMsg =
       error_message: errorMsg,
       data_tentativa: new Date()
     });
-    logger.info(` Sync pendente registrado: pessoa ${pessoaId}, dispositivo ${dispositivoId}, action ${action}`);
+    // Log detalhado somente em nível debug para não poluir terminal em produção
+    logger.debug(` Sync pendente registrado: pessoa ${pessoaId}, dispositivo ${dispositivoId}, action ${action}`);
   } catch (err) {
+    // Ignora duplicatas silenciosamente (índice único)
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      logger.debug(` Sync pendente duplicado ignorado: pessoa ${pessoaId}, dispositivo ${dispositivoId}, action ${action}`);
+      return;
+    }
     logger.errorWithStack('Erro ao registrar sync pendente', err);
+  }
+};
+
+// Inserção em lote na tabela sync_pendente (com IGNORE para evitar falhas por duplicidade)
+const registrarSyncPendentesEmLote = async (pessoaId, dispositivos, action, errorMsg = null) => {
+  try {
+    if (!Array.isArray(dispositivos) || dispositivos.length === 0) return;
+    const db = require('../config/database');
+
+    const now = new Date();
+    const columns = ['pessoa_id', 'dispositivo_id', 'action', 'error_message', 'data_tentativa'];
+    const valuesTuples = dispositivos.map(d => [pessoaId, d.id, action, errorMsg, now]);
+
+    const placeholders = valuesTuples.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+    const flatValues = valuesTuples.flat();
+
+    const sql = `INSERT IGNORE INTO sync_pendente (${columns.join(', ')}) VALUES ${placeholders}`;
+    await db.query(sql, flatValues);
+    logger.debug(` Sync pendente em lote: pessoa ${pessoaId}, dispositivos ${dispositivos.length}, action ${action}`);
+  } catch (err) {
+    logger.errorWithStack('Erro ao registrar sync pendentes em lote', err);
   }
 };
 
@@ -190,10 +203,8 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, ca
     return { dispositivo: dispositivo.nome, sucesso: true };
 
   } catch (error) {
-    const jaExisteCriacaoPendente = await existeRegistroPendente(id, 'CREATE');
-    if (!jaExisteCriacaoPendente) {
-      await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message);
-    }
+    // Fila a atualização; duplicatas são ignoradas pelo índice único
+    await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message);
 
     logger.error(` Erro ao editar pessoa em ${dispositivo.nome}: ${error.message}`);
     return { dispositivo: dispositivo.nome, sucesso: false, erro: error.message };
@@ -445,6 +456,7 @@ module.exports = {
   generateQrCode,
   generateRFID,
   registrarSyncPendente,
+  registrarSyncPendentesEmLote,
   existeRegistroPendente,
   existeRegistroPendentePorDispositivo
 };
