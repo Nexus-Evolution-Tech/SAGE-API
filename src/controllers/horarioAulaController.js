@@ -338,11 +338,11 @@ const horarioAulaController = {
           h.turma_id,
           t.nome as turma_nome,
           a.nome as aula_nome,
-          p.nome as professor_nome
+          COALESCE(p.nome, CONCAT('Professor ID ', a.professor_id)) as professor_nome
         FROM HorarioAula h
         JOIN Aula a ON h.aula_id = a.id
         JOIN Turma t ON h.turma_id = t.id
-        JOIN Pessoa p ON a.professor_id = p.id
+        LEFT JOIN Pessoa p ON a.professor_id = p.id
         WHERE a.professor_id = ?
           AND h.dia_semana = ?
           AND h.horario = ?
@@ -468,11 +468,11 @@ const horarioAulaController = {
           h.turma_id,
           t.nome as turma_nome,
           a.nome as aula_nome,
-          p.nome as professor_nome
+          COALESCE(p.nome, CONCAT('Professor ID ', a.professor_id)) as professor_nome
         FROM HorarioAula h
         JOIN Aula a ON h.aula_id = a.id
         JOIN Turma t ON h.turma_id = t.id
-        JOIN Pessoa p ON a.professor_id = p.id
+        LEFT JOIN Pessoa p ON a.professor_id = p.id
         WHERE a.professor_id = ?
           AND h.dia_semana = ?
           AND h.horario = ?
