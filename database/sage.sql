@@ -182,6 +182,21 @@ CREATE TABLE IF NOT EXISTS Administrador (
     FOREIGN KEY (id) REFERENCES Funcionario(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS Sala (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero VARCHAR(50) NOT NULL COMMENT 'Número ou identificador da sala',
+    nome VARCHAR(100) NULL COMMENT 'Nome descritivo da sala',
+    capacidade INT NULL COMMENT 'Capacidade de alunos',
+    tipo ENUM('SALA_AULA', 'LABORATORIO', 'AUDITORIO', 'BIBLIOTECA', 'OUTRO') DEFAULT 'SALA_AULA',
+    ativo BOOLEAN DEFAULT TRUE,
+    observacao TEXT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_numero (numero),
+    INDEX idx_sala_ativo (ativo),
+    INDEX idx_sala_tipo (tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS Empresa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) ,
@@ -233,7 +248,8 @@ CREATE TABLE IF NOT EXISTS Aula (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (professor_id) REFERENCES Professor(id) ON DELETE SET NULL,
     FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL,
-    FOREIGN KEY (materia_id) REFERENCES Materia(id) ON DELETE SET NULL
+    FOREIGN KEY (materia_id) REFERENCES Materia(id) ON DELETE SET NULL,
+    FOREIGN KEY (sala_padrao_id) REFERENCES Sala(id) ON DELETE SET NULL
 );
 
 -- Tabela de agendamento de aulas (separa a associação Aula x Turma x Horário)
@@ -248,6 +264,7 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE CASCADE,
     FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
+    FOREIGN KEY (sala_id) REFERENCES Sala(id) ON DELETE SET NULL,
     UNIQUE KEY idx_horario_turma_dia_hora (turma_id, dia_semana, horario),
     INDEX idx_horario_sala (sala_id),
     INDEX idx_horario_dia_hora (dia_semana, horario)
@@ -328,6 +345,24 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- ========================================
+-- INSERÇÃO DE DADOS DE EXEMPLO - SALAS
+-- ========================================
+INSERT INTO Sala (numero, nome, capacidade, tipo, ativo) VALUES
+('101', 'Sala 101', 40, 'SALA_AULA', TRUE),
+('102', 'Sala 102', 40, 'SALA_AULA', TRUE),
+('103', 'Sala 103', 40, 'SALA_AULA', TRUE),
+('104', 'Sala 104', 40, 'SALA_AULA', TRUE),
+('105', 'Sala 105', 40, 'SALA_AULA', TRUE),
+('201', 'Sala 201', 40, 'SALA_AULA', TRUE),
+('202', 'Sala 202', 40, 'SALA_AULA', TRUE),
+('203', 'Sala 203', 40, 'SALA_AULA', TRUE),
+('LAB-INFO', 'Laboratório de Informática', 35, 'LABORATORIO', TRUE),
+('LAB-QUIM', 'Laboratório de Química', 30, 'LABORATORIO', TRUE),
+('LAB-FIS', 'Laboratório de Física', 30, 'LABORATORIO', TRUE),
+('AUD-01', 'Auditório Principal', 200, 'AUDITORIO', TRUE),
+('BIB-01', 'Biblioteca', 80, 'BIBLIOTECA', TRUE);
 
 
 DELIMITER $$

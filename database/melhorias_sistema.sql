@@ -57,12 +57,44 @@ CREATE TABLE IF NOT EXISTS session_cache (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ajustes de estrutura para alinhamento com API atual
+-- Criar tabela Sala (caso ainda não exista)
+CREATE TABLE IF NOT EXISTS Sala (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero VARCHAR(50) NOT NULL COMMENT 'Número ou identificador da sala',
+    nome VARCHAR(100) NULL COMMENT 'Nome descritivo da sala',
+    capacidade INT NULL COMMENT 'Capacidade de alunos',
+    tipo ENUM('SALA_AULA', 'LABORATORIO', 'AUDITORIO', 'BIBLIOTECA', 'OUTRO') DEFAULT 'SALA_AULA',
+    ativo BOOLEAN DEFAULT TRUE,
+    observacao TEXT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_numero (numero),
+    INDEX idx_sala_ativo (ativo),
+    INDEX idx_sala_tipo (tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Inserir salas de exemplo se não existirem
+INSERT IGNORE INTO Sala (numero, nome, capacidade, tipo, ativo) VALUES
+('101', 'Sala 101', 40, 'SALA_AULA', TRUE),
+('102', 'Sala 102', 40, 'SALA_AULA', TRUE),
+('103', 'Sala 103', 40, 'SALA_AULA', TRUE),
+('104', 'Sala 104', 40, 'SALA_AULA', TRUE),
+('105', 'Sala 105', 40, 'SALA_AULA', TRUE),
+('201', 'Sala 201', 40, 'SALA_AULA', TRUE),
+('202', 'Sala 202', 40, 'SALA_AULA', TRUE),
+('203', 'Sala 203', 40, 'SALA_AULA', TRUE),
+('LAB-INFO', 'Laboratório de Informática', 35, 'LABORATORIO', TRUE),
+('LAB-QUIM', 'Laboratório de Química', 30, 'LABORATORIO', TRUE),
+('LAB-FIS', 'Laboratório de Física', 30, 'LABORATORIO', TRUE),
+('AUD-01', 'Auditório Principal', 200, 'AUDITORIO', TRUE),
+('BIB-01', 'Biblioteca', 80, 'BIBLIOTECA', TRUE);
+
 -- Aula: adicionar colunas novas (se não existirem)
 ALTER TABLE Aula 
-ADD COLUMN sala_padrao_id INT NULL AFTER materia_id;
+ADD COLUMN IF NOT EXISTS sala_padrao_id INT NULL AFTER materia_id;
 
 ALTER TABLE Aula 
-ADD COLUMN observacao VARCHAR(255) NULL AFTER divisao;
+ADD COLUMN IF NOT EXISTS observacao VARCHAR(255) NULL AFTER divisao;
 
 -- Índices úteis para buscas
 CREATE INDEX idx_aula_professor ON Aula(professor_id);
@@ -79,8 +111,25 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE CASCADE,
-  FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE
+  FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
+  FOREIGN KEY (sala_id) REFERENCES Sala(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Adicionar FK para sala_padrao_id em Aula (se não existir)
+-- Nota: Esta linha pode falhar em MySQL antigo que não suporta ADD CONSTRAINT IF NOT EXISTS
+-- Se falhar, ignore o erro
+SET @exist_fk := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
+                  WHERE CONSTRAINT_SCHEMA = DATABASE() 
+                  AND TABLE_NAME = 'Aula' 
+                  AND CONSTRAINT_NAME = 'fk_aula_sala_padrao');
+
+SET @sql_fk := IF(@exist_fk = 0,
+    'ALTER TABLE Aula ADD CONSTRAINT fk_aula_sala_padrao FOREIGN KEY (sala_padrao_id) REFERENCES Sala(id) ON DELETE SET NULL',
+    'SELECT "FK já existe" AS resultado');
+
+PREPARE stmt FROM @sql_fk;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Garantir índices e unicidade
 CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
