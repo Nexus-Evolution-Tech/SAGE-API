@@ -55,3 +55,34 @@ CREATE TABLE IF NOT EXISTS session_cache (
   FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id) ON DELETE CASCADE,
   INDEX idx_session_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ajustes de estrutura para alinhamento com API atual
+-- Aula: adicionar colunas novas (se não existirem)
+ALTER TABLE Aula 
+ADD COLUMN sala_padrao_id INT NULL AFTER materia_id;
+
+ALTER TABLE Aula 
+ADD COLUMN observacao VARCHAR(255) NULL AFTER divisao;
+
+-- Índices úteis para buscas
+CREATE INDEX idx_aula_professor ON Aula(professor_id);
+CREATE INDEX idx_aula_materia ON Aula(materia_id);
+
+-- Criar tabela HorarioAula (caso ainda não exista)
+CREATE TABLE IF NOT EXISTS HorarioAula (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  turma_id INT NOT NULL,
+  aula_id INT NOT NULL,
+  dia_semana ENUM ('SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA') NOT NULL,
+  horario TIME NOT NULL,
+  sala_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE CASCADE,
+  FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Garantir índices e unicidade
+CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
+CREATE INDEX idx_horario_sala ON HorarioAula(sala_id);
+CREATE INDEX idx_horario_dia_hora ON HorarioAula(dia_semana, horario);
