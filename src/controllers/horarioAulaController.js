@@ -38,11 +38,26 @@ const horarioAulaController = {
     try {
       const { turmaId, diaSemana } = req.query;
 
-      let query = "SELECT * FROM HorarioAula WHERE 1=1";
+      let query = `
+        SELECT 
+          ha.id,
+          ha.turma_id,
+          ha.aula_id,
+          ha.dia_semana,
+          ha.horario,
+          ha.sala_id,
+          ha.created_at,
+          ha.updated_at,
+          a.inicio,
+          a.fim
+        FROM HorarioAula ha
+        LEFT JOIN Aula a ON ha.aula_id = a.id
+        WHERE 1=1
+      `;
       const params = [];
 
       if (turmaId) {
-        query += " AND turma_id = ?";
+        query += " AND ha.turma_id = ?";
         params.push(turmaId);
       }
 
@@ -51,25 +66,45 @@ const horarioAulaController = {
         if (!diaDb) {
           return res.status(400).json({ message: "Dia da semana inválido. Use: SEGUNDA, TERCA, QUARTA, QUINTA ou SEXTA" });
         }
-        query += " AND dia_semana = ?";
+        query += " AND ha.dia_semana = ?";
         params.push(diaDb);
       }
 
-      query += " ORDER BY FIELD(dia_semana, 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'), horario";
+      query += " ORDER BY FIELD(ha.dia_semana, 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'), ha.horario";
 
       const [horarios] = await db.query(query, params);
 
       // Converter para camelCase
-      const horariosFormatados = horarios.map((horario) => ({
-        id: horario.id,
-        turmaId: horario.turma_id,
-        aulaId: horario.aula_id,
-        diaSemana: toApiDiaSemana(horario.dia_semana),
-        horario: horario.horario,
-        salaId: horario.sala_id,
-        createdAt: horario.created_at,
-        updatedAt: horario.updated_at,
-      }));
+      // Se a Aula não tiver inicio/fim, usar o horario de HorarioAula como fallback
+      const horariosFormatados = horarios.map((horario) => {
+        let inicio = horario.inicio;
+        let fim = horario.fim;
+        
+        // Fallback: se não houver inicio/fim na Aula, calcular a partir de HorarioAula
+        // Assumindo que cada aula dura 50 minutos (padrão escolar brasileiro)
+        if (!inicio && horario.horario) {
+          inicio = horario.horario;
+          // Calcular fim adicionando 50 minutos
+          const [hh, mm, ss] = horario.horario.split(':').map(Number);
+          const totalMinutos = hh * 60 + mm + 50;
+          const novaHora = Math.floor(totalMinutos / 60);
+          const novoMinuto = totalMinutos % 60;
+          fim = `${String(novaHora).padStart(2, '0')}:${String(novoMinuto).padStart(2, '0')}:00`;
+        }
+        
+        return {
+          id: horario.id,
+          turmaId: horario.turma_id,
+          aulaId: horario.aula_id,
+          diaSemana: toApiDiaSemana(horario.dia_semana),
+          horario: horario.horario,
+          inicio: inicio,
+          fim: fim,
+          salaId: horario.sala_id,
+          createdAt: horario.created_at,
+          updatedAt: horario.updated_at,
+        };
+      });
 
       return res.status(200).json(horariosFormatados);
     } catch (error) {

@@ -346,27 +346,6 @@ END$$
 
 DELIMITER ;
 
--- ========================================
--- INSERÇÃO DE DADOS DE EXEMPLO - SALAS
--- ========================================
-INSERT INTO Sala (numero, nome, capacidade, tipo, ativo) VALUES
-('101', 'Sala 101', 40, 'SALA_AULA', TRUE),
-('102', 'Sala 102', 40, 'SALA_AULA', TRUE),
-('103', 'Sala 103', 40, 'SALA_AULA', TRUE),
-('104', 'Sala 104', 40, 'SALA_AULA', TRUE),
-('105', 'Sala 105', 40, 'SALA_AULA', TRUE),
-('201', 'Sala 201', 40, 'SALA_AULA', TRUE),
-('202', 'Sala 202', 40, 'SALA_AULA', TRUE),
-('203', 'Sala 203', 40, 'SALA_AULA', TRUE),
-('LAB-INFO', 'Laboratório de Informática', 35, 'LABORATORIO', TRUE),
-('LAB-QUIM', 'Laboratório de Química', 30, 'LABORATORIO', TRUE),
-('LAB-FIS', 'Laboratório de Física', 30, 'LABORATORIO', TRUE),
-('AUD-01', 'Auditório Principal', 200, 'AUDITORIO', TRUE),
-('BIB-01', 'Biblioteca', 80, 'BIBLIOTECA', TRUE);
-
-
-DELIMITER $$
-
 CREATE EVENT atualizar_ou_desligar_alunos
 -- ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 MINUTE
 ON SCHEDULE

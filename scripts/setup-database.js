@@ -285,42 +285,26 @@ async function setupBancoDados() {
     logger.info('   Tabelas não existem, executando migrations...');
     
     // 4. Executar migrations principais
-    logger.info('\n4️⃣ Executando migrations...');
+    logger.info('\n4️⃣ Executando migration única: sage.sql');
     const migrationsDir = path.join(__dirname, '../database');
-    
-    const migrations = [
-      'sage.sql',
-      'melhorias_sistema.sql',
-      'dados_etec_taboao.sql'
-    ];
-
-    for (const migration of migrations) {
-      const filePath = path.join(migrationsDir, migration);
-      try {
-        await fs.access(filePath);
-        await executarMigration(filePath);
-      } catch (error) {
-        if (error.code === 'ENOENT') {
-          logger.warn(`   ⚠️ Migration não encontrada: ${migration}`);
-        } else {
-          logger.error(`    Erro: ${error.message}`);
-        }
+    const filePath = path.join(migrationsDir, 'sage.sql');
+    try {
+      await fs.access(filePath);
+      await executarMigration(filePath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        logger.error('   ❌ Arquivo sage.sql não encontrado em /database');
+        throw error;
+      } else {
+        logger.error(`    Erro ao executar sage.sql: ${error.message}`);
+        throw error;
       }
     }
   } else {
     logger.info('    Estrutura do banco já existe');
     
-    // Executar apenas melhorias (índices, novas colunas)
-    logger.info('\n4️⃣ Aplicando melhorias...');
-    const filePath = path.join(__dirname, '../database/melhorias_sistema.sql');
-    try {
-      await fs.access(filePath);
-      await executarMigration(filePath);
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        logger.warn(`   ⚠️ Aviso ao aplicar melhorias: ${error.message}`);
-      }
-    }
+    // Não aplicar scripts adicionais: manter apenas sage.sql conforme requisito
+    logger.info('\n4️⃣ Nenhum script adicional será aplicado (apenas sage.sql)');
   }
 
   // 5. Validar estrutura
