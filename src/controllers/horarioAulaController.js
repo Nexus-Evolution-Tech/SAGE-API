@@ -80,13 +80,18 @@ const horarioAulaController = {
 
   async criar(req, res) {
     try {
-      const { turmaId, aulaId, diaSemana, horario, salaId } = req.body;
+      let { turmaId, aulaId, diaSemana, horario, salaId } = req.body;
 
       // Validações
       if (!turmaId || !aulaId || !diaSemana || !horario) {
         return res.status(400).json({
           message: "Turma, aula, dia da semana e horário são obrigatórios",
         });
+      }
+
+      // Normalizar horário: se vier como intervalo "07:30-08:20", extrair apenas início
+      if (typeof horario === 'string' && horario.includes('-')) {
+        horario = horario.split('-')[0].trim();
       }
 
       // Validar dia da semana
@@ -168,7 +173,7 @@ const horarioAulaController = {
   async editar(req, res) {
     try {
       const { id } = req.params;
-      const { turmaId, aulaId, diaSemana, horario, salaId } = req.body;
+      let { turmaId, aulaId, diaSemana, horario, salaId } = req.body;
 
       // Verificar se o horário existe
       const [horarioExiste] = await db.query("SELECT * FROM HorarioAula WHERE id = ?", [id]);
@@ -177,6 +182,11 @@ const horarioAulaController = {
       }
 
       const horarioAtual = horarioExiste[0];
+
+      // Normalizar horário: se vier como intervalo "07:30-08:20", extrair apenas início
+      if (horario && typeof horario === 'string' && horario.includes('-')) {
+        horario = horario.split('-')[0].trim();
+      }
 
       // Validar dia da semana (se fornecido)
       if (diaSemana) {
@@ -287,12 +297,17 @@ const horarioAulaController = {
   // POST /horarios-aulas/validar - Validar conflitos
   async validar(req, res) {
     try {
-      const { turmaId, aulaId, diaSemana, horario, salaId, horarioIdExcluir } = req.body;
+      let { turmaId, aulaId, diaSemana, horario, salaId, horarioIdExcluir } = req.body;
 
       if (!turmaId || !aulaId || !diaSemana || !horario) {
         return res.status(400).json({ 
           message: 'Campos obrigatórios: turmaId, aulaId, diaSemana, horario' 
         });
+      }
+
+      // Normalizar horário: se vier como intervalo "07:30-08:20", extrair apenas início
+      if (typeof horario === 'string' && horario.includes('-')) {
+        horario = horario.split('-')[0].trim();
       }
 
       const diaDb = toDbDiaSemana(diaSemana);
