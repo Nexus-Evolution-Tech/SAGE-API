@@ -2640,10 +2640,10 @@ components:
         saida:
           type: string
 
-    SyncDbByAction:
+    SyncDbByOperation:
       type: object
       properties:
-        action:
+        operation:
           type: string
           description: Tipo de ação pendente
           example: CREATE
@@ -2656,7 +2656,7 @@ components:
       properties:
         id:
           type: integer
-        action:
+        operation:
           type: string
           example: CREATE
         pessoa_id:
@@ -2690,10 +2690,10 @@ components:
           format: date-time
         total:
           type: integer
-        byAction:
+        byOperation:
           type: array
           items:
-            $ref: '#/components/schemas/SyncDbByAction'
+            $ref: '#/components/schemas/SyncDbByOperation'
         oldest:
           type: string
           format: date-time

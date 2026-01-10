@@ -142,11 +142,11 @@ global.trackSlowQuery = trackSlowQuery;
 router.get('/monitoring/sync-db', async (req, res) => {
   try {
     const [[{ total }]] = await db.query('SELECT COUNT(*) AS total FROM sync_pendente');
-    const [byAction] = await db.query('SELECT action, COUNT(*) AS total FROM sync_pendente GROUP BY action');
+    const [byOperation] = await db.query('SELECT operation, COUNT(*) AS total FROM sync_pendente GROUP BY operation');
     const [[times]] = await db.query('SELECT MIN(data_tentativa) AS oldest, MAX(data_tentativa) AS newest FROM sync_pendente');
 
     const [latest] = await db.query(
-      `SELECT sp.id, sp.action, sp.pessoa_id, p.nome AS pessoa, sp.dispositivo_id, d.nome AS dispositivo,
+      `SELECT sp.id, sp.operation, sp.pessoa_id, p.nome AS pessoa, sp.dispositivo_id, d.nome AS dispositivo,
               sp.data_tentativa, sp.retry_count, sp.last_attempt, sp.error_message
          FROM sync_pendente sp
          LEFT JOIN Pessoa p ON p.id = sp.pessoa_id
@@ -158,7 +158,7 @@ router.get('/monitoring/sync-db', async (req, res) => {
     res.json({
       timestamp: new Date().toISOString(),
       total,
-      byAction,
+      byOperation,
       oldest: times?.oldest || null,
       newest: times?.newest || null,
       latest
@@ -173,11 +173,11 @@ router.get('/monitoring/sync-db', async (req, res) => {
 router.get('/sync-db', async (req, res) => {
   try {
     const [[{ total }]] = await db.query('SELECT COUNT(*) AS total FROM sync_pendente');
-    const [byAction] = await db.query('SELECT action, COUNT(*) AS total FROM sync_pendente GROUP BY action');
+    const [byOperation] = await db.query('SELECT operation, COUNT(*) AS total FROM sync_pendente GROUP BY operation');
     const [[times]] = await db.query('SELECT MIN(data_tentativa) AS oldest, MAX(data_tentativa) AS newest FROM sync_pendente');
 
     const [latest] = await db.query(
-      `SELECT sp.id, sp.action, sp.pessoa_id, p.nome AS pessoa, sp.dispositivo_id, d.nome AS dispositivo,
+      `SELECT sp.id, sp.operation, sp.pessoa_id, p.nome AS pessoa, sp.dispositivo_id, d.nome AS dispositivo,
               sp.data_tentativa, sp.retry_count, sp.last_attempt, sp.error_message
          FROM sync_pendente sp
          LEFT JOIN Pessoa p ON p.id = sp.pessoa_id
@@ -189,7 +189,7 @@ router.get('/sync-db', async (req, res) => {
     res.json({
       timestamp: new Date().toISOString(),
       total,
-      byAction,
+      byOperation,
       oldest: times?.oldest || null,
       newest: times?.newest || null,
       latest

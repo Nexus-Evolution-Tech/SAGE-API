@@ -18,6 +18,7 @@ const { hashSenha } = require('../utils/criptografia');
 const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
+const registrarSyncPendente = require('../services/sync');
 
 async function criarPessoaCompleta(dados) {
   const {
@@ -72,6 +73,9 @@ async function criarPessoaCompleta(dados) {
     default:
       throw new Error('Tipo de pessoa inválido');
   }
+
+  //4. Registrar sync pendente para todas as catracas
+  await registrarSyncPendente(idPessoa, 'CREATE');
 
   return { idPessoa, tipoCriado: tipo };
 }
@@ -248,7 +252,7 @@ async function verificarTodasPessoasPresentesEAtrasadas() {
 
 async function buscarPessoasPorTipo(tipo, limit = 50, offset = 0) {
   const [pessoas] = await db.query(
-    'SELECT * FROM Pessoa WHERE tipo = ? LIMIT ? OFFSET ?',
+    'SELECT * FROM Pessoa WHERE tipo = ? AND visivel = 1 LIMIT ? OFFSET ?',
     [tipo, limit, offset]
   );
 

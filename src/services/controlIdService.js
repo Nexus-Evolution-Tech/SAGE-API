@@ -18,65 +18,9 @@ const limit = pLimit(PARALLEL_LIMIT);
 
 // Compat: alguns módulos antigos podem referenciar esta função.
 // Mantemos um stub que retorna false para evitar SELECTs de deduplicação.
-async function existeRegistroPendentePorDispositivo() {
-  return false;
-}
-
-// Função para inserir na tabela sync_pendente (com deduplicação)
-const registrarSyncPendente = async (pessoaId, dispositivoId, action, errorMsg = null) => {
-  try {
-    await global.db('sync_pendente').insert({
-      pessoa_id: pessoaId,
-      dispositivo_id: dispositivoId,
-      action: action,
-      error_message: errorMsg,
-      data_tentativa: new Date()
-    });
-    // Log detalhado somente em nível debug para não poluir terminal em produção
-    logger.debug(` Sync pendente registrado: pessoa ${pessoaId}, dispositivo ${dispositivoId}, action ${action}`);
-  } catch (err) {
-    // Ignora duplicatas silenciosamente (índice único)
-    if (err && err.code === 'ER_DUP_ENTRY') {
-      logger.debug(` Sync pendente duplicado ignorado: pessoa ${pessoaId}, dispositivo ${dispositivoId}, action ${action}`);
-      return;
-    }
-    logger.errorWithStack('Erro ao registrar sync pendente', err);
-  }
-};
-
-// Inserção em lote na tabela sync_pendente (com IGNORE para evitar falhas por duplicidade)
-const registrarSyncPendentesEmLote = async (pessoaId, dispositivos, action, errorMsg = null) => {
-  try {
-    if (!Array.isArray(dispositivos) || dispositivos.length === 0) return;
-    const db = require('../config/database');
-
-    const now = new Date();
-    const columns = ['pessoa_id', 'dispositivo_id', 'action', 'error_message', 'data_tentativa'];
-    const valuesTuples = dispositivos.map(d => [pessoaId, d.id, action, errorMsg, now]);
-
-    const placeholders = valuesTuples.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-    const flatValues = valuesTuples.flat();
-
-    const sql = `INSERT IGNORE INTO sync_pendente (${columns.join(', ')}) VALUES ${placeholders}`;
-    await db.query(sql, flatValues);
-    logger.debug(` Sync pendente em lote: pessoa ${pessoaId}, dispositivos ${dispositivos.length}, action ${action}`);
-  } catch (err) {
-    logger.errorWithStack('Erro ao registrar sync pendentes em lote', err);
-  }
-};
-
-async function existeRegistroPendente(id, acao) {
-  try {
-    const total = await global.db('sync_pendente')
-      .where('pessoa_id', id)
-      .where('action', acao)
-      .count();
-    return Number(total || 0) > 0;
-  } catch (err) {
-    logger.errorWithStack('Erro ao verificar registro pendente', err);
-    return false;
-  }
-}
+// async function existeRegistroPendentePorDispositivo() {
+//   return false;
+// }
 
 // ==================== CRIAR PESSOA ====================
 
@@ -90,7 +34,7 @@ const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserI
     const session = await obterSessao(link, dispositivo);
     
     if (!session) {
-      await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE', 'Sessão inválida');
+      // await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE', 'Sessão inválida');
       return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
     }
 
@@ -115,7 +59,7 @@ const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserI
     return { dispositivo: dispositivo.nome, sucesso: true, catracaId: catracaUserId };
 
   } catch (error) {
-    await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE', error.message);
+    // await registrarSyncPendente(novaPessoa.id, dispositivo.id, 'CREATE', error.message);
     logger.error(` Erro ao criar pessoa em ${dispositivo.nome}: ${error.message}`);
     return { dispositivo: dispositivo.nome, sucesso: false, erro: error.message };
   }
@@ -168,14 +112,14 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
 /**
  * Processa edição de pessoa em um dispositivo específico (PARALELO)
  */
-const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, catracaUserId) => {
+const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qrcode, catracaUserId) => {
   const link = linkCatraca(dispositivo);
   
   try {
     const session = await obterSessao(link, dispositivo);
     
     if (!session) {
-      await registrarSyncPendente(id, dispositivo.id, 'UPDATE', 'Sessão inválida');
+      // await registrarSyncPendente(id, dispositivo.id, 'UPDATE', 'Sessão inválida');
       return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
     }
 
@@ -184,13 +128,14 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, ca
     // Editar nome do usuário
     await controlId.editarUsuario(catracaUserId, nome, link, session, dispositivo, resultados);
 
+    const sessionAdm = await controlId.obterSessaoAdmin(
+      link,
+      process.env.CATRACA_ADMIN_USER,
+      process.env.CATRACA_ADMIN_PASSWORD
+    );
+
     // Editar/deletar cartão RFID
     if (cartao_rfid !== null && cartao_rfid.length === 8) {
-      const sessionAdm = await controlId.obterSessaoAdmin(
-        link,
-        process.env.CATRACA_ADMIN_USER,
-        process.env.CATRACA_ADMIN_PASSWORD
-      );
       const value = await gerarCardValue(cartao_rfid);
 
       await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'RFID');
@@ -199,12 +144,21 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, ca
       await controlId.deletarCartao(catracaUserId, link, session, dispositivo, resultados);
     }
 
+    // QRCODE é atualizado sempre, mesmo que não tenha mudado efetivamente
+    const value = Number(qrcode);
+
+    await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'QRCODE');
+    await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
+
+    // UPLOAD_PHOTO
+    await controlId.criarImagemUser(catracaUserId, link, session, dispositivo);
+
     logger.info(` Pessoa ${id} editada em ${dispositivo.nome}`);
     return { dispositivo: dispositivo.nome, sucesso: true };
 
   } catch (error) {
     // Fila a atualização; duplicatas são ignoradas pelo índice único
-    await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message);
+    // await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message);
 
     logger.error(` Erro ao editar pessoa em ${dispositivo.nome}: ${error.message}`);
     return { dispositivo: dispositivo.nome, sucesso: false, erro: error.message };
@@ -214,7 +168,7 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, ca
 /**
  * Edita pessoa em todas as catracas (ou em uma específica) - PROCESSAMENTO PARALELO
  */
-const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = null) => {
+const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qrcode, dispositivoId = null) => {
   const catracaUserId = USER_ID_OFFSET + Number(id);
   const todosDispositivos = await listarTodos();
   
@@ -230,7 +184,7 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, dispositivoId = nu
 
   //  PROCESSAMENTO PARALELO
   const promessas = dispositivos.map(dispositivo =>
-    limit(() => processarEdicaoDispositivo(dispositivo, id, nome, cartao_rfid, catracaUserId))
+    limit(() => processarEdicaoDispositivo(dispositivo, id, nome, cartao_rfid, qrcode, catracaUserId))
   );
 
   const resultados = await Promise.all(promessas);
@@ -260,7 +214,7 @@ const processarDelecaoDispositivo = async (dispositivo, id, catracaUserId) => {
     const session = await obterSessao(link, dispositivo);
     
     if (!session) {
-      await registrarSyncPendente(id, dispositivo.id, 'DELETE', 'Sessão inválida');
+      // await registrarSyncPendente(id, dispositivo.id, 'DELETE', 'Sessão inválida');
       return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
     }
 
@@ -273,7 +227,7 @@ const processarDelecaoDispositivo = async (dispositivo, id, catracaUserId) => {
     return { dispositivo: dispositivo.nome, sucesso: true };
 
   } catch (error) {
-    await registrarSyncPendente(id, dispositivo.id, 'DELETE', error.message);
+    // await registrarSyncPendente(id, dispositivo.id, 'DELETE', error.message);
     logger.error(` Erro ao deletar pessoa em ${dispositivo.nome}: ${error.message}`);
     return { dispositivo: dispositivo.nome, sucesso: false, erro: error.message };
   }
@@ -455,8 +409,8 @@ module.exports = {
   criarImagemUsuario,
   generateQrCode,
   generateRFID,
-  registrarSyncPendente,
-  registrarSyncPendentesEmLote,
-  existeRegistroPendente,
-  existeRegistroPendentePorDispositivo
+  // registrarSyncPendente,
+  // registrarSyncPendentesEmLote,
+  // existeRegistroPendente,
+  // existeRegistroPendentePorDispositivo
 };

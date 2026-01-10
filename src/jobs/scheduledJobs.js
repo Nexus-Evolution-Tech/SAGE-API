@@ -5,7 +5,7 @@ const db = require('../config/database');
 
 // Job para verificar sincronizações pendentes
 const verificarSyncPendentesJob = () => {
-  const cronExpression = process.env.SYNC_CHECK_INTERVAL || '*/5 * * * *'; // A cada 5 minutos
+  const cronExpression = process.env.SYNC_CHECK_INTERVAL || '*/1 * * * *'; // A cada 1 minuto
 
   return cron.schedule(cronExpression, async () => {
         logger.info('Iniciando job de verificação de sincronizações pendentes');
@@ -71,18 +71,19 @@ const verificarSyncPendentesJob = () => {
           }
 
           // Processar ação
-          if (registro.action === 'CREATE') {
+          if (registro.operation === 'CREATE') {
             await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
             logger.info(` Pessoa ${pessoa.nome} criada (sync pendente)`);
-          } else if (registro.action === 'UPDATE') {
+          } else if (registro.operation === 'UPDATE') {
             await controlIdService.editarPessoaNasCatracas(
               pessoa.id,
               pessoa.nome,
               pessoa.cartao_rfid,
+              pessoa.qrcode,
               { dispositivoId: registro.dispositivo_id }
             );
             logger.info(` Pessoa ${pessoa.nome} atualizada (sync pendente)`);
-          } else if (registro.action === 'DELETE') {
+          } else if (registro.operation === 'DELETE') {
             await controlIdService.deletarPessoaDasCatracas(pessoa.id, { dispositivoId: registro.dispositivo_id });
             logger.info(` Pessoa ${pessoa.nome} deletada (sync pendente)`);
           }

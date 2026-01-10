@@ -99,8 +99,9 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     cartao_rfid VARCHAR(8) COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
     CONSTRAINT chk_rfid CHECK (REGEXP_LIKE(cartao_rfid, '^[0-9]{3}[0-9]{5}$')),
     senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',
-    data_nascimento DATE ,
-    tipo ENUM ('ALUNO', 'RESPONSAVEL', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM') ,
+    data_nascimento DATE,
+    tipo ENUM ('ALUNO', 'RESPONSAVEL', 'PROFESSOR', 'ADMINISTRADOR', 'TERCEIRIZADO', 'PROFADM'),
+    visivel BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
@@ -299,7 +300,7 @@ CREATE TABLE IF NOT EXISTS sync_pendente (
   pessoa_id INT NOT NULL,
   dispositivo_id INT NOT NULL,
   data_tentativa TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  action ENUM ('CREATE', 'UPDATE', 'DELETE'),
+  operation ENUM ('CREATE', 'UPDATE', 'DELETE'),
   FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id),
   FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id)
 );

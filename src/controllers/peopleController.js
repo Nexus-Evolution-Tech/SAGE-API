@@ -9,6 +9,7 @@ const db = require('../config/database');
 const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
 const { buscarPessoaBase } = require('../utils/people-db-utils');
 const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
+const registrarSyncPendente = require('../services/sync');
 
 // --- LISTAR (Sem alterações) ---
 const listar = async (req, res) => {
@@ -18,7 +19,7 @@ const listar = async (req, res) => {
 
   try {
     const pessoas = await buscarTodasPessoas(limit, offset);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa');
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE visivel = 1');
 
     res.json({
       data: ajustarFusoHorarioBrasil(pessoas),
@@ -40,12 +41,12 @@ const criar = async (req, res) => {
     const id = pessoaCriada.idPessoa;
     const pessoa = await buscarPessoaBase(id);
 
-    const novaPessoaParaCatraca = {
-      id: pessoa.id,
-      nome: pessoa.nome,
-      cartao_rfid: pessoa.cartao_rfid,
-      qrcode: pessoa.qr_code
-    };
+    // const novaPessoaParaCatraca = {
+    //   id: pessoa.id,
+    //   nome: pessoa.nome,
+    //   cartao_rfid: pessoa.cartao_rfid,
+    //   qrcode: pessoa.qr_code
+    // };
 
     res.status(201).json({
       message: 'Pessoa criada com sucesso',
@@ -54,11 +55,11 @@ const criar = async (req, res) => {
     });
 
     // 2. Sincroniza com catraca (em background - não bloqueia resposta)
-    if (pessoa.tipo !== 'RESPONSAVEL') {
-      controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca).catch(() => {
-        // Se falhar, já está registrado em sync_pendente para retry automático
-      });
-    }
+    // if (pessoa.tipo !== 'RESPONSAVEL') {
+    //   controlIdService.criarNovaPessoaNasCatracas(novaPessoaParaCatraca).catch(() => {
+    //     // Se falhar, já está registrado em sync_pendente para retry automático
+    //   });
+    // }
 
   } catch (error) {
     res.status(400).json({
@@ -110,7 +111,7 @@ const listarPorTipo = async (req, res) => {
 
   try {
     const pessoas = await peopleService.buscarPessoasPorTipo(tipo, limit, offset);
-    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE tipo = ?', [tipo]);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM Pessoa WHERE tipo = ? AND visivel = 1', [tipo]);
 
     res.json({
       data: ajustarFusoHorarioBrasil(pessoas),
@@ -133,13 +134,14 @@ const editar = async (req, res) => {
     await atualizarPessoaCompleta(id, req.body);
 
     // 2. Sincronização com catraca (em background - não bloqueia resposta)
-    if (req.body.nome || req.body.cartao_rfid) {
-      buscarPessoaBase(id).then(pessoaAtualizada => {
-        return controlIdService.editarPessoaNasCatracas(id, pessoaAtualizada.nome, pessoaAtualizada.cartao_rfid);
-      }).catch(() => {
-        // Se falhar, já está registrado em sync_pendente para retry automático
-      });
-    }
+    // if (req.body.nome || req.body.cartao_rfid) {
+    //   buscarPessoaBase(id).then(pessoaAtualizada => {
+    //     return controlIdService.editarPessoaNasCatracas(id, pessoaAtualizada.nome, pessoaAtualizada.cartao_rfid);
+    //   }).catch(() => {
+    //     // Se falhar, já está registrado em sync_pendente para retry automático
+    //   });
+    // }
+    await registrarSyncPendente(id, 'UPDATE'); // aqui esta funcionando como um service estendido, não é boas práticas, ta chamando direto o people-db-utils, mas e pra chamar tudo no peopleService (responsável pela regra de negócios)
 
     // 3. Retorna sucesso imediatamente
     res.json({ message: 'Pessoa atualizada com sucesso', sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
@@ -156,13 +158,16 @@ const deletar = async (req, res) => {
     // 1. Remove do banco local
     await removerPessoa(id);
 
+    await registrarSyncPendente(id, 'DELETE');
+
+    let resultados = { message: "Sincronização com catraca em background" };
     // 2. Sincronização com catraca
-    let resultados = { message: "Catraca não sincronizada" };
-    try {
-      resultados = await controlIdService.deletarPessoaDasCatracas(id);
-    } catch (errorCatraca) {
-      resultados = { error: errorCatraca.message };
-    }
+    // let resultados = { message: "Catraca não sincronizada" };
+    // try {
+    //   resultados = await controlIdService.deletarPessoaDasCatracas(id);
+    // } catch (errorCatraca) {
+    //   resultados = { error: errorCatraca.message };
+    // }
 
     res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
@@ -208,13 +213,16 @@ const uploadFoto = async (req, res) => {
     await peopleService.uploadFotoPessoa(req, res); 
     
     // Sincronização com catraca
-    if(req.file) {
-      try {
-        await criarImagemUsuario(req.params.id);
-      } catch (errorCatraca) {
-        // Ignora erro de sincronização
-      }
-    }
+    // if(req.file) {
+    //   try {
+    //     await criarImagemUsuario(req.params.id);
+    //   } catch (errorCatraca) {
+    //     // Ignora erro de sincronização
+    //   }
+    // }
+    // await registrarSyncPendente(req.params.id, 'UPLOAD_PHOTO'); - a partir do momento em que eu clico em salvar ja cadastra um UPDATE em sync_pendente
+
+    res.json({ message: 'Foto enviada com sucesso', file: req.file ? req.file.filename : null, sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
   } catch (error) {
     if (!res.headersSent) {
       res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
@@ -230,6 +238,8 @@ const gerarQrCode = async (req, res) => {
 
     const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
     await db.query(query, [data.qrcode, id]);
+
+    // await registrarSyncPendente(id, 'UPDATE'); - a partir do momento em que eu clico em salvar ja cadastra um UPDATE em sync_pendente
 
     res.json({ message: "QR Code gerado com sucesso", id, qr_code: data.qrcode });
   } catch (error) {

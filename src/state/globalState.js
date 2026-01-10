@@ -88,7 +88,7 @@ class GlobalState {
       adicionado_em: new Date(),
       tentativas: 0
     });
-    logger.info(`[STATE] Adicionado à fila: pessoa ${pendingSync.pessoa_id}, ação ${pendingSync.action}`);
+    logger.info(`[STATE] Adicionado à fila: pessoa ${pendingSync.pessoa_id}, ação ${pendingSync.operation}`);
   }
 
   /**

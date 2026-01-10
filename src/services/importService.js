@@ -3,7 +3,7 @@ const fs = require('fs');
 const peopleService = require('./peopleService');
 const db = require('../config/database');
 const { hashSenha } = require('../utils/criptografia');
-const { registrarSyncPendente, registrarSyncPendentesEmLote } = require('./controlIdService');
+const { registrarSyncPendente, registrarSyncPendentesEmLote } = require('./sync');
 const { listarTodos: listarDispositivos } = require('./deviceService');
 const logger = require('../config/logger');
 

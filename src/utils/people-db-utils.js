@@ -185,7 +185,7 @@ async function criarProfAdm(pessoaId, dados) {
 
 // Buscar todas as pessoas
 async function buscarTodasPessoas(limit, offset) {
-  const [pessoas] = await db.query('SELECT * FROM Pessoa LIMIT ? OFFSET ?', [limit, offset]);
+  const [pessoas] = await db.query('SELECT * FROM Pessoa WHERE visivel = 1 LIMIT ? OFFSET ?', [limit, offset]);
 
   const resultado = [];
 
@@ -227,7 +227,7 @@ async function buscarTodasPessoas(limit, offset) {
 
 async function buscarPorId(id) {
   // Consulta protegida contra SQL Injection
-  const [rows] = await db.query(`SELECT * FROM Pessoa WHERE id = ?`, [id]);
+  const [rows] = await db.query(`SELECT * FROM Pessoa WHERE id = ? AND visivel = 1`, [id]);
 
   const pessoa = rows[0]; // Pega o primeiro (e único) resultado
   if (!pessoa) {
@@ -362,11 +362,12 @@ async function atualizarPessoaCompleta(id, updates) {
 
 // Remover pessoa (incluindo nas tabelas filhas)
 async function removerPessoa(id) {
-  await db.query('DELETE FROM Aluno WHERE id = ?', [id]);
-  await db.query('DELETE FROM Professor WHERE id = ?', [id]);
-  await db.query('DELETE FROM Administrador WHERE id = ?', [id]);
-  await db.query('DELETE FROM Terceirizado WHERE id = ?', [id]);
-  await db.query('DELETE FROM Pessoa WHERE id = ?', [id]);
+  // await db.query('DELETE FROM Aluno WHERE id = ?', [id]);
+  // await db.query('DELETE FROM Professor WHERE id = ?', [id]);
+  // await db.query('DELETE FROM Administrador WHERE id = ?', [id]);
+  // await db.query('DELETE FROM Terceirizado WHERE id = ?', [id]);
+  // await db.query('DELETE FROM Pessoa WHERE id = ?', [id]);
+  await db.query('UPDATE Pessoa SET visivel = 0 WHERE id = ?', [id]);
 }
 
 module.exports = {

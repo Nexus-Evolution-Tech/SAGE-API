@@ -10,16 +10,16 @@ CREATE INDEX idx_dispositivo_status ON Dispositivo(status);
 
 -- Adicionar colunas na tabela sync_pendente
 ALTER TABLE sync_pendente
-ADD COLUMN error_message TEXT NULL AFTER action,
+ADD COLUMN error_message TEXT NULL AFTER operation,
 ADD COLUMN retry_count INT DEFAULT 0 AFTER error_message,
 ADD COLUMN last_attempt DATETIME NULL AFTER retry_count;
 
 -- Adicionar índices para melhorar performance
 CREATE INDEX idx_sync_pessoa_dispositivo ON sync_pendente(pessoa_id, dispositivo_id);
-CREATE INDEX idx_sync_action ON sync_pendente(action);
+CREATE INDEX idx_sync_operation ON sync_pendente(operation);
 CREATE INDEX idx_sync_created ON sync_pendente(created_at);
--- Evita duplicidade por pessoa/dispositivo/ação e elimina SELECTs de deduplicação na aplicação
-ALTER TABLE sync_pendente ADD UNIQUE KEY uniq_sync_pendente (pessoa_id, dispositivo_id, action);
+-- Evita duplicidade por pessoa/dispositivo/operação e elimina SELECTs de deduplicação na aplicação
+-- ALTER TABLE sync_pendente ADD UNIQUE KEY uniq_sync_pendente (pessoa_id, dispositivo_id, operation);
 
 -- Adicionar índices na tabela Acesso para melhorar performance
 CREATE INDEX idx_acesso_pessoa_data ON Acesso(pessoa_id, data_hora DESC);

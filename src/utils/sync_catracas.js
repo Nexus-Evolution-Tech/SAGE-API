@@ -33,11 +33,11 @@ async function verificarSyncPendentes(dispositivo) {
           .first();
         
         // Checar a ação (CREATE, UPDATE, DELETE)
-        if (registro.action === 'CREATE') {
+        if (registro.operation === 'CREATE') {
           await criarNovaPessoaNasCatracas(pessoa, { dispositivoId: dispositivo.id });
-        } else if (registro.action === 'UPDATE') {
+        } else if (registro.operation === 'UPDATE') {
           await editarPessoaNasCatracas(pessoa.id, pessoa.nome, pessoa.cartao_rfid, { dispositivoId: dispositivo.id });
-        } else if (registro.action === 'DELETE') {
+        } else if (registro.operation === 'DELETE') {
           await deletarPessoaDasCatracas(pessoa.id, { dispositivoId: dispositivo.id });
         }
 
