@@ -33,6 +33,8 @@ tags:
     description: Operações relacionadas às pessoas
   - name: Materias
     description: Operações relacionadas às matérias
+  - name: Salas
+    description: Operações relacionadas às salas e laboratórios
   - name: Aulas
     description: Operações relacionadas às aulas
   - name: Acessos
@@ -45,6 +47,90 @@ tags:
     description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
 
 paths:
+  /sala/:
+    get:
+      tags: [Salas]
+      summary: Lista todas as salas
+      responses:
+        '200':
+          description: Lista de salas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sala'
+    post:
+      tags: [Salas]
+      summary: Cria uma nova sala
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sala'
+            example:
+              numero: "101"
+              nome: "Laboratório de Informática"
+              capacidade: 30
+              unidade_id: 1
+      responses:
+        '201':
+          description: Sala criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+  /sala/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Salas]
+      summary: Retorna uma sala pelo ID
+      responses:
+        '200':
+          description: Sala encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+        '404':
+          description: Sala não encontrada
+    patch:
+      tags: [Salas]
+      summary: Atualiza uma sala
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sala'
+            example:
+              numero: "102"
+              nome: "Laboratório de Ciências"
+              capacidade: 25
+              unidade_id: 1
+      responses:
+        '200':
+          description: Sala atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+        '404':
+          description: Sala não encontrada
+    delete:
+      tags: [Salas]
+      summary: Remove uma sala
+      responses:
+        '204':
+          description: Sala deletada
+        '404':
+          description: Sala não encontrada
   /monitoring/sync-db:
     get:
       tags: [Monitoramento]
@@ -2720,3 +2806,6 @@ components:
           type: string
         horario_chegada:
           type: string
+
+    Sala:
+      type: object

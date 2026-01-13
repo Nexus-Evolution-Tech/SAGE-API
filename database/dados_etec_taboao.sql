@@ -26,7 +26,7 @@ INSERT INTO sage.turma (nome, turno, curso_id, unidade_id) VALUES
 ("1º A - TI-N - Informática", "NOTURNO", 4, 1),
 ("3º A - TDS-N Desenvolvimento de Sistemas", "NOTURNO", 5, 1);
 
-INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial) VALUES
+INSERT INTO sage.dispositivo (nome, modelo, endereco, porta, usuario, senha, numero_serial) VALUES
 ("Catraca 01", "IDBlock", "192.168.0.126", "80", "admin", "admin", "0K0410/0011BC"),
 ("Catraca 02", "IDBlock", "192.168.0.127", "82", "admin", "admin", "0K0410/00177E");
 
@@ -277,9 +277,9 @@ INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, di
 ("I. WEB - ?", NULL, 7, 44, "18:10:00", "19:00:00", "TERCA", "DIV B"),
 ("EF - Harry", 878, 7, 42, "19:00:00", "20:40:00", "TERÇA", "DIV A/B"),
 ("LP - Débora", 870, 7, 33, "21:00:00", "22:40:00", "TERÇA", "DIV A/B"),
-("FI - Rafael - EAD", 194, 7, 45, "22:40:00", "00:20:00", "TERÇA", "DIV A/B"),
+("FI - Rafael - EAD", 894, 7, 45, "22:40:00", "00:20:00", "TERÇA", "DIV A/B"),
 ("Etica - Flávia", 875, 7, 43, "18:10:00", "19:00:00", "QUARTA", "DIV A"),
-("A.D. - Joelane", 35, 7, 46, "19:00:00", "20:40:00", "QUARTA", "DIV A"),
+("A.D. - Joelane", NULL, 7, 46, "19:00:00", "20:40:00", "QUARTA", "DIV A"),
 ("A.D. - Lucas", 886, 7, 46, "19:00:00", "20:40:00", "QUARTA", "DIV B"),
 ("Química - Flávia", 875, 7, 37, "21:00:00", "22:40:00", "QUARTA", "DIV A/B"),
 ("Mat - Thiago", 901, 7, 34, "18:10:00", "20:40:00", "QUINTA", "DIV A/B"),
@@ -289,22 +289,22 @@ INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, di
 ("P.A. - Acássio", 863, 7, 48, "18:10:00", "19:00:00", "SEXTA", "DIV B"),
 ("LP - Débora", 870, 7, 33, "21:00:00", "21:50:00", "SEXTA", "DIV A/B"),
 ("Inglês - Fabiana - EAD", 873, 7, 40, "22:40:00", "00:20:00", "TERÇA", "DIV A/B"),
-("Biologia - Rafael - EAD", 195, 7, 36, "00:20:00", "02:00:00", "TERÇA", "DIV A/B");
+("Biologia - Rafael - EAD", 895, 7, 36, "00:20:00", "02:00:00", "TERÇA", "DIV A/B");
 
 -- 1º B - MTec-N Informática para Internet
 INSERT INTO sage.aula (nome, professor_id, turma_id, materia_id, inicio, fim, dia_semana, divisao) VALUES
 ("EF - Harry", 878, 8, 42, "18:10:00", "19:00:00", "SEGUNDA", "DIV A/B"),
 ("Arte - Josiane", 881, 8, 41, "19:00:00", "20:40:00", "SEGUNDA", "DIV A/B"),
 ("PC - Daniel", 869, 8, 49, "21:00:00", "22:40:00", "SEGUNDA", "DIV A"),
-("PC - Gleyce", 32, 8, 49, "21:00:00", "22:40:00", "SEGUNDA", "DIV B"),
-("M.B.D. - Francisco - EAD", 2, 8, 49, "22:40:00", "00:20:00", "SEGUNDA", "DIV B"),
+("PC - Gleyce", NULL, 8, 49, "21:00:00", "22:40:00", "SEGUNDA", "DIV B"),
+("M.B.D. - Francisco - EAD", NULL, 8, 49, "22:40:00", "00:20:00", "SEGUNDA", "DIV B"),
 ("EF - Harry", 878, 8, 42, "18:10:00", "19:00:00", "TERÇA", "DIV A/B"),
 ("Física - Jean", 880, 8, 35, "19:00:00", "20:40:00", "TERÇA", "DIV A/B"),
 ("O.C.A. - Lucas", 886, 8, 51, "21:00:00", "22:40:00", "TERÇA", "DIV A"),
 ("O.C.A. - Daniel", 869, 8, 51, "21:00:00", "22:40:00", "TERÇA", "DIV B"),
 ("Mat - Thiago", 901, 8, 34, "18:10:00", "20:40:00", "QUARTA", "DIV A/B"),
 ("SU - Lucas", 886, 8, 52, "21:00:00", "22:40:00", "QUARTA", "DIV A"),
-("SU - Felipe", 37, 8, 52, "21:00:00", "22:40:00", "QUARTA", "DIV B"),
+("SU - Felipe", NULL, 8, 52, "21:00:00", "22:40:00", "QUARTA", "DIV B"),
 ("Quí - Flávia", 875, 8, 37, "18:10:00", "19:50:00", "QUINTA", "DIV A/B"),
 ("Geo - Marcos Lisa", 890, 8, 39, "19:50:00", "21:50:00", "QUINTA", "DIV A/B"),
 ("História - Diego - EAD", 871, 8, 38, "22:40:00", "00:20:00", "QUINTA", "DIV A/B"),

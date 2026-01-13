@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS Atraso (
 CREATE TABLE IF NOT EXISTS Responsavel (
     id INT PRIMARY KEY,
     aluno_id INT,
-    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE
+    FOREIGN KEY (id) REFERENCES Pessoa(id) ON DELETE CASCADE -- ATENÇÃO: quando ficar invisível, precisa fazer o soft delete do responsável também
 );
 
 CREATE TABLE IF NOT EXISTS Aluno (
@@ -185,6 +185,8 @@ CREATE TABLE IF NOT EXISTS Administrador (
 
 CREATE TABLE IF NOT EXISTS Sala (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    unidade_id INT,
+    FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL,
     numero VARCHAR(50) NOT NULL COMMENT 'Número ou identificador da sala',
     nome VARCHAR(100) NULL COMMENT 'Nome descritivo da sala',
     capacidade INT NULL COMMENT 'Capacidade de alunos',
@@ -312,22 +314,24 @@ BEGIN
     DECLARE v_atualizados INT DEFAULT 0;
     DECLARE v_desligados INT DEFAULT 0;
 
-    -- Desliga alunos que estão em turmas finais
+    -- Primeiro UPDATE: Desligamento (Soft Delete)
     UPDATE Aluno a
     JOIN Pessoa p ON a.id = p.id
-    SET a.status = 'CANCELADO', p.updated_at = NOW() -- o SET ocorre depois do WHERE ser avaliado
+    SET a.status = 'CANCELADO', 
+        p.updated_at = NOW(), 
+        p.visivel = FALSE  -- Removido o segundo SET e adicionada a vírgula
     WHERE p.tipo = 'ALUNO'
       AND a.status = 'EM CURSO'
       AND YEAR(p.updated_at) < YEAR(CURDATE())
       AND a.turma_id IN (5, 6, 8, 9);
 
-    SET v_desligados = ROW_COUNT(); -- pega quantos foram desligados
+    SET v_desligados = ROW_COUNT();
 
-    -- Atualiza turma conforme regras definidas
+    -- Segundo UPDATE: Promoção de Turmas
     UPDATE Aluno a
     JOIN Pessoa p ON a.id = p.id
     SET 
-        a.turma_id = CASE 
+        a.turma_id = CASE
                         WHEN a.turma_id = 1 THEN 3
                         WHEN a.turma_id = 2 THEN 4
                         WHEN a.turma_id = 3 THEN 5
@@ -341,9 +345,8 @@ BEGIN
       AND YEAR(p.updated_at) < YEAR(CURDATE())
       AND a.turma_id IN (1, 2, 3, 4, 7);
 
-    SET v_atualizados = ROW_COUNT(); -- pega quantos foram atualizados   
-
-END$$
+    SET v_atualizados = ROW_COUNT();
+END $$
 
 DELIMITER ;
 
