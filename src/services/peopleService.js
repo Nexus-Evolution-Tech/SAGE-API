@@ -6,6 +6,7 @@ const {
   criarAdministrador,
   criarTerceirizado,
   criarProfAdm,
+  atualizarPessoaCompleta,
   buscarAluno,
   buscarResponsavel,
   buscarProfessor,
@@ -23,103 +24,89 @@ const registrarSyncPendente = require('../services/sync');
 /**
  * Verifica se já existe uma pessoa com os documentos fornecidos
  */
-async function verificarDuplicidade(dados) {
+async function buscarPessoaExistente(dados) {
   const { cpf, rg, email, cartao_rfid, ra } = dados;
   const checks = [];
   const params = [];
 
-  // 1. Verificação na tabela Pessoa (CPF, RG, Email, Cartão RFID)
+  // 1. Verificação na tabela Pessoa (Prioridade para documentos únicos)
   if (cpf) { checks.push('cpf = ?'); params.push(cpf); }
   if (rg) { checks.push('rg = ?'); params.push(rg); }
   if (email) { checks.push('email = ?'); params.push(email); }
   if (cartao_rfid) { checks.push('cartao_rfid = ?'); params.push(cartao_rfid); }
 
   if (checks.length > 0) {
-    const sqlPessoa = `SELECT nome FROM Pessoa WHERE ${checks.join(' OR ')} LIMIT 1`;
+    const sqlPessoa = `SELECT id FROM Pessoa WHERE ${checks.join(' OR ')} LIMIT 1`;
     const [rowsPessoa] = await db.query(sqlPessoa, params);
-    if (rowsPessoa.length > 0) {
-      throw new Error(`Conflito de dados: Pessoa já cadastrada com este CPF/RG/Email (Nome: ${rowsPessoa[0].nome})`);
-    }
+    if (rowsPessoa.length > 0) return rowsPessoa[0].id;
   }
 
-  // 2. Verificação específica de Aluno (RA)
+  // 2. Verificação específica de Aluno (RA) caso não tenha achado na Pessoa
   if (ra) {
     const [rowsAluno] = await db.query('SELECT id FROM Aluno WHERE ra = ? LIMIT 1', [ra]);
-    if (rowsAluno.length > 0) {
-      throw new Error(`Conflito de dados: Já existe um aluno cadastrado com o RA ${ra}`);
-    }
+    if (rowsAluno.length > 0) return rowsAluno[0].id;
   }
+
+  return null;
 }
 
+// Upsert = Update or Insert -> se ele identificar uma pessoa existente, ele atualiza, senão cria uma nova (isso é fundamental para o bot da planilha)
 async function criarPessoaCompleta(dados) {
   const {
     nome, foto, rg, cpf, telefone, email, data_nascimento,
-    genero, tipo, ...camposExtras
+    tipo, ...camposExtras
   } = dados;
 
-  // --- NOVA VERIFICAÇÃO DIRETAMENTE NO SERVICE ---
-  // Isso impede que a importação ou o cadastro manual criem duplicatas
-  await verificarDuplicidade({ 
-    cpf, 
-    rg, 
-    email,
-    cartao_rfid: camposExtras.cartao_rfid,
-    ra: camposExtras.ra // campo extra caso seja aluno
+  // Tenta encontrar ID existente por CPF/RG/Email/RFID ou RA
+  const idExistente = await buscarPessoaExistente({ 
+    cpf, rg, email, cartao_rfid: camposExtras.cartao_rfid, ra: camposExtras.ra 
   });
 
-  // 1. Criar Pessoa
+  if (idExistente) {
+    console.log(`Pessoa encontrada (ID: ${idExistente}). Atualizando dados...`);
+    
+    // Chamamos sua função de atualização enviando todos os dados recebidos
+    await atualizarPessoaCompleta(idExistente, {
+      nome, foto, rg, cpf, telefone, email, data_nascimento, ...camposExtras
+    });
+
+    // Registrar sincronismo de atualização (UPDATE)
+    await registrarSyncPendente(idExistente, 'UPDATE');
+    
+    return { idPessoa: idExistente, tipoCriado: tipo, status: 'ATUALIZADO' };
+  }
+
+  // --- SE NÃO EXISTIR, SEGUE O FLUXO ORIGINAL DE CRIAÇÃO ---
+  
   const pessoa = await criarPessoaBase({
-    nome,
-    foto,
-    rg,
-    cpf,
-    telefone,
-    email,
+    nome, foto, rg, cpf, telefone, email, tipo,
     unidade_id: camposExtras.unidade_id || null,
     qr_code: camposExtras.qr_code || null,
     cartao_rfid: camposExtras.cartao_rfid || null,
     senha_acesso: camposExtras.senha_acesso ? await hashSenha(camposExtras.senha_acesso) : null,
-    data_nascimento,
-    tipo
+    data_nascimento
   });
 
   const idPessoa = pessoa.id;
 
-  // 2. Se não for aluno nem responsável, criar Funcionario
+  // Lógica de tabelas secundárias (Funcionario, Aluno, etc)
   const tiposFuncionario = ['PROFESSOR', 'ADMINISTRADOR', 'PROFADM', 'TERCEIRIZADO'];
   if (tiposFuncionario.includes(tipo)) {
-    await criarFuncionarioBase(idPessoa, camposExtras)
+    await criarFuncionarioBase(idPessoa, camposExtras);
   }
 
-  // 3. Criar tipo específico
   switch (tipo) {
-    case 'ALUNO':
-      await criarAluno(idPessoa, camposExtras);
-      break;
-    case 'RESPONSAVEL':
-      await criarResponsavel(idPessoa, camposExtras);
-      break;
-    case 'PROFESSOR':
-      await criarProfessor(idPessoa, camposExtras);
-      break;
-    case 'ADMINISTRADOR':
-      await criarAdministrador(idPessoa, camposExtras);
-      break;
-    case 'TERCEIRIZADO':
-      await criarTerceirizado(idPessoa, camposExtras);
-      break;
-    case 'PROFADM':
-      await criarProfAdm(idPessoa, camposExtras);
-      break;
-    default:
-      throw new Error('Tipo de pessoa inválido');
+    case 'ALUNO': await criarAluno(idPessoa, camposExtras); break;
+    case 'RESPONSAVEL': await criarResponsavel(idPessoa, camposExtras); break;
+    case 'PROFESSOR': await criarProfessor(idPessoa, camposExtras); break;
+    case 'ADMINISTRADOR': await criarAdministrador(idPessoa, camposExtras); break;
+    case 'TERCEIRIZADO': await criarTerceirizado(idPessoa, camposExtras); break;
+    case 'PROFADM': await criarProfAdm(idPessoa, camposExtras); break;
+    default: throw new Error('Tipo de pessoa inválido');
   }
 
-  // 4. Registrar sync pendente para todas as catracas
-  // Importante: registrarSyncPendente já deve lidar com a lista de dispositivos interna
   await registrarSyncPendente(idPessoa, 'CREATE');
-
-  return { idPessoa, tipoCriado: tipo };
+  return { idPessoa, tipoCriado: tipo, status: 'CRIADO' };
 }
 
 // Converte "HH:mm" para minutos
