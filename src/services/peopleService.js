@@ -20,11 +20,52 @@ const path = require('path');
 const fs = require('fs');
 const registrarSyncPendente = require('../services/sync');
 
+/**
+ * Verifica se já existe uma pessoa com os documentos fornecidos
+ */
+async function verificarDuplicidade(dados) {
+  const { cpf, rg, email, cartao_rfid, ra } = dados;
+  const checks = [];
+  const params = [];
+
+  // 1. Verificação na tabela Pessoa (CPF, RG, Email, Cartão RFID)
+  if (cpf) { checks.push('cpf = ?'); params.push(cpf); }
+  if (rg) { checks.push('rg = ?'); params.push(rg); }
+  if (email) { checks.push('email = ?'); params.push(email); }
+  if (cartao_rfid) { checks.push('cartao_rfid = ?'); params.push(cartao_rfid); }
+
+  if (checks.length > 0) {
+    const sqlPessoa = `SELECT nome FROM Pessoa WHERE ${checks.join(' OR ')} LIMIT 1`;
+    const [rowsPessoa] = await db.query(sqlPessoa, params);
+    if (rowsPessoa.length > 0) {
+      throw new Error(`Conflito de dados: Pessoa já cadastrada com este CPF/RG/Email (Nome: ${rowsPessoa[0].nome})`);
+    }
+  }
+
+  // 2. Verificação específica de Aluno (RA)
+  if (ra) {
+    const [rowsAluno] = await db.query('SELECT id FROM Aluno WHERE ra = ? LIMIT 1', [ra]);
+    if (rowsAluno.length > 0) {
+      throw new Error(`Conflito de dados: Já existe um aluno cadastrado com o RA ${ra}`);
+    }
+  }
+}
+
 async function criarPessoaCompleta(dados) {
   const {
     nome, foto, rg, cpf, telefone, email, data_nascimento,
     genero, tipo, ...camposExtras
   } = dados;
+
+  // --- NOVA VERIFICAÇÃO DIRETAMENTE NO SERVICE ---
+  // Isso impede que a importação ou o cadastro manual criem duplicatas
+  await verificarDuplicidade({ 
+    cpf, 
+    rg, 
+    email,
+    cartao_rfid: camposExtras.cartao_rfid,
+    ra: camposExtras.ra // campo extra caso seja aluno
+  });
 
   // 1. Criar Pessoa
   const pessoa = await criarPessoaBase({
@@ -74,7 +115,8 @@ async function criarPessoaCompleta(dados) {
       throw new Error('Tipo de pessoa inválido');
   }
 
-  //4. Registrar sync pendente para todas as catracas
+  // 4. Registrar sync pendente para todas as catracas
+  // Importante: registrarSyncPendente já deve lidar com a lista de dispositivos interna
   await registrarSyncPendente(idPessoa, 'CREATE');
 
   return { idPessoa, tipoCriado: tipo };
