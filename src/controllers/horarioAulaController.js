@@ -3,7 +3,7 @@ const db = require("../config/database");
 // -----------------------------
 // Normalização de dia da semana
 // -----------------------------
-const DIA_DB = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'];
+const DIA_DB = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
 
 function toDbDiaSemana(value) {
   if (!value) return null;
@@ -20,6 +20,19 @@ function toApiDiaSemana(dbValue) {
 }
 
 // -----------------------------
+// Normalização de divisão
+// -----------------------------
+function normalizeDivisao(value) {
+  if (!value) return null;
+  const v = String(value).toUpperCase().trim();
+  if (v === 'A' || v === 'DIV A') return 'DIV A';
+  if (v === 'B' || v === 'DIV B') return 'DIV B';
+  if (v === 'A/B' || v === 'DIV A/B') return 'DIV A/B';
+  if (v === 'INT') return 'INT';
+  return v;
+}
+
+// -----------------------------
 // Controller
 // -----------------------------
 const horarioAulaController = {
@@ -29,13 +42,15 @@ const horarioAulaController = {
   // ------------------------------------
   async listar(req, res) {
     try {
-      const { turmaId, diaSemana } = req.query;
+      const { turmaId, diaSemana, divisao } = req.query;
+      const div = normalizeDivisao(divisao);
 
       let sql = `
         SELECT
           ha.id,
           ha.turma_id,
           ha.aula_id,
+          ha.divisao,
           ha.dia_semana,
           ha.inicio,
           ha.fim,
@@ -61,9 +76,14 @@ const horarioAulaController = {
         params.push(diaDb);
       }
 
+      if (div) {
+        sql += ' AND (ha.divisao = ? OR ha.divisao = "INT")';
+        params.push(div);
+      }
+
       sql += `
         ORDER BY
-          FIELD(ha.dia_semana, 'SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA'),
+          FIELD(ha.dia_semana, 'DOMINGO','SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SABADO'),
           ha.inicio
       `;
 
@@ -73,6 +93,7 @@ const horarioAulaController = {
         id: r.id,
         turmaId: r.turma_id,
         aulaId: r.aula_id,
+        divisao: r.divisao,
         diaSemana: toApiDiaSemana(r.dia_semana),
         inicio: r.inicio,
         fim: r.fim,
@@ -94,7 +115,7 @@ const horarioAulaController = {
   // ------------------------------------
   async criar(req, res) {
     try {
-      const { turmaId, aulaId, diaSemana, inicio, fim, salaId } = req.body;
+      let { turmaId, aulaId, diaSemana, divisao, inicio, fim, salaId } = req.body;
 
       if (!turmaId || !aulaId || !diaSemana || !inicio || !fim) {
         return res.status(400).json({
@@ -103,6 +124,8 @@ const horarioAulaController = {
       }
 
       const diaDb = toDbDiaSemana(diaSemana);
+      const div = normalizeDivisao(divisao) || 'INT';
+
       if (!diaDb) {
         return res.status(400).json({ message: 'Dia da semana inválido' });
       }
@@ -114,24 +137,25 @@ const horarioAulaController = {
         FROM HorarioAula
         WHERE turma_id = ?
           AND dia_semana = ?
+          AND divisao = ?
           AND NOT (fim <= ? OR inicio >= ?)
         `,
-        [turmaId, diaDb, inicio, fim]
+        [turmaId, diaDb, div, inicio, fim]
       );
 
       if (conflito.length > 0) {
         return res.status(409).json({
-          message: 'Conflito de horário para a turma'
+          message: 'Conflito de horário para a turma/divisão'
         });
       }
 
       const [result] = await db.query(
         `
         INSERT INTO HorarioAula
-          (turma_id, aula_id, dia_semana, inicio, fim, sala_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+          (turma_id, aula_id, dia_semana, divisao, inicio, fim, sala_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         `,
-        [turmaId, aulaId, diaDb, inicio, fim, salaId || null]
+        [turmaId, aulaId, diaDb, div, inicio, fim, salaId || null]
       );
 
       res.status(201).json({ id: result.insertId });
@@ -148,7 +172,7 @@ const horarioAulaController = {
   async editar(req, res) {
     try {
       const { id } = req.params;
-      const { turmaId, aulaId, diaSemana, inicio, fim, salaId } = req.body;
+      let { turmaId, aulaId, diaSemana, divisao, inicio, fim, salaId } = req.body;
 
       const [existe] = await db.query(
         'SELECT * FROM HorarioAula WHERE id = ?',
@@ -165,9 +189,8 @@ const horarioAulaController = {
       const novoAulaId  = aulaId ?? atual.aula_id;
       const novoInicio  = inicio ?? atual.inicio;
       const novoFim     = fim ?? atual.fim;
-      const novoDia     = diaSemana
-        ? toDbDiaSemana(diaSemana)
-        : atual.dia_semana;
+      const novoDia     = diaSemana ? toDbDiaSemana(diaSemana) : atual.dia_semana;
+      const novoDiv     = normalizeDivisao(divisao) ?? atual.divisao;
 
       if (!novoDia) {
         return res.status(400).json({ message: 'Dia da semana inválido' });
@@ -179,15 +202,16 @@ const horarioAulaController = {
         FROM HorarioAula
         WHERE turma_id = ?
           AND dia_semana = ?
+          AND divisao = ?
           AND id != ?
           AND NOT (fim <= ? OR inicio >= ?)
         `,
-        [novoTurmaId, novoDia, id, novoInicio, novoFim]
+        [novoTurmaId, novoDia, novoDiv, id, novoInicio, novoFim]
       );
 
       if (conflito.length > 0) {
         return res.status(409).json({
-          message: 'Conflito de horário para a turma'
+          message: 'Conflito de horário para a turma/divisão'
         });
       }
 
@@ -198,6 +222,7 @@ const horarioAulaController = {
           turma_id = ?,
           aula_id = ?,
           dia_semana = ?,
+          divisao = ?,
           inicio = ?,
           fim = ?,
           sala_id = ?,
@@ -208,6 +233,7 @@ const horarioAulaController = {
           novoTurmaId,
           novoAulaId,
           novoDia,
+          novoDiv,
           novoInicio,
           novoFim,
           salaId ?? atual.sala_id,
@@ -228,13 +254,15 @@ const horarioAulaController = {
   // ------------------------------------
   async validar(req, res) {
     try {
-      const { turmaId, diaSemana, inicio, fim, horarioIdExcluir } = req.body;
+      let { turmaId, diaSemana, divisao, inicio, fim, horarioIdExcluir } = req.body;
 
       if (!turmaId || !diaSemana || !inicio || !fim) {
         return res.status(400).json({ message: 'Dados obrigatórios ausentes' });
       }
 
       const diaDb = toDbDiaSemana(diaSemana);
+      const div = normalizeDivisao(divisao) || 'INT';
+
       if (!diaDb) {
         return res.status(400).json({ message: 'Dia da semana inválido' });
       }
@@ -244,9 +272,10 @@ const horarioAulaController = {
         FROM HorarioAula
         WHERE turma_id = ?
           AND dia_semana = ?
+          AND divisao = ?
           AND NOT (fim <= ? OR inicio >= ?)
       `;
-      const params = [turmaId, diaDb, inicio, fim];
+      const params = [turmaId, diaDb, div, inicio, fim];
 
       if (horarioIdExcluir) {
         sql += ' AND id != ?';

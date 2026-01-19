@@ -8,17 +8,6 @@ function parseId(id) {
   return isNaN(parsed) ? null : parsed;
 }
 
-// Normalização de divisão
-function normalizeDivisao(value) {
-  if (!value) return null;
-  const v = String(value).toUpperCase().trim();
-  if (v === 'A' || v === 'DIV A') return 'DIV A';
-  if (v === 'B' || v === 'DIV B') return 'DIV B';
-  if (v === 'A/B' || v === 'DIV A/B') return 'DIV A/B';
-  if (v === 'INT') return 'INT';
-  return v;
-}
-
 const lessonController = {
 
   // --------------------------------------------------
@@ -35,7 +24,6 @@ const lessonController = {
           a.professor_id AS professorId,
           a.materia_id AS materiaId,
           a.sala_padrao_id AS salaPadraoId,
-          a.divisao,
           a.observacao,
           a.created_at AS createdAt,
           a.updated_at AS updatedAt
@@ -69,14 +57,12 @@ const lessonController = {
       professorId,
       materiaId,
       salaPadraoId,
-      divisao = 'INT',
       observacao
     } = req.body;
 
     professorId = parseId(professorId);
     materiaId = parseId(materiaId);
     salaPadraoId = parseId(salaPadraoId);
-    divisao = normalizeDivisao(divisao);
 
     if (!nome) {
       return res.status(400).json({ message: 'nome é obrigatório' });
@@ -110,15 +96,14 @@ const lessonController = {
       const [result] = await db.query(
         `
         INSERT INTO Aula
-          (nome, professor_id, materia_id, sala_padrao_id, divisao, observacao)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (nome, professor_id, materia_id, sala_padrao_id, observacao)
+        VALUES (?, ?, ?, ?, ?)
         `,
         [
           nome,
           professorId,
           materiaId,
           salaPadraoId,
-          divisao,
           observacao || null
         ]
       );
@@ -131,7 +116,6 @@ const lessonController = {
           professor_id AS professorId,
           materia_id AS materiaId,
           sala_padrao_id AS salaPadraoId,
-          divisao,
           observacao,
           created_at AS createdAt,
           updated_at AS updatedAt
@@ -158,14 +142,12 @@ const lessonController = {
       professorId,
       materiaId,
       salaPadraoId,
-      divisao,
       observacao
     } = req.body;
 
     professorId = parseId(professorId);
     materiaId = parseId(materiaId);
     salaPadraoId = parseId(salaPadraoId);
-    divisao = normalizeDivisao(divisao);
 
     try {
       const campos = [];
@@ -203,11 +185,6 @@ const lessonController = {
       if (salaPadraoId !== undefined) {
         campos.push('sala_padrao_id = ?');
         valores.push(salaPadraoId);
-      }
-
-      if (divisao !== undefined) {
-        campos.push('divisao = ?');
-        valores.push(divisao);
       }
 
       if (observacao !== undefined) {
@@ -257,14 +234,13 @@ const lessonController = {
   },
 
   // --------------------------------------------------
-  // GET /aulas/horarios/:turma_id/:divisao  (COMPAT)
+  // GET /aulas/horarios/:turma_id  (COMPAT)
   // --------------------------------------------------
   async getHorariosPorTurma(req, res) {
-    const { turma_id, divisao } = req.params;
+    const { turma_id } = req.params;
     const turmaId = parseId(turma_id);
-    const div = normalizeDivisao(divisao);
 
-    if (!turmaId || !div) {
+    if (!turmaId) {
       return res.status(400).json({ message: 'Parâmetros inválidos' });
     }
 
@@ -274,17 +250,15 @@ const lessonController = {
         SELECT
           a.id AS aulaId,
           a.nome,
-          a.divisao,
           h.dia_semana AS diaSemana,
           h.inicio,
           h.fim
         FROM HorarioAula h
         JOIN Aula a ON a.id = h.aula_id
         WHERE h.turma_id = ?
-          AND (a.divisao = 'INT' OR a.divisao = ?)
         ORDER BY h.dia_semana, h.inicio
         `,
-        [turmaId, div]
+        [turmaId]
       );
 
       res.json(rows || []);
