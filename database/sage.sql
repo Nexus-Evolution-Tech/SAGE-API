@@ -107,17 +107,6 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS Horario (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    pessoa_id INT ,
-    dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') ,
-    entrada TIME,
-    saida TIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS Atraso (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pessoa_id INT NOT NULL,
@@ -237,40 +226,41 @@ CREATE TABLE IF NOT EXISTS Terceirizado (
 
 CREATE TABLE IF NOT EXISTS Aula (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(50) ,
+    nome VARCHAR(50) NOT NULL,
     professor_id INT,
-    turma_id INT,
     materia_id INT,
-    sala_padrao_id INT NULL,
-    inicio TIME ,
-    fim TIME ,
-    dia_semana ENUM ('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') ,
-    divisao ENUM ('INT', 'DIV A', 'DIV B', 'DIV A/B') ,
+    divisao ENUM('INT', 'DIV A', 'DIV B', 'DIV A/B') NOT NULL,
     observacao VARCHAR(255) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (professor_id) REFERENCES Professor(id) ON DELETE SET NULL,
-    FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE SET NULL,
     FOREIGN KEY (materia_id) REFERENCES Materia(id) ON DELETE SET NULL,
-    FOREIGN KEY (sala_padrao_id) REFERENCES Sala(id) ON DELETE SET NULL
-);
+    INDEX idx_professor (professor_id),
+    INDEX idx_materia (materia_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabela de agendamento de aulas (separa a associação Aula x Turma x Horário)
 CREATE TABLE IF NOT EXISTS HorarioAula (
     id INT AUTO_INCREMENT PRIMARY KEY,
     turma_id INT NOT NULL,
     aula_id INT NOT NULL,
-    dia_semana ENUM ('SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA') NOT NULL,
-    horario TIME NOT NULL,
+    dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    inicio TIME NOT NULL,
+    fim TIME NOT NULL,
     sala_id INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (turma_id) REFERENCES Turma(id) ON DELETE CASCADE,
     FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
     FOREIGN KEY (sala_id) REFERENCES Sala(id) ON DELETE SET NULL,
-    UNIQUE KEY idx_horario_turma_dia_hora (turma_id, dia_semana, horario),
-    INDEX idx_horario_sala (sala_id),
-    INDEX idx_horario_dia_hora (dia_semana, horario)
+    
+    -- Restrições de unicidade e integridade
+    UNIQUE KEY uq_turma_dia_inicio (turma_id, dia_semana, inicio),
+    
+    -- Índices para pesquisas frequentes
+    INDEX idx_turma_dia (turma_id, dia_semana),
+    INDEX idx_dia_inicio (dia_semana, inicio),
+    INDEX idx_sala (sala_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS Acesso (

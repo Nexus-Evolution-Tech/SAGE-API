@@ -1,183 +1,200 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
 
-// Helper para converter IDs string → number
+// Helper
 function parseId(id) {
-  if (!id || id === 'null' || id === 'undefined') return null;
+  if (id === undefined || id === null || id === 'null') return null;
   const parsed = parseInt(id);
   return isNaN(parsed) ? null : parsed;
 }
 
+// Normalização de divisão
+function normalizeDivisao(value) {
+  if (!value) return null;
+  const v = String(value).toUpperCase().trim();
+  if (v === 'A' || v === 'DIV A') return 'DIV A';
+  if (v === 'B' || v === 'DIV B') return 'DIV B';
+  if (v === 'A/B' || v === 'DIV A/B') return 'DIV A/B';
+  if (v === 'INT') return 'INT';
+  return v;
+}
+
 const lessonController = {
-  // GET /aulas?search=texto - Lista catalogo de aulas (SEM turmaIds)
+
+  // --------------------------------------------------
+  // GET /aulas
+  // --------------------------------------------------
   async listar(req, res) {
     const { search } = req.query;
 
     try {
-      let query = `SELECT a.id, a.nome, 
-                           a.professor_id AS professorId, 
-                           a.materia_id AS materiaId,
-                           a.sala_padrao_id AS salaPadraoId,
-                           a.divisao, 
-                           a.observacao,
-                           a.created_at AS createdAt, 
-                           a.updated_at AS updatedAt
-                    FROM Aula a
-                    WHERE a.turma_id IS NULL AND a.inicio IS NULL`;
+      let sql = `
+        SELECT
+          a.id,
+          a.nome,
+          a.professor_id AS professorId,
+          a.materia_id AS materiaId,
+          a.sala_padrao_id AS salaPadraoId,
+          a.divisao,
+          a.observacao,
+          a.created_at AS createdAt,
+          a.updated_at AS updatedAt
+        FROM Aula a
+        WHERE 1 = 1
+      `;
+
       const params = [];
 
       if (search) {
-        query += ` AND a.nome LIKE ?`;
+        sql += ' AND a.nome LIKE ?';
         params.push(`%${search}%`);
       }
 
-      query += ` ORDER BY a.nome`;
+      sql += ' ORDER BY a.nome';
 
-      const [aulas] = await db.query(query, params);
-
-      res.json(aulas || []);
+      const [rows] = await db.query(sql, params);
+      res.json(rows || []);
     } catch (error) {
       logger.error(`Erro ao listar aulas: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao listar aulas', error: error.message });
+      res.status(500).json({ message: 'Erro ao listar aulas' });
     }
   },
 
-  // POST /aulas - Cria nova aula no catalogo (SEM turmaIds)
+  // --------------------------------------------------
+  // POST /aulas
+  // --------------------------------------------------
   async criar(req, res) {
-    let { nome, professorId, materiaId, salaPadraoId, divisao, observacao } = req.body;
+    let {
+      nome,
+      professorId,
+      materiaId,
+      salaPadraoId,
+      divisao = 'INT',
+      observacao
+    } = req.body;
 
-    // Normalizar divisao: aceitar 'A','B','A/B','INT' e 'DIV A','DIV B','DIV A/B'
-    function normalizeDivisao(value) {
-      if (!value) return null;
-      const v = String(value).toUpperCase().trim();
-      if (v === 'A' || v === 'DIV A') return 'DIV A';
-      if (v === 'B' || v === 'DIV B') return 'DIV B';
-      if (v === 'A/B' || v === 'DIV A/B') return 'DIV A/B';
-      if (v === 'INT') return 'INT';
-      return v; // mantém valor se já estiver válido
-    }
-    divisao = normalizeDivisao(divisao);
-
-    // Converter IDs de string para number
     professorId = parseId(professorId);
     materiaId = parseId(materiaId);
     salaPadraoId = parseId(salaPadraoId);
+    divisao = normalizeDivisao(divisao);
 
-    // Validações
     if (!nome) {
-      return res.status(400).json({ message: 'Campo obrigatorio: nome' });
+      return res.status(400).json({ message: 'nome é obrigatório' });
     }
-
     if (!professorId) {
-      return res.status(400).json({ message: 'Campo obrigatorio: professorId' });
+      return res.status(400).json({ message: 'professorId é obrigatório' });
     }
-
     if (!materiaId) {
-      return res.status(400).json({ message: 'Campo obrigatorio: materiaId' });
+      return res.status(400).json({ message: 'materiaId é obrigatório' });
     }
 
     try {
-      // Verificar se professor existe
-      const [professor] = await db.query(
+      // Valida professor
+      const [prof] = await db.query(
         `SELECT id FROM Pessoa WHERE id = ? AND tipo = 'PROFESSOR'`,
         [professorId]
       );
-      if (!professor || professor.length === 0) {
-        return res.status(400).json({ message: 'Professor não encontrado ou inválido' });
+      if (prof.length === 0) {
+        return res.status(400).json({ message: 'Professor inválido' });
       }
 
-      // Verificar se matéria existe
-      const [materia] = await db.query(
+      // Valida matéria
+      const [mat] = await db.query(
         `SELECT id FROM Materia WHERE id = ?`,
         [materiaId]
       );
-      if (!materia || materia.length === 0) {
-        return res.status(400).json({ message: 'Matéria não encontrada' });
+      if (mat.length === 0) {
+        return res.status(400).json({ message: 'Matéria inválida' });
       }
 
-      // Inserir nova aula (SEM turmas - turmas vem via horarios)
       const [result] = await db.query(
-        `INSERT INTO Aula (nome, professor_id, materia_id, sala_padrao_id, divisao, observacao) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [nome, professorId, materiaId, salaPadraoId, divisao || null, observacao || null]
+        `
+        INSERT INTO Aula
+          (nome, professor_id, materia_id, sala_padrao_id, divisao, observacao)
+        VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        [
+          nome,
+          professorId,
+          materiaId,
+          salaPadraoId,
+          divisao,
+          observacao || null
+        ]
       );
 
-      const aulaId = result.insertId;
-
-      // Retornar aula criada
       const [aula] = await db.query(
-        `SELECT id, nome, 
-                professor_id AS professorId, 
-                materia_id AS materiaId,
-                sala_padrao_id AS salaPadraoId,
-                divisao, 
-                observacao,
-                created_at AS createdAt, 
-                updated_at AS updatedAt 
-         FROM Aula WHERE id = ?`,
-        [aulaId]
+        `
+        SELECT
+          id,
+          nome,
+          professor_id AS professorId,
+          materia_id AS materiaId,
+          sala_padrao_id AS salaPadraoId,
+          divisao,
+          observacao,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM Aula
+        WHERE id = ?
+        `,
+        [result.insertId]
       );
 
       res.status(201).json(aula[0]);
     } catch (error) {
       logger.error(`Erro ao criar aula: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao criar aula', error: error.message });
+      res.status(500).json({ message: 'Erro ao criar aula' });
     }
   },
 
-  // PUT /aulas/:id - Atualiza aula do catalogo (SEM turmaIds)
+  // --------------------------------------------------
+  // PUT /aulas/:id
+  // --------------------------------------------------
   async editar(req, res) {
     const { id } = req.params;
-    let { nome, professorId, materiaId, salaPadraoId, divisao, observacao } = req.body;
+    let {
+      nome,
+      professorId,
+      materiaId,
+      salaPadraoId,
+      divisao,
+      observacao
+    } = req.body;
 
-    // Normalizar divisao no update também
-    function normalizeDivisao(value) {
-      if (value === undefined) return undefined;
-      if (value === null) return null;
-      const v = String(value).toUpperCase().trim();
-      if (v === 'A' || v === 'DIV A') return 'DIV A';
-      if (v === 'B' || v === 'DIV B') return 'DIV B';
-      if (v === 'A/B' || v === 'DIV A/B') return 'DIV A/B';
-      if (v === 'INT') return 'INT';
-      return v; // mantém valor se já estiver válido
-    }
-    divisao = normalizeDivisao(divisao);
-
-    // Converter IDs de string para number
     professorId = parseId(professorId);
     materiaId = parseId(materiaId);
     salaPadraoId = parseId(salaPadraoId);
+    divisao = normalizeDivisao(divisao);
 
     try {
       const campos = [];
       const valores = [];
 
-      if (nome !== undefined && nome !== null) { 
-        campos.push('nome = ?'); 
-        valores.push(nome); 
+      if (nome !== undefined) {
+        campos.push('nome = ?');
+        valores.push(nome);
       }
 
-      if (professorId !== undefined && professorId !== null) {
-        // Validar professor
+      if (professorId !== null && professorId !== undefined) {
         const [prof] = await db.query(
           `SELECT id FROM Pessoa WHERE id = ? AND tipo = 'PROFESSOR'`,
           [professorId]
         );
-        if (!prof || prof.length === 0) {
-          return res.status(400).json({ message: 'Professor não encontrado ou inválido' });
+        if (prof.length === 0) {
+          return res.status(400).json({ message: 'Professor inválido' });
         }
         campos.push('professor_id = ?');
         valores.push(professorId);
       }
 
-      if (materiaId !== undefined && materiaId !== null) {
-        // Validar matéria
+      if (materiaId !== null && materiaId !== undefined) {
         const [mat] = await db.query(
           `SELECT id FROM Materia WHERE id = ?`,
           [materiaId]
         );
-        if (!mat || mat.length === 0) {
-          return res.status(400).json({ message: 'Matéria não encontrada' });
+        if (mat.length === 0) {
+          return res.status(400).json({ message: 'Matéria inválida' });
         }
         campos.push('materia_id = ?');
         valores.push(materiaId);
@@ -188,14 +205,14 @@ const lessonController = {
         valores.push(salaPadraoId);
       }
 
-      if (divisao !== undefined) { 
-        campos.push('divisao = ?'); 
-        valores.push(divisao || null); 
+      if (divisao !== undefined) {
+        campos.push('divisao = ?');
+        valores.push(divisao);
       }
 
-      if (observacao !== undefined) { 
-        campos.push('observacao = ?'); 
-        valores.push(observacao || null); 
+      if (observacao !== undefined) {
+        campos.push('observacao = ?');
+        valores.push(observacao);
       }
 
       if (campos.length === 0) {
@@ -203,100 +220,77 @@ const lessonController = {
       }
 
       valores.push(id);
-      await db.query(`UPDATE Aula SET ${campos.join(', ')} WHERE id = ?`, valores);
+
+      await db.query(
+        `UPDATE Aula SET ${campos.join(', ')} WHERE id = ?`,
+        valores
+      );
 
       res.json({ message: 'Aula atualizada com sucesso' });
     } catch (error) {
       logger.error(`Erro ao atualizar aula: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao atualizar aula', error: error.message });
+      res.status(500).json({ message: 'Erro ao atualizar aula' });
     }
   },
 
-  // DELETE /aulas/:id?mode=detach - Remove aula
+  // --------------------------------------------------
+  // DELETE /aulas/:id
+  // --------------------------------------------------
   async deletar(req, res) {
     const { id } = req.params;
-    const { mode } = req.query;
 
     try {
-      if (mode === 'detach') {
-        // 1. Remover aula dos horários (desassociar)
-        await db.query('DELETE FROM HorarioAula WHERE aula_id = ?', [id]);
-        
-        // 2. Deletar a aula do catálogo
-        const [result] = await db.query('DELETE FROM Aula WHERE id = ?', [id]);
-        
-        if (result.affectedRows === 0) {
-          return res.status(404).json({ message: 'Aula não encontrada' });
-        }
-        
-        return res.status(200).json({ 
-          message: 'Aula removida e desassociada dos horários' 
-        });
-      }
-      
-      // Deleção simples (pode falhar se houver FK constraint)
-      const [result] = await db.query('DELETE FROM Aula WHERE id = ?', [id]);
-      
+      // Remove vínculos primeiro
+      await db.query(`DELETE FROM HorarioAula WHERE aula_id = ?`, [id]);
+
+      const [result] = await db.query(`DELETE FROM Aula WHERE id = ?`, [id]);
+
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: 'Aula não encontrada' });
       }
-      
-      return res.status(200).json({ message: 'Aula removida' });
+
+      res.json({ message: 'Aula removida com sucesso' });
     } catch (error) {
       logger.error(`Erro ao deletar aula: ${error.message}`);
-      res.status(500).json({ 
-        message: 'Erro ao deletar aula',
-        error: error.message 
-      });
+      res.status(500).json({ message: 'Erro ao deletar aula' });
     }
   },
 
-  // GET /aulas/horarios/:turma_id/:divisao - Compatibilidade (manter)
+  // --------------------------------------------------
+  // GET /aulas/horarios/:turma_id/:divisao  (COMPAT)
+  // --------------------------------------------------
   async getHorariosPorTurma(req, res) {
     const { turma_id, divisao } = req.params;
-    if (!turma_id || !divisao) {
-        return res.status(400).json({ message: 'Parametros turma_id e divisao sao obrigatorios' });
-    }
-    
-    let div = '';
-    switch (divisao.toUpperCase()) {
-        case 'A':
-            div = 'DIV A';
-            break;
-        case 'B':
-            div = 'DIV B';
-            break;
-        case 'INT':
-            div = 'INT';
-            break;
-        default:
-            return res.status(400).json({ message: 'Divisao invalida. Use "A" ou "B".' });
+    const turmaId = parseId(turma_id);
+    const div = normalizeDivisao(divisao);
+
+    if (!turmaId || !div) {
+      return res.status(400).json({ message: 'Parâmetros inválidos' });
     }
 
     try {
-        let aulas;
-        if (div !== 'INT'){
-            aulas = await global.db('Aula')
-                .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
-                .where('turma_id', turma_id)
-                .andWhere(function() {
-                    this.where('divisao', 'INT').orWhere('divisao', div);
-                })
-                .get();
-        } else if (div === 'INT') {
-            aulas = await global.db('Aula')
-                .select('id', 'nome', 'professor_id', 'turma_id', 'materia_id', 'inicio', 'fim', 'dia_semana', 'divisao')
-                .where('turma_id', turma_id)
-                .get();
-        }
+      const [rows] = await db.query(
+        `
+        SELECT
+          a.id AS aulaId,
+          a.nome,
+          a.divisao,
+          h.dia_semana AS diaSemana,
+          h.inicio,
+          h.fim
+        FROM HorarioAula h
+        JOIN Aula a ON a.id = h.aula_id
+        WHERE h.turma_id = ?
+          AND (a.divisao = 'INT' OR a.divisao = ?)
+        ORDER BY h.dia_semana, h.inicio
+        `,
+        [turmaId, div]
+      );
 
-        if (aulas.length === 0) {
-            return res.status(404).json({ message: 'Nenhuma aula encontrada para a turma e divisao especificadas.' });
-        }
-
-        res.json(aulas);
+      res.json(rows || []);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar aulas do banco de dados' });
+      logger.error(`Erro ao buscar horários por turma: ${error.message}`);
+      res.status(500).json({ message: 'Erro ao buscar horários' });
     }
   }
 };
