@@ -112,10 +112,10 @@ CREATE TABLE IF NOT EXISTS Presenca (
     pessoa_id INT NOT NULL,
     data DATE NOT NULL,
     dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    status ENUM('PRESENTE', 'ATRASADO') NOT NULL,
     aulas_perdidas INT NOT NULL,
     horario_previsto TIME,
     horario_chegada TIME,
+    atrasado BOOLEAN NOT NULL,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 

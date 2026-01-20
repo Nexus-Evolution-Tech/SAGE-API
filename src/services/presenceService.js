@@ -96,8 +96,6 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
   const atrasado = horarioChegada > tolerancia;
   const aulasPerdidas = calcularAulasPerdidas(aulasHoje, horarioChegada);
 
-  const status = atrasado ? 'ATRASADO' : 'PRESENTE';
-
   // Checa se já existe registro
   const [registros] = await db.query('SELECT id FROM Presenca WHERE pessoa_id = ? AND data = ?', [pessoa_id, dataAcesso]);
   const registroExistente = registros[0];
@@ -106,40 +104,39 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
     // Inserir
     await db.query(`
       INSERT INTO Presenca
-      (pessoa_id, data, dia_semana, status, aulas_perdidas, horario_previsto, horario_chegada)
+      (pessoa_id, data, dia_semana, aulas_perdidas, horario_previsto, horario_chegada, atrasado)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [
       pessoa_id,
       dataAcesso,
       diaSemana,
-      status,
       aulasPerdidas,
       formatarHoraParaSQL(entradaPrevista),
-      formatarHoraParaSQL(horarioChegada)
+      formatarHoraParaSQL(horarioChegada),
+      atrasado
     ]);
   } else {
     // Atualiza registro existente
     await db.query(`
       UPDATE Presenca
-      SET dia_semana = ?, status = ?, aulas_perdidas = ?, horario_previsto = ?, horario_chegada = ?
+      SET dia_semana = ?, aulas_perdidas = ?, horario_previsto = ?, horario_chegada = ?, atrasado = ?
       WHERE id = ?
     `, [
       diaSemana,
-      status,
       aulasPerdidas,
       formatarHoraParaSQL(entradaPrevista),
       formatarHoraParaSQL(horarioChegada),
+      atrasado,
       registroExistente.id
     ]);
   }
 
   return {
     pessoa_id,
-    status,
     aulas_perdidas: aulasPerdidas,
     horario_entrada_prevista: formatarHora(entradaPrevista),
     horario_entrada_real: formatarHora(horarioChegada),
-    atrasado
+    atrasado: atrasado,
   };
 }
 
