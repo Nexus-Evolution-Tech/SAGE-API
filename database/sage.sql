@@ -107,16 +107,15 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS Atraso (
+CREATE TABLE IF NOT EXISTS Presenca (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pessoa_id INT NOT NULL,
     data DATE NOT NULL,
     dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    status ENUM('PRESENTE', 'AUSENTE', 'SEM AULA', 'NAO SE APLICA') NOT NULL,
+    status ENUM('PRESENTE', 'ATRASADO') NOT NULL,
     aulas_perdidas INT NOT NULL,
     horario_previsto TIME,
     horario_chegada TIME,
-    atrasado BOOLEAN,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 

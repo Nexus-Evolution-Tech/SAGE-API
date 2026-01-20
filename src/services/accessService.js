@@ -1,5 +1,5 @@
 const deviceService = require('./deviceService');
-const {verificarEAtribuirAtraso} = require('../utils/computarAtrasos');
+const {verificarEAtribuirPresenca} = require('./presenceService');
 
 function mapearMetodo(value) {
   if (value.length === 8) return 'QRCODE';
@@ -66,7 +66,23 @@ async function sincronizarAcessos(dispositivo) {
 
       acessosSincronizados++;
 
-      // await verificarEAtribuirAtraso(pessoa_id, data_hora);
+      // ✅ Computa presença e atraso imediatamente
+      if (!acessoExistente) {
+        await global.db('Acesso').insert({
+          pessoa_id,
+          dispositivo_id,
+          status,
+          permitido,
+          metodo_auth,
+          data_hora,
+          updated_at: new Date()
+        });
+
+        acessosSincronizados++;
+
+        // ✅ Computa presença e atraso imediatamente
+        await verificarEAtribuirPresenca(pessoa_id, data_hora);
+      }
     }
   }
 
@@ -94,100 +110,6 @@ async function sincronizarTodosAcessos() {
 
   return resultados;
 }
-
-// async function sincronizarTodosAcessos() {
-//   const dispositivos = await global.db('Dispositivo');
-//   const resultados = [];
-
-//   for (const dispositivo of dispositivos) {
-//     const resultado = await sincronizarAcessos(dispositivo);
-//     resultados.push(resultado);
-//   }
-
-//   return resultados;
-// }
-
-// ESSE SINCRONIZA AS DUAS CATRACAS PELA ORDEM CASO CADA UMA TIVESSE UM LOG INDIVIDUAL
-// async function sincronizarTodasCatracas() {
-//   // 1. Pega todas as catracas do banco
-//   const dispositivos = await global.db('Dispositivo');
-
-//   // 2. Para cada dispositivo, pega o último timestamp sincronizado na tabela Acesso
-//   const promessasLogs = dispositivos.map(async (dispositivo) => {
-//     const ultimoAcesso = await global.db('Acesso')
-//       .where({ dispositivo_id: dispositivo.id })
-//       .orderBy('data_hora', 'desc')
-//       .first();
-
-//     const timestampInicial = ultimoAcesso
-//       ? Math.floor(new Date(ultimoAcesso.data_hora).getTime() / 1000)
-//       : 0;
-
-//     // Obtém sessão e logs incrementais
-//     const link = deviceService.linkCatraca(dispositivo);
-//     const session = await deviceService.obterSessao(link, dispositivo);
-
-//     if (!session) {
-//       console.log(`Erro ao obter sessão para a catraca ${dispositivo.nome}`);
-//       return [];
-//     }
-
-//     const logs = await deviceService.obterLogsCatraca(session, link, timestampInicial);
-
-//     // Acrescenta info do dispositivo para cada log
-//     return logs.map(log => ({
-//       ...log,
-//       dispositivo_id: dispositivo.id,
-//       dispositivo_nome: dispositivo.nome
-//     }));
-//   });
-
-//   // 3. Aguarda todos os logs serem buscados em paralelo
-//   const resultados = await Promise.all(promessasLogs);
-
-//   // 4. Junta tudo em uma lista só
-//   let todosLogs = resultados.flat();
-
-//   // 5. Ordena os logs por timestamp
-//   todosLogs.sort((a, b) => a.time - b.time);
-
-//   // 6. Insere os logs ordenados na tabela Acesso
-//   let acessosSincronizados = 0;
-
-//   for (const log of todosLogs) {
-//     const pessoa_id = /* log.user_id - 110000000 */ 1; // ajuste conforme sua regra
-//     const dispositivo_id = log.dispositivo_id;
-//     const data_hora = new Date(log.time * 1000);
-//     const status = identificarAcesso(log.portal_id);
-//     const metodo_auth = mapearMetodo(log.card_value);
-//     const permitido = true;
-
-//     // Evita duplicidade
-//     const acessoExistente = await global.db('Acesso')
-//       .where({ pessoa_id, dispositivo_id, data_hora })
-//       .first();
-
-//     if (!acessoExistente) {
-//       await global.db('Acesso').insert({
-//         pessoa_id,
-//         dispositivo_id,
-//         status,
-//         permitido,
-//         metodo_auth,
-//         data_hora,
-//         updated_at: new Date()
-//       });
-
-//       acessosSincronizados++;
-//     }
-//   }
-
-//   return {
-//     sucesso: true,
-//     acessosSincronizados,
-//     message: `${acessosSincronizados} acessos sincronizados com sucesso, em ordem cronológica global.`
-//   };
-// }
 
 function calcularIdade(dataNascimento) {
   const hoje = new Date();

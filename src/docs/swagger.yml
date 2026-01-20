@@ -43,8 +43,8 @@ tags:
     description: Operações relacionadas as solicitações de acessos de saída dos alunos menores de idade
   - name: Horarios
     description: Operações relacionadas com os horários dos funcionários
-  - name: Atrasos
-    description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
+  - name: Presencas
+    description: Operações relacionadas com as presenças das pessoas de acordo com seu horário previsto de entrada
 
 paths:
   /sala/:
@@ -1358,52 +1358,6 @@ paths:
                   totalPages:
                     type: integer
                     example: 4
-
-  /pessoas/status:
-    get:
-      tags: [Pessoas]
-      summary: Retorna o status de presença de todas as pessoas
-      responses:
-        '200':
-          description: Status da presença da pessoa
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  nome:
-                    type: string
-                  status:
-                    type: string
-                    enum: [PRESENTE, AUSENTE]
-
-  /pessoas/{id}/status:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      tags: [Pessoas]
-      summary: Verifica se uma pessoa está presente
-      responses:
-        '200':
-          description: Status da presença da pessoa
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  nome:
-                    type: string
-                  status:
-                    type: string
-                    enum: [PRESENTE, AUSENTE]
   
   /pessoas/url:
     get:
@@ -2223,11 +2177,11 @@ paths:
           description: Horário deletado
         '404':
           description: Horário não encontrado
-  
-  /atrasos:
+
+  /presencas:
     get:
-      tags: [Atrasos]
-      summary: Lista todos os horários (atrasos) com paginação
+      tags: [Presencas]
+      summary: Lista todas as presenças com paginação
       parameters:
         - in: query
           name: page
@@ -2245,7 +2199,7 @@ paths:
           description: Número de registros por página
       responses:
         '200':
-          description: Lista paginada de horários (atrasos)
+          description: Lista paginada de presenças
           content:
             application/json:
               schema:
@@ -2254,7 +2208,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Atraso'
+                      $ref: '#/components/schemas/Presenca'
                   page:
                     type: integer
                     example: 1
@@ -2268,7 +2222,7 @@ paths:
                     type: integer
                     example: 5
 
-  /atrasos/{id}:
+  /presencas/{id}:
     parameters:
       - name: id
         in: path
@@ -2276,25 +2230,25 @@ paths:
         schema:
           type: string
     get:
-      tags: [Atrasos]
-      summary: Retorna um Atraso pelo ID
+      tags: [Presencas]
+      summary: Retorna uma Presenca pelo ID
       responses:
         '200':
-          description: Atraso encontrado
+          description: Presenca encontrada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Atraso'
+                $ref: '#/components/schemas/Presenca'
         '404':
-          description: Atraso não encontrado
+          description: Presenca não encontrada
     delete:
-      tags: [Atrasos]
-      summary: Remove um Atraso
+      tags: [Presencas]
+      summary: Remove uma Presenca
       responses:
         '204':
-          description: Atraso deletado
+          description: Presenca deletada
         '404':
-          description: Atraso não encontrado
+          description: Presenca não encontrada
 
 components:
   securitySchemes:
@@ -2793,7 +2747,7 @@ components:
           items:
             $ref: '#/components/schemas/SyncDbItem'
     
-    Atraso:
+    Presenca:
       type: object
       properties:
         id:
