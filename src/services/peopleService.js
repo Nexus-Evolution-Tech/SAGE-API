@@ -142,81 +142,65 @@ function formatarHora(date) {
 function calcularAulasPerdidas(aulas, entradaDate) {
   const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
   return aulas.filter(aula => {
-    const [hora, minuto] = aula.inicio.split(':').map(Number);
-    const minutosAula = hora * 60 + minuto;
-    return minutosAula < minutosEntrada;
-  }).length;
-}
-
-// Calcula quantas aulas foram perdidas com base na hora de entrada
-function calcularAulasPerdidas(aulas, entradaDate) {
-  const minutosEntrada = entradaDate.getHours() * 60 + entradaDate.getMinutes();
-  return aulas.filter(aula => {
-    const [hora, minuto] = aula.inicio.split(':').map(Number);
-    const minutosAula = hora * 60 + minuto;
+    const inicio = aula.horario.split('-')[0]; // pegar só início
+    const minutosAula = horaParaMinutos(inicio);
     return minutosAula < minutosEntrada;
   }).length;
 }
 
 async function verificarPessoaPresenteEAtrasada(id) {
   const hoje = new Date();
-  const inicioDia = new Date(hoje); inicioDia.setHours(0, 0, 0, 0);
-  const fimDia = new Date(hoje); fimDia.setHours(23, 59, 59, 999);
-  const diasSemanaEnum = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+  const diasSemanaEnum = ['DOMINGO','SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO'];
   const diaSemana = diasSemanaEnum[hoje.getDay()];
   const toleranciaMinutos = 15;
 
-  const pessoa = await global.db('Pessoa').where('id', id).first(['id', 'nome', 'tipo']);
+  // Pega a pessoa
+  const [pessoas] = await db.query('SELECT id, nome, tipo FROM Pessoa WHERE id = ?', [id]);
+  const pessoa = pessoas[0];
   if (!pessoa) throw new Error(`Pessoa com id ${id} não encontrada`);
 
-  let entrada = null;
-  let entradaPrevista = null;
-  let atrasado = false;
-  let aulasPerdidas = 0;
+  // Busca último acesso do dia
+  const inicioDia = new Date(hoje); inicioDia.setHours(0,0,0,0);
+  const fimDia = new Date(hoje); fimDia.setHours(23,59,59,999);
+  const [acessos] = await db.query(
+    'SELECT * FROM Acesso WHERE pessoa_id = ? AND status = "ENTRADA" AND data_hora BETWEEN ? AND ? ORDER BY data_hora ASC LIMIT 1',
+    [id, inicioDia, fimDia]
+  );
+  const acesso = acessos[0];
+  const entrada = acesso?.data_hora || null;
 
-  const acesso = await global.db('Acesso')
-    .where('pessoa_id', id)
-    .andWhere('status', 'ENTRADA')
-    .andWhere('data_hora', '>=', inicioDia)
-    .andWhere('data_hora', '<=', fimDia)
-    .orderBy('data_hora', 'asc')
-    .first();
-
-  if (acesso) entrada = acesso.data_hora;
-
+  // Busca aulas do dia
   let aulasHoje = [];
-
   if (pessoa.tipo === 'ALUNO') {
-    const aluno = await global.db('Aluno').where('id', pessoa.id).first(['turma_id', 'divisao']);
+    const [alunos] = await db.query('SELECT turma_id, divisao FROM Aluno WHERE id = ?', [pessoa.id]);
+    const aluno = alunos[0];
     if (aluno) {
-      const divisoes = aluno.divisao === 'DIV A' ? ['DIV A', 'DIV A/B'] : ['DIV B', 'DIV A/B'];
-      aulasHoje = await global.db('Aula')
-        .where('turma_id', aluno.turma_id)
-        .andWhere('dia_semana', diaSemana)
-        .whereIn('divisao', divisoes)
-        .orderBy('inicio', 'asc')
-        .select('inicio');
-      if (aulasHoje.length > 0) entradaPrevista = definirHorario(aulasHoje[0].inicio);
+      const [aulas] = await db.query(`
+        SELECT ha.horario
+        FROM HorarioAula ha
+        JOIN Aula a ON a.id = ha.aula_id
+        WHERE ha.turma_id = ? AND ha.dia_semana = ? AND ha.divisao IN (?, 'INT')
+        ORDER BY ha.horario ASC
+      `, [aluno.turma_id, diaSemana, aluno.divisao]);
+      aulasHoje = aulas;
     }
-
-  } else if (['PROFESSOR', 'PROFADM'].includes(pessoa.tipo)) {
-    aulasHoje = await global.db('Aula')
-      .where({ professor_id: pessoa.id, dia_semana: diaSemana })
-      .orderBy('inicio', 'asc')
-      .select('inicio');
-
-    if (aulasHoje.length > 0) entradaPrevista = definirHorario(aulasHoje[0].inicio);
-
-  } else if (pessoa.tipo !== 'RESPONSAVEL') {
-    const funcionario = await global.db(pessoa.tipo)
-      .where('id', pessoa.id)
-      .first('entrada');
-
-    if (funcionario?.entrada) {
-      entradaPrevista = definirHorario(funcionario.entrada);
-    }
+  } else if (['PROFESSOR','PROFADM'].includes(pessoa.tipo)) {
+    const [aulas] = await db.query(`
+      SELECT ha.horario
+      FROM HorarioAula ha
+      JOIN Aula a ON a.id = ha.aula_id
+      WHERE a.professor_id = ? AND ha.dia_semana = ?
+      ORDER BY ha.horario ASC
+    `, [pessoa.id, diaSemana]);
+    aulasHoje = aulas;
   }
 
+  // Define horário previsto da primeira aula
+  const entradaPrevista = aulasHoje.length > 0 ? definirHorario(aulasHoje[0].horario.split('-')[0]) : null;
+
+  // Calcula atrasado e aulas perdidas
+  let atrasado = false;
+  let aulasPerdidas = 0;
   if (aulasHoje.length > 0) {
     if (entrada && entradaPrevista) {
       const entradaDate = new Date(entrada);
@@ -224,40 +208,65 @@ async function verificarPessoaPresenteEAtrasada(id) {
       atrasado = entradaDate > tolerancia;
       aulasPerdidas = calcularAulasPerdidas(aulasHoje, entradaDate);
     } else {
-      // Pessoa não veio, usa hora atual para calcular quantas aulas ela perdeu
-      const agora = new Date();
-      aulasPerdidas = calcularAulasPerdidas(aulasHoje, agora);
+      aulasPerdidas = calcularAulasPerdidas(aulasHoje, new Date());
     }
   }
 
+  // Define status
   let status = 'AUSENTE';
-  if (['ALUNO', 'PROFESSOR', 'PROFADM'].includes(pessoa.tipo) && aulasHoje.length === 0) {
-    status = 'SEM AULA';
-  } else if (entrada) {
-    status = 'PRESENTE';
-  } else if (pessoa.tipo === 'RESPONSAVEL') {
-    status = 'NAO SE APLICA';
-  }
+  if (['ALUNO','PROFESSOR','PROFADM'].includes(pessoa.tipo) && aulasHoje.length === 0) status = 'SEM AULA';
+  else if (entrada) status = 'PRESENTE';
+  else if (pessoa.tipo === 'RESPONSAVEL') status = 'NAO SE APLICA';
 
-  // Inserir no banco apenas se PRESENTE ou AUSENTE
-  if (['PRESENTE', 'AUSENTE'].includes(status)) {
-    await global.db('Atraso').insert({
-      pessoa_id: pessoa.id,
-      data: hoje.toISOString().split('T')[0],
-      dia_semana: diaSemana,
-      status,
-      aulas_perdidas: aulasPerdidas,
-      horario_previsto: entradaPrevista ? formatarHoraParaSQL(entradaPrevista) : null,
-      horario_chegada: entrada ? formatarHoraParaSQL(new Date(entrada)) : null,
-      atrasado: entrada && entradaPrevista ? atrasado : null
-    });
+  // Checa se já existe registro na tabela Atraso para hoje
+  const [atrasos] = await db.query(
+    'SELECT * FROM Atraso WHERE pessoa_id = ? AND data = ?',
+    [pessoa.id, hoje.toISOString().split('T')[0]]
+  );
+  const atrasoExistente = atrasos[0];
+
+  const dadosAtraso = {
+    pessoa_id: pessoa.id,
+    data: hoje.toISOString().split('T')[0],
+    dia_semana: diaSemana,
+    status,
+    aulas_perdidas: aulasPerdidas,
+    horario_previsto: entradaPrevista ? formatarHoraParaSQL(entradaPrevista) : null,
+    horario_chegada: entrada ? formatarHoraParaSQL(new Date(entrada)) : null,
+    atrasado: entrada && entradaPrevista ? atrasado : null
+  };
+
+  if (!atrasoExistente) {
+    // Se não existe, insere
+    await db.query(
+      `INSERT INTO Atraso
+       (pessoa_id, data, dia_semana, status, aulas_perdidas, horario_previsto, horario_chegada, atrasado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      Object.values(dadosAtraso)
+    );
+  } else {
+    // Se existe, atualiza todos os campos
+    await db.query(
+      `UPDATE Atraso
+       SET dia_semana = ?, status = ?, aulas_perdidas = ?, horario_previsto = ?, horario_chegada = ?, atrasado = ?
+       WHERE id = ?`,
+      [
+        dadosAtraso.dia_semana,
+        dadosAtraso.status,
+        dadosAtraso.aulas_perdidas,
+        dadosAtraso.horario_previsto,
+        dadosAtraso.horario_chegada,
+        dadosAtraso.atrasado,
+        atrasoExistente.id
+      ]
+    );
   }
 
   return {
     id: pessoa.id,
     nome: pessoa.nome,
     tipo: pessoa.tipo,
-    dia: hoje.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    dia: hoje.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
     dia_semana: diaSemana,
     status,
     aulas_perdidas: aulasPerdidas,
@@ -267,15 +276,10 @@ async function verificarPessoaPresenteEAtrasada(id) {
   };
 }
 
+// Itera sobre todas as pessoas
 async function verificarTodasPessoasPresentesEAtrasadas() {
-  const pessoas = await global.db('Pessoa').select('id');
-  const resultados = [];
-
-  for (const { id } of pessoas) {
-    const resultado = await verificarPessoaPresenteEAtrasada(id);
-    resultados.push(resultado);
-  }
-
+  const [pessoas] = await db.query('SELECT id FROM Pessoa');
+  const resultados = await Promise.all(pessoas.map(({id}) => verificarPessoaPresenteEAtrasada(id)));
   return resultados;
 }
 
