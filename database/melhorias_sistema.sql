@@ -81,9 +81,6 @@ CREATE TABLE IF NOT EXISTS Sala (
 ALTER TABLE Aula 
 ADD COLUMN IF NOT EXISTS sala_padrao_id INT NULL AFTER materia_id;
 
-ALTER TABLE Aula 
-ADD COLUMN IF NOT EXISTS observacao VARCHAR(255) NULL AFTER divisao;
-
 -- Índices úteis para buscas
 CREATE INDEX idx_aula_professor ON Aula(professor_id);
 CREATE INDEX idx_aula_materia ON Aula(materia_id);
