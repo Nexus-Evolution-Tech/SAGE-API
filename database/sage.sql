@@ -107,16 +107,15 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS Atraso (
+CREATE TABLE IF NOT EXISTS Presenca (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pessoa_id INT NOT NULL,
     data DATE NOT NULL,
     dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    status ENUM('PRESENTE', 'AUSENTE', 'SEM AULA', 'NAO SE APLICA') NOT NULL,
     aulas_perdidas INT NOT NULL,
     horario_previsto TIME,
     horario_chegada TIME,
-    atrasado BOOLEAN,
+    atrasado BOOLEAN NOT NULL,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
 
@@ -245,8 +244,7 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
     aula_id INT NOT NULL,
 	divisao ENUM('INT', 'DIV A', 'DIV B') NOT NULL,
     dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    inicio TIME NOT NULL,
-    fim TIME NOT NULL,
+    horario VARCHAR(11) NOT NULL,
     sala_id INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -254,12 +252,9 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
     FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
     FOREIGN KEY (sala_id) REFERENCES Sala(id) ON DELETE SET NULL,
     
-    -- Restrições de unicidade e integridade
-    UNIQUE KEY uq_turma_dia_inicio (turma_id, dia_semana, inicio),
-    
     -- Índices para pesquisas frequentes
     INDEX idx_turma_dia (turma_id, dia_semana),
-    INDEX idx_dia_inicio (dia_semana, inicio),
+    INDEX idx_dia_horario (dia_semana, horario),
     INDEX idx_sala (sala_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

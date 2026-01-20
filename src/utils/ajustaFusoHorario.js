@@ -6,7 +6,7 @@ function ajustarFusoHorarioBrasil(dados) {
   if (!dados) return dados;
   
   // Campos que podem conter datas
-  const camposData = ['created_at', 'updated_at', 'data_nascimento', 'data_inicio', 'data_fim', 'data_hora', 'data_cadastro'];
+  const camposData = ['created_at', 'updated_at', 'data_nascimento', 'data_inicio', 'data_fim', 'data_hora', 'data_cadastro', 'data'];
   
   // Se é um array, aplica recursivamente
   if (Array.isArray(dados)) {
