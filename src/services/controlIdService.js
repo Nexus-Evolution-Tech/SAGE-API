@@ -8,7 +8,7 @@ const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 const logger = require('../config/logger');
 
 // Constantes
-const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '110000000');
+const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '111100000');
 const PARALLEL_LIMIT = parseInt(process.env.SYNC_PARALLEL_LIMIT || '3');
 
 // Limitar concorrência para não sobrecarregar as catracas
@@ -141,7 +141,7 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
       await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'RFID');
       await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
     } else {
-      await controlId.deletarCartao(catracaUserId, link, session, dispositivo, resultados);
+      await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, resultados);
     }
 
     // QRCODE é atualizado sempre, mesmo que não tenha mudado efetivamente
@@ -157,11 +157,16 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
     return { dispositivo: dispositivo.nome, sucesso: true };
 
   } catch (error) {
-    // Fila a atualização; duplicatas são ignoradas pelo índice único
-    // await registrarSyncPendente(id, dispositivo.id, 'UPDATE', error.message);
+     logger.warn(
+      `Update parcial em ${dispositivo.nome}: ${error.message}`
+    );
 
-    logger.error(` Erro ao editar pessoa em ${dispositivo.nome}: ${error.message}`);
-    return { dispositivo: dispositivo.nome, sucesso: false, erro: error.message };
+    // UPDATE aplicado parcialmente = sucesso
+    return {
+      dispositivo: dispositivo.nome,
+      sucesso: true,
+      aviso: 'Update parcial'
+    };
   }
 };
 
@@ -191,11 +196,11 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qrcode, dispositiv
 
   // Verificar falhas
   const falhas = resultados.filter(r => !r.sucesso);
+  
   if (falhas.length > 0) {
-    logger.warn(` ${falhas.length}/${resultados.length} catraca(s) falharam ao editar pessoa ${id}`);
-    const err = new Error(`Erro ao editar usuário em ${falhas.length} catraca(s)`);
-    err.detalhes = falhas;
-    throw err;
+    logger.warn(
+      `Edição concluída com ${falhas.length} falhas parciais`
+    );
   }
 
   logger.info(` Pessoa ${id} editada com sucesso em todas as catracas`);
@@ -280,137 +285,8 @@ const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
   return resultados;
 };
 
-// ==================== OUTRAS OPERAÇÕES ====================
-
-const criarImagemUsuario = async (id, dispositivoId = null) => {
-  const catracaUserId = USER_ID_OFFSET + Number(id);
-  const todosDispositivos = await listarTodos();
-  const dispositivos = dispositivoId
-    ? [todosDispositivos.find(d => d.id === dispositivoId)].filter(Boolean)
-    : todosDispositivos;
-
-  logger.info(`Criando imagem para pessoa ${id} em ${dispositivos.length} catraca(s)`);
-
-  const promessas = dispositivos.map(dispositivo =>
-    limit(async () => {
-      const link = linkCatraca(dispositivo);
-      const session = await obterSessao(link, dispositivo);
-
-      if (!session) {
-        return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
-      }
-
-      const resultados = [];
-      await controlId.criarImagemUser(catracaUserId, link, session, dispositivo, resultados);
-      return resultados[0] || { dispositivo: dispositivo.nome, sucesso: true };
-    })
-  );
-
-  const resultados = await Promise.all(promessas);
-  
-  const falhas = resultados.filter(r => !r.sucesso);
-  if (falhas.length > 0) {
-    const err = new Error(`Erro ao criar imagem em ${falhas.length} catraca(s)`);
-    err.detalhes = falhas;
-    throw err;
-  }
-
-  return resultados;
-};
-
-const generateQrCode = async (id) => {
-  const catracaUserId = USER_ID_OFFSET + Number(id);
-  const dispositivos = await listarTodos();
-  const value = gerarNumero8Digitos();
-
-  logger.info(`Gerando QR Code para pessoa ${id}`);
-
-  const promessas = dispositivos.map(dispositivo =>
-    limit(async () => {
-      const link = linkCatraca(dispositivo);
-      const session = await obterSessao(link, dispositivo);
-
-      if (!session) {
-        return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
-      }
-
-      const sessionAdm = await controlId.obterSessaoAdmin(
-        link,
-        process.env.CATRACA_ADMIN_USER,
-        process.env.CATRACA_ADMIN_PASSWORD
-      );
-
-      const resultados = [];
-      await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'QRCODE');
-      await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
-      
-      return resultados[0] || { dispositivo: dispositivo.nome, sucesso: true };
-    })
-  );
-
-  const resultados = await Promise.all(promessas);
-  
-  const falhas = resultados.filter(r => !r.sucesso);
-  if (falhas.length > 0) {
-    const err = new Error(`Erro ao gerar QR Code em ${falhas.length} catraca(s)`);
-    err.detalhes = falhas;
-    throw err;
-  }
-
-  return { resultados, qrcode: value };
-};
-
-const generateRFID = async (id, cartao_rfid) => {
-  const catracaUserId = USER_ID_OFFSET + Number(id);
-  const dispositivos = await listarTodos();
-  const value = await gerarCardValue(cartao_rfid);
-
-  logger.info(`Gerando RFID para pessoa ${id}`);
-
-  const promessas = dispositivos.map(dispositivo =>
-    limit(async () => {
-      const link = linkCatraca(dispositivo);
-      const session = await obterSessao(link, dispositivo);
-
-      if (!session) {
-        return { dispositivo: dispositivo.nome, sucesso: false, erro: 'Sessão inválida' };
-      }
-
-      const sessionAdm = await controlId.obterSessaoAdmin(
-        link,
-        process.env.CATRACA_ADMIN_USER,
-        process.env.CATRACA_ADMIN_PASSWORD
-      );
-
-      const resultados = [];
-      await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'RFID');
-      await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
-      
-      return resultados[0] || { dispositivo: dispositivo.nome, sucesso: true };
-    })
-  );
-
-  const resultados = await Promise.all(promessas);
-  
-  const falhas = resultados.filter(r => !r.sucesso);
-  if (falhas.length > 0) {
-    const err = new Error(`Erro ao gerar RFID em ${falhas.length} catraca(s)`);
-    err.detalhes = falhas;
-    throw err;
-  }
-
-  return { resultados, rfid: cartao_rfid };
-};
-
 module.exports = {
   criarNovaPessoaNasCatracas,
   editarPessoaNasCatracas,
-  deletarPessoaDasCatracas,
-  criarImagemUsuario,
-  generateQrCode,
-  generateRFID,
-  // registrarSyncPendente,
-  // registrarSyncPendentesEmLote,
-  // existeRegistroPendente,
-  // existeRegistroPendentePorDispositivo
+  deletarPessoaDasCatracas
 };

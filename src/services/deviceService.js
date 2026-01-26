@@ -30,7 +30,7 @@ async function obterSessao(linkCatraca, dispositivo, forceNew = false) {
       throw new Error('Sessão não retornada pela catraca');
     }
 
-    logger.info(` Sessão criada: ${dispositivo.nome}`);
+    logger.info(` Sessão criada para ${dispositivo.nome}: ${session}`);
     
     return session;
   } catch (error) {

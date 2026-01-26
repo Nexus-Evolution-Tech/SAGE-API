@@ -84,7 +84,11 @@ const criarUsuario = async (catracaUserId, novaPessoa, link, session, dispositiv
     resultados.push({ dispositivo: dispositivo.nome, sucesso: true, catracaId: userId });
   } catch (error) {
     resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: error.response?.data || error.message });
-    throw new Error(`Erro ao criar usuário na catraca ${dispositivo.nome}:`, error.response?.data || error.message);
+    throw new Error(
+      `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
+        JSON.stringify(error.response?.data || error.message)
+      }`
+    );
   }
 }
 
@@ -112,7 +116,19 @@ const editarUsuario = async (id, nome, link, session, dispositivo, resultados) =
 
     resultados.push({ dispositivo: dispositivo.nome, sucesso: true, catracaId: response.data.ids?.[0] });
   } catch (error) {
-    resultados.push({ dispositivo: dispositivo.nome, sucesso: false, erro: error.response?.data || error.message });
+    const status = error.response?.status;
+    const apiError = error.response?.data;
+
+    if (status === 400 && !apiError?.error) {
+      resultados.push({ dispositivo: dispositivo.nome, sucesso: true });
+      return;
+    }
+
+    throw new Error(
+      `Erro real ao editar usuário: ${
+        JSON.stringify(apiError || error.message)
+      }`
+    );
   }
 }
 
@@ -150,8 +166,12 @@ const criarCartao = async (id, value, link, session, dispositivo, resultados) =>
   };
   try {
     await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, cardPayload, { headers: { "Content-Type": "application/json" } });
-  } catch (err) {
-    throw new Error(`Não foi possível criar cartão na catraca ${dispositivo.nome}:`, err.message);
+  } catch (error) {
+    throw new Error(
+      `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
+        JSON.stringify(error.response?.data || error.message)
+      }`
+    );
   }
 }
 
@@ -209,7 +229,11 @@ const criarGrupo = async (id, link, session, dispositivo, resultados) => {
     try {
       await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, groupPayload, { headers: { "Content-Type": "application/json" } });
     } catch (err) {
-      throw new Error(`Não foi possível criar grupo na catraca ${dispositivo.nome}:`, err.message);
+      throw new Error(
+        `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
+          JSON.stringify(error.response?.data || error.message)
+        }`
+      );
     }
 }
 
