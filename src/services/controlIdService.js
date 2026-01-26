@@ -7,8 +7,6 @@ const gerarCardValue = require('../utils/gerarCardValue');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 const logger = require('../config/logger');
 
-// Constantes
-const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '111100000');
 const PARALLEL_LIMIT = parseInt(process.env.SYNC_PARALLEL_LIMIT || '3');
 
 // Limitar concorrência para não sobrecarregar as catracas
@@ -69,7 +67,7 @@ const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserI
  * Cria pessoa em todas as catracas (ou em uma específica) - PROCESSAMENTO PARALELO
  */
 const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
-  const catracaUserId = USER_ID_OFFSET + Number(novaPessoa.id);
+  const catracaUserId = Number(novaPessoa.id);
   const todosDispositivos = await listarTodos();
   
   // Filtrar dispositivos (todos ou específico)
@@ -174,7 +172,7 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
  * Edita pessoa em todas as catracas (ou em uma específica) - PROCESSAMENTO PARALELO
  */
 const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qrcode, dispositivoId = null) => {
-  const catracaUserId = USER_ID_OFFSET + Number(id);
+  const catracaUserId = Number(id);
   const todosDispositivos = await listarTodos();
   
   const dispositivos = dispositivoId !== null
@@ -242,7 +240,7 @@ const processarDelecaoDispositivo = async (dispositivo, id, catracaUserId) => {
  * Deleta pessoa de todas as catracas (ou de uma específica) - PROCESSAMENTO PARALELO
  */
 const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
-  const catracaUserId = USER_ID_OFFSET + Number(id);
+  const catracaUserId = Number(id);
   const todosDispositivos = await listarTodos();
   
   const dispositivos = dispositivoId !== null
