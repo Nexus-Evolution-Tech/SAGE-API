@@ -117,6 +117,6 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- Garantir índices e unicidade
-CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
-CREATE INDEX idx_horario_sala ON HorarioAula(sala_id);
-CREATE INDEX idx_horario_dia_hora ON HorarioAula(dia_semana, horario);
+-- CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
+-- CREATE INDEX idx_horario_sala ON HorarioAula(sala_id);
+-- CREATE INDEX idx_horario_dia_hora ON HorarioAula(dia_semana, horario);

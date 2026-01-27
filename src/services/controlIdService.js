@@ -25,7 +25,7 @@ const limit = pLimit(PARALLEL_LIMIT);
 /**
  * Processa criação de pessoa em um dispositivo específico (PARALELO)
  */
-const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserId, qrcode) => {
+const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserId, qr_code) => {
   const link = linkCatraca(dispositivo);
   
   try {
@@ -48,7 +48,7 @@ const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserI
     }
 
     // 3. Criar cartão QR code
-    await controlId.criarCartao(catracaUserId, qrcode, link, session, dispositivo, resultados);
+    await controlId.criarCartao(catracaUserId, qr_code, link, session, dispositivo, resultados);
 
     // 4. Criar grupo
     await controlId.criarGrupo(catracaUserId, link, session, dispositivo, resultados);
@@ -79,15 +79,11 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
     throw new Error('Nenhum dispositivo encontrado');
   }
 
-  const qrcode = novaPessoa.qrcode && novaPessoa.qrcode.length === 8 
-    ? Number(novaPessoa.qrcode) 
-    : gerarNumero8Digitos();
-
-  logger.info(`Iniciando criação paralela de ${novaPessoa.nome} em ${dispositivos.length} catraca(s)`);
+  logger.info(`Iniciando criação paralela de ${novaPessoa.nome} em ${dispositivos.length} catraca(s)\nQRCODE: ${novaPessoa.qr_code}`);
 
   //  PROCESSAMENTO PARALELO com limit
   const promessas = dispositivos.map(dispositivo =>
-    limit(() => processarCriacaoDispositivo(dispositivo, novaPessoa, catracaUserId, qrcode))
+    limit(() => processarCriacaoDispositivo(dispositivo, novaPessoa, catracaUserId, Number(novaPessoa.qr_code)))
   );
 
   const resultados = await Promise.all(promessas);
@@ -110,7 +106,7 @@ const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
 /**
  * Processa edição de pessoa em um dispositivo específico (PARALELO)
  */
-const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qrcode, catracaUserId) => {
+const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr_code, catracaUserId) => {
   const link = linkCatraca(dispositivo);
   
   try {
@@ -142,8 +138,8 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
       await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, resultados);
     }
 
-    // QRCODE é atualizado sempre, mesmo que não tenha mudado efetivamente
-    const value = Number(qrcode);
+    // qr_code é atualizado sempre, mesmo que não tenha mudado efetivamente
+    const value = Number(qr_code);
 
     await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'QRCODE');
     await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
@@ -171,7 +167,7 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
 /**
  * Edita pessoa em todas as catracas (ou em uma específica) - PROCESSAMENTO PARALELO
  */
-const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qrcode, dispositivoId = null) => {
+const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qr_code, dispositivoId = null) => {
   const catracaUserId = Number(id);
   const todosDispositivos = await listarTodos();
   
@@ -187,7 +183,7 @@ const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qrcode, dispositiv
 
   //  PROCESSAMENTO PARALELO
   const promessas = dispositivos.map(dispositivo =>
-    limit(() => processarEdicaoDispositivo(dispositivo, id, nome, cartao_rfid, qrcode, catracaUserId))
+    limit(() => processarEdicaoDispositivo(dispositivo, id, nome, cartao_rfid, qr_code, catracaUserId))
   );
 
   const resultados = await Promise.all(promessas);

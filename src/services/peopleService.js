@@ -20,6 +20,7 @@ const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
 const registrarSyncPendente = require('../services/sync');
+const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 
 /**
  * Verifica se já existe uma pessoa com os documentos fornecidos
@@ -81,7 +82,7 @@ async function criarPessoaCompleta(dados) {
   const pessoa = await criarPessoaBase({
     nome, foto, rg, cpf, telefone, email, tipo,
     unidade_id: camposExtras.unidade_id || null,
-    qr_code: camposExtras.qr_code || null,
+    qr_code: camposExtras.qr_code || gerarNumero8Digitos(),
     cartao_rfid: camposExtras.cartao_rfid || null,
     senha_acesso: camposExtras.senha_acesso ? await hashSenha(camposExtras.senha_acesso) : null,
     data_nascimento

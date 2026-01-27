@@ -19,9 +19,11 @@ function identificarAcesso(portal_id) {
   return portal_id === 1 ? 'ENTRADA' : 'SAIDA';
 }
 
-// Converte timestamp Unix para Date
+// Converte timestamp Unix para Date e adiciona +3 horas
 function timestampParaData(time) {
-  return new Date(time * 1000);
+  const data = new Date(time * 1000); // timestamp Unix em segundos
+  data.setHours(data.getHours() + 3); // adiciona 3 horas
+  return data;
 }
 
 // Calcula idade

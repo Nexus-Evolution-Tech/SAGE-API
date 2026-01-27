@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS Pessoa (
     CONSTRAINT chk_telefone CHECK (REGEXP_LIKE(telefone, '^[0-9]{10,11}$')),
     email VARCHAR(100)  COMMENT 'Email de contato, em caso de alunos é o institucional',
     unidade_id INT,
-    qr_code VARCHAR(255) COMMENT 'Precisa ser descoberto o padrão ER deste campo: provavelmente será UUID ou código numérico',
+    qr_code VARCHAR(8),
     cartao_rfid VARCHAR(8) COMMENT 'Dígito de 8 caracteres: <area>.<codigo>',
     CONSTRAINT chk_rfid CHECK (REGEXP_LIKE(cartao_rfid, '^[0-9]{3}[0-9]{5}$')),
     senha_acesso VARCHAR(255) COMMENT 'Precisa de criptografia na aplicação Node.js',

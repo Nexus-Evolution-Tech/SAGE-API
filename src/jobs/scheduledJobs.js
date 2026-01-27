@@ -10,7 +10,7 @@ const listarTodos = async () => {
 
 // Job de sincronização de acessos
 const sincronizarAcessosJob = () => {
-  const cronExpression = '*/1 * * * *'; // a cada 1 minutos
+  const cronExpression = '*/10 * * * *'; // a cada 10 minutos
 
   return cron.schedule(cronExpression, async () => {
     try {
@@ -114,7 +114,7 @@ const verificarSyncPendentesJob = () => {
             await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
           } else if (registro.operation === 'UPDATE') {
             await controlIdService.editarPessoaNasCatracas(
-              pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qrcode,
+              pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qr_code,
               { dispositivoId: registro.dispositivo_id }
             );
           } else if (registro.operation === 'DELETE') {
