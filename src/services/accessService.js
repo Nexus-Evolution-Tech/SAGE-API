@@ -2,6 +2,8 @@ const deviceService = require('./deviceService');
 const verificarEAtribuirPresenca = require('./presenceService');
 const db = require('../config/database')
 
+const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '110000000');
+
 function formatarUserId(user_id) {
   // Converte para string, remove todos os zeros à esquerda, depois pega os últimos 7 dígitos
   const str = String(user_id).replace(/^0+/, ''); // remove zeros à esquerda
@@ -78,7 +80,7 @@ async function sincronizarAcessos(dispositivo) {
     // Ignora logs de pessoas anteriores a 73975 (inclusive)
     if (log.id <= MIN_ID) continue;
 
-    const pessoa_id = formatarUserId(log.user_id); //PARA PASSAR O ID DAS PESSOAS É PRECISO DELETAR TODOS OS OUTROS DADOS ANTERIORES
+    const pessoa_id = formatarUserId(log.user_id - USER_ID_OFFSET); //PARA PASSAR O ID DAS PESSOAS É PRECISO DELETAR TODOS OS OUTROS DADOS ANTERIORES
     const dispositivo_id = dispositivo.id;
     const data_hora = timestampParaData(log.time);
     const status = identificarAcesso(log.portal_id);

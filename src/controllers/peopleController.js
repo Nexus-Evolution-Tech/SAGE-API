@@ -6,10 +6,11 @@ const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/database');
-const { criarImagemUsuario, generateQrCode } = require('../services/controlIdService');
+const { criarImagemUsuario } = require('../services/controlIdService');
 const { buscarPessoaBase } = require('../utils/people-db-utils');
 const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
 const registrarSyncPendente = require('../services/sync');
+const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 
 // --- LISTAR (Sem alterações) ---
 const listar = async (req, res) => {
@@ -234,14 +235,14 @@ const uploadFoto = async (req, res) => {
 const gerarQrCode = async (req, res) => {
   const id = req.params.id;
   try {
-    const data = await generateQrCode(id);
+    const qrcode = gerarNumero8Digitos();
 
     const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
-    await db.query(query, [data.qrcode, id]);
+    await db.query(query, [qrcode, id]);
 
     // await registrarSyncPendente(id, 'UPDATE'); - a partir do momento em que eu clico em salvar ja cadastra um UPDATE em sync_pendente
 
-    res.json({ message: "QR Code gerado com sucesso", id, qr_code: data.qrcode });
+    res.json({ message: "QR Code gerado com sucesso", id, qr_code: qrcode });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
   }
