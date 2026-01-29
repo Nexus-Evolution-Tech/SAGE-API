@@ -278,33 +278,64 @@ async function criarAcesso(dados) {
       const aluno = await global.db('Aluno').where('id', pessoa_id).first();
       const turmaId = aluno.turma_id;
 
+<<<<<<< Updated upstream
       const aulasHoje = await global.db('Aula')
         .where({ turma_id: turmaId, dia_semana: diaSemana })
         .orderBy('inicio', 'asc');
+=======
+      if (!turmaId) {
+        return { message: 'Acesso negado: aluno sem turma associada', error: 'TURMA_NAO_DEFINIDA' };
+      }
 
-      if (!aulasHoje || aulasHoje.length === 0) {
+      // Mapa de dias da semana (JS: 0=domingo -> DB: DOMINGO) 
+      const diasDasemana = ['DOMINGO','SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO'];
+      const diaSemanaDb = diasDasemana[diaSemana];
+>>>>>>> Stashed changes
+
+      console.log(`[ACCESS-DEBUG] Consultando aulas: turma=${turmaId}, dia=${diaSemanaDb}`);
+      const aulasHoje = await global.db('HorarioAula')
+        .where('turma_id', turmaId)
+        .where('dia_semana', diaSemanaDb)
+        .orderBy('horario', 'asc')
+        .select();
+      
+      console.log(`[ACCESS-DEBUG] Aulas encontradas: ${JSON.stringify(aulasHoje)}`);
+
+      // Verificação defensiva: se não há aulas, autoriza saída
+      if (!aulasHoje || !Array.isArray(aulasHoje) || aulasHoje.length === 0) {
         permitido = true;
         mensagem = "Acesso autorizado: Nenhuma aula cadastrada para hoje";
         break;
       }
 
+      // Verifica se a primeira aula tem dados válidos
       const primeiraAula = aulasHoje[0];
       const ultimaAula = aulasHoje[aulasHoje.length - 1];
+      
+      if (!primeiraAula || !primeiraAula.horario || !ultimaAula || !ultimaAula.horario) {
+        permitido = true;
+        mensagem = "Acesso autorizado: Nenhuma aula válida cadastrada para hoje";
+        break;
+      }
+
+      // Extrai os horários (formato "07:30-08:20")
+      const primeiroHorario = primeiraAula.horario.split('-')[0]; // "07:30"
+      const ultimoHorario = ultimaAula.horario.split('-')[1]; // "08:20"
 
       const agora = hoje.toTimeString().split(' ')[0]; // HH:MM:SS
 
       /*INDEPENDENTE SE COMEÇOU A PRIMEIRA AULA DO DIA OU NÃO, A PARTIR DO MOMENTO EM QUE O ALUNO ENTRA NA ESCOLA, SÓ PODERÁ SAIR NO SEU HORÁRIO DE SAÍDA*/
-      // if (agora < primeiraAula.inicio) {
+      // if (agora < primeiroHorario) {
       //   // Antes da primeira aula, pode sair sem problemas
       //   permitido = true;
-      //   mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiraAula.inicio}`;
+      //   mensagem = `Acesso autorizado: Ainda não começou a primeira aula - Primeira aula às ${primeiroHorario}`;
       //   break;
       // }
 
-      if (agora >= ultimaAula.fim) {
+      if (agora >= ultimoHorario) {
         // Após o fim da última aula, pode sair sem problemas
         permitido = true;
-        mensagem = `Acesso autorizado: Aulas encerradas - Última aula terminou às ${ultimaAula.fim}`;
+        mensagem = `Acesso autorizado: Aulas encerradas - Última aula terminou às ${ultimoHorario}`;
         break;
       }
 

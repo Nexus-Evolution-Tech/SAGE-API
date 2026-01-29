@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste - Relatórios de Acesso</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: white;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    .filters {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .filter-group label {
+      font-weight: 600;
+      color: #333;
+    }
+    
+    select, button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button {
+      background: #4CAF50;
+      color: white;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    
+    button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .card h3 {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .card .number {
+      font-size: 32px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    
+    .card .percent {
+      color: #4CAF50;
+      font-size: 14px;
+    }
+    
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      position: relative;
+      height: 350px;
+    }
+    
+    .error {
+      background: #f44336;
+      color: white;
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
+    .loading {
+      text-align: center;
+      color: white;
+      padding: 40px;
+      font-size: 18px;
+    }
+    
+    .response-raw {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Relatório de Acesso e Presença</h1>
+    
+    <div class="filters">
+      <div class="filter-group">
+        <label>Grupo:</label>
+        <button id="btnAlunos" onclick="selecionarGrupo('ALUNOS')" style="background: #667eea; color: white; font-weight: bold;">👥 Alunos</button>
+        <button id="btnFuncionarios" onclick="selecionarGrupo('FUNCIONARIOS')" style="background: white; color: #333;">👔 Funcionários</button>
+      </div>
+      
+      <div class="filter-group">
+        <label for="periodo">Período:</label>
+        <select id="periodo" onchange="mudarPeriodo()">
+          <option value="HOJE">Hoje</option>
+          <option value="DIA_ESPECIFICO">Dia Específico</option>
+          <option value="SEMANA_ATUAL">Semana Atual</option>
+          <option value="SEMANA_ESPECIFICO">Semana Específica</option>
+          <option value="MES_ATUAL">Mês Atual</option>
+          <option value="MES_ESPECIFICO">Mês Específico</option>
+        </select>
+        <input type="date" id="data" style="display: none;" onchange="atualizar()">
+        <input type="month" id="mes" style="display: none;" onchange="atualizar()">
+      </div>
+      
+      <div class="filter-group">
+        <label for="tipo">Filtro:</label>
+        <select id="tipo" onchange="atualizar()">
+          <option value="TODOS">Carregando...</option>
+        </select>
+      </div>
+      
+      <button id="btnAtualizar" onclick="atualizar()" disabled>🔄 Carregar</button>
+    </div>
+    
+    <div id="carregando" class="loading" style="display: none;">Carregando dados...</div>
+    <div id="erro" class="error" style="display: none;"></div>
+    <div id="resposta" class="response-raw" style="display: none;"></div>
+    
+    <div id="conteudo">
+      <div class="cards">
+        <div class="card">
+          <h3>Total</h3>
+          <div class="number" id="total">-</div>
+        </div>
+        <div class="card">
+          <h3>No Horário</h3>
+          <div class="number" id="noHorario" style="color: #4CAF50">-</div>
+        </div>
+        <div class="card">
+          <h3>Atrasados</h3>
+          <div class="number" id="atrasados" style="color: #FFC107">-</div>
+        </div>
+        <div class="card">
+          <h3>Faltantes</h3>
+          <div class="number" id="faltantes" style="color: #F44336">-</div>
+        </div>
+      </div>
+      
+      <div class="charts">
+        <div class="chart-container">
+          <canvas id="pizzaChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="linhaChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let chartPizza = null;
+    let chartLinha = null;
+    let grupoAtual = 'ALUNOS';
+    let turmasCarregadas = false;
+
+    function mudarPeriodo() {
+      const periodo = document.getElementById('periodo').value;
+      const dataInput = document.getElementById('data');
+      const mesInput = document.getElementById('mes');
+      
+      // Esconder ambos
+      dataInput.style.display = 'none';
+      mesInput.style.display = 'none';
+      
+      // Mostrar o apropriado
+      if (periodo === 'DIA_ESPECIFICO' || periodo === 'SEMANA_ESPECIFICO') {
+        dataInput.style.display = 'inline-block';
+      } else if (periodo === 'MES_ESPECIFICO') {
+        mesInput.style.display = 'inline-block';
+      }
+      
+      atualizar();
+    }
+
+    async function carregarTurmas() {
+      try {
+        const response = await fetch('http://localhost:3000/api/relatorios/turmas');
+        const turmas = await response.json();
+        
+        const selectTipo = document.getElementById('tipo');
+        selectTipo.innerHTML = '<option value="TODOS">Todas as Turmas</option>';
+        
+        turmas.forEach(turma => {
+          const option = document.createElement('option');
+          option.value = turma.id;
+          option.textContent = turma.nome;
+          selectTipo.appendChild(option);
+        });
+        
+        selectTipo.value = 'TODOS';
+        turmasCarregadas = true;
+        console.log('[TURMAS] Carregadas:', turmas.length);
+      } catch (err) {
+        console.error('[TURMAS-ERROR]', err);
+        document.getElementById('tipo').innerHTML = '<option>Erro ao carregar turmas</option>';
+      }
+    }
+
+    function carregarFuncionarios() {
+      const selectTipo = document.getElementById('tipo');
+      selectTipo.innerHTML = `
+        <option value="TODOS">Todos</option>
+        <option value="PROFESSOR">Professores</option>
+        <option value="ADMINISTRADOR">Administrativos</option>
+        <option value="TERCEIRIZADO">Terceirizados</option>
+      `;
+      selectTipo.value = 'TODOS';
+    }
+
+    function selecionarGrupo(grupo) {
+      grupoAtual = grupo;
+      document.getElementById('btnAlunos').style.background = grupo === 'ALUNOS' ? '#667eea' : 'white';
+      document.getElementById('btnAlunos').style.color = grupo === 'ALUNOS' ? 'white' : '#333';
+      document.getElementById('btnFuncionarios').style.background = grupo === 'FUNCIONARIOS' ? '#667eea' : 'white';
+      document.getElementById('btnFuncionarios').style.color = grupo === 'FUNCIONARIOS' ? 'white' : '#333';
+      
+      if (grupo === 'ALUNOS' && !turmasCarregadas) {
+        carregarTurmas();
+      } else if (grupo === 'FUNCIONARIOS') {
+        carregarFuncionarios();
+      }
+      
+      atualizar();
+    }
+    
+    async function atualizar() {
+      const tipo = document.getElementById('tipo').value;
+      const periodo = document.getElementById('periodo').value;
+      const data = document.getElementById('data').value;
+      const mes = document.getElementById('mes').value;
+      const btnAtualizar = document.getElementById('btnAtualizar');
+      
+      btnAtualizar.disabled = true;
+      document.getElementById('carregando').style.display = 'block';
+      document.getElementById('erro').style.display = 'none';
+      document.getElementById('resposta').style.display = 'block';
+      
+      try {
+        let url = `http://localhost:3000/api/relatorios/acesso?grupo=${grupoAtual}&tipo=${tipo}&periodo=${periodo}`;
+        
+        // Adicionar data ou mes se necessário
+        if ((periodo === 'DIA_ESPECIFICO' || periodo === 'SEMANA_ESPECIFICO') && data) {
+          url += `&data=${data}`;
+        } else if (periodo === 'MES_ESPECIFICO' && mes) {
+          url += `&mes=${mes}`;
+        }
+        
+        console.log('Buscando:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const responseData = await response.json();
+        document.getElementById('resposta').textContent = JSON.stringify(responseData, null, 2);
+        
+        if (!response.ok) {
+          throw new Error(responseData.erro || `HTTP ${response.status}`);
+        }
+        
+        // Atualizar cards
+        document.getElementById('total').textContent = responseData.metricas.total;
+        document.getElementById('noHorario').textContent = responseData.metricas.no_horario;
+        document.getElementById('atrasados').textContent = responseData.metricas.atrasados;
+        document.getElementById('faltantes').textContent = responseData.metricas.faltantes;
+        
+        // Gráfico Pizza
+        if (chartPizza) chartPizza.destroy();
+        chartPizza = new Chart(document.getElementById('pizzaChart'), {
+          type: 'doughnut',
+          data: {
+            labels: responseData.pizza.map(p => p.label),
+            datasets: [{
+              data: responseData.pizza.map(p => p.value),
+              backgroundColor: responseData.pizza.map(p => p.color),
+              borderColor: '#fff',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' },
+              title: { display: true, text: 'Status de Presença' }
+            }
+          }
+        });
+        
+        // Gráfico Linha
+        if (chartLinha) chartLinha.destroy();
+        chartLinha = new Chart(document.getElementById('linhaChart'), {
+          type: 'line',
+          data: {
+            labels: responseData.linha.map(l => l.periodo),
+            datasets: [
+              {
+                label: 'No Horário',
+                data: responseData.linha.map(l => l.no_horario),
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                tension: 0.4
+              },
+              {
+                label: 'Atrasados',
+                data: responseData.linha.map(l => l.atrasados),
+                borderColor: '#FFC107',
+                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                tension: 0.4
+              },
+              {
+                label: 'Faltantes',
+                data: responseData.linha.map(l => l.faltantes),
+                borderColor: '#F44336',
+                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                tension: 0.4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' },
+              title: { display: true, text: 'Presença por Horário' }
+            },
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        });
+        
+        document.getElementById('erro').style.display = 'none';
+      } catch (err) {
+        console.error('Erro:', err);
+        document.getElementById('erro').style.display = 'block';
+        document.getElementById('erro').textContent = '❌ Erro: ' + err.message;
+      } finally {
+        document.getElementById('carregando').style.display = 'none';
+        btnAtualizar.disabled = false;
+      }
+    }
+    
+    // Inicializar ao abrir página
+    window.addEventListener('load', () => {
+      document.getElementById('btnAtualizar').disabled = false;
+      carregarTurmas();
+      atualizar();
+    });
+  </script>
+</body>
+</html>

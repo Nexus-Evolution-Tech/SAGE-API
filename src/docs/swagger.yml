@@ -43,6 +43,199 @@ tags:
     description: Operações relacionadas com os atrasos das pessoas de acordo com seu horário previsto de entrada
 
 paths:
+<<<<<<< Updated upstream
+=======
+  /sala/:
+    get:
+      tags: [Salas]
+      summary: Lista todas as salas
+      responses:
+        '200':
+          description: Lista de salas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sala'
+    post:
+      tags: [Salas]
+      summary: Cria uma nova sala
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sala'
+            example:
+              numero: "101"
+              nome: "Laboratório de Informática"
+              capacidade: 30
+              unidade_id: 1
+      responses:
+        '201':
+          description: Sala criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+  /sala/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+
+  /api/relatorios/acesso:
+    get:
+      tags: [Acessos]
+      summary: Relatório de Acesso & Presença (pizza + linha + tabela)
+      description: Retorna métricas agregadas, dados para gráfico de pizza e linha, e registros detalhados conforme período e filtros.
+      parameters:
+        - in: query
+          name: grupo
+          schema:
+            type: string
+            enum: [ALUNOS, FUNCIONARIOS]
+            default: ALUNOS
+        - in: query
+          name: tipo_funcionario
+          schema:
+            type: string
+            enum: [TODOS, PROFESSOR, ADMIN, TERCEIRIZADO]
+            default: TODOS
+          description: Aplicado quando grupo=FUNCIONARIOS
+        - in: query
+          name: turma_id
+          schema:
+            type: string
+            default: TODOS
+          description: Aplicado quando grupo=ALUNOS
+        - in: query
+          name: periodo
+          schema:
+            type: string
+            enum: [TODAY, SPECIFIC_DAY, CURRENT_WEEK, SPECIFIC_WEEK, CURRENT_MONTH, SPECIFIC_MONTH]
+            default: TODAY
+        - in: query
+          name: data_inicio
+          schema:
+            type: string
+            format: date
+          description: Data base para períodos específicos (obrigatório em SPECIFIC_DAY/WEEK/MONTH)
+        - in: query
+          name: data_fim
+          schema:
+            type: string
+            format: date
+          description: Opcional para ranges futuros
+      responses:
+        '200':
+          description: Dados do relatório
+          content:
+            application/json:
+              example:
+                periodo: { de: "2026-01-27", ate: "2026-01-27", tipo: "TODAY" }
+                filtro: { grupo: "FUNCIONARIOS", tipo: "TODOS", turma_id: "TODOS" }
+                metricas:
+                  total: 12
+                  no_horario: 9
+                  atrasados: 2
+                  faltantes: 1
+                  percentual_presenca: 75
+                dados_pizza:
+                  - { label: "No Horário", value: 9, percentual: 75, color: "#4CAF50" }
+                  - { label: "Atrasados", value: 2, percentual: 16.6, color: "#FFC107" }
+                  - { label: "Faltantes", value: 1, percentual: 8.3, color: "#F44336" }
+                dados_linha:
+                  - { horario: "07:30", no_horario: 5, atrasados: 1, faltantes: 0 }
+                  - { horario: "08:20", no_horario: 4, atrasados: 1, faltantes: 1 }
+        '400':
+          description: Parâmetro inválido
+          content:
+            application/json:
+              example: { erro: "Período inválido" }
+
+  /api/relatorios/turmas:
+    get:
+      tags: [Acessos]
+      summary: Lista de turmas para filtros de relatórios
+      responses:
+        '200':
+          description: Lista de turmas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    nome:
+                      type: string
+        '500':
+          description: Erro ao buscar turmas
+    get:
+      tags: [Salas]
+      summary: Retorna uma sala pelo ID
+      responses:
+        '200':
+          description: Sala encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+        '404':
+          description: Sala não encontrada
+    patch:
+      tags: [Salas]
+      summary: Atualiza uma sala
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sala'
+            example:
+              numero: "102"
+              nome: "Laboratório de Ciências"
+              capacidade: 25
+              unidade_id: 1
+      responses:
+        '200':
+          description: Sala atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sala'
+        '404':
+          description: Sala não encontrada
+    delete:
+      tags: [Salas]
+      summary: Remove uma sala
+      responses:
+        '204':
+          description: Sala deletada
+        '404':
+          description: Sala não encontrada
+  /monitoring/sync-db:
+    get:
+      tags: [Monitoramento]
+      summary: Status da fila de sincronização (banco de dados)
+      description: Retorna contagem total, agrupamento por ação, registros mais antigos/novos e as últimas 50 entradas da tabela `sync_pendente`.
+      security: []
+      responses:
+        '200':
+          description: Status atual da fila
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncDbStatus'
+        '500':
+          description: Erro ao consultar a fila no banco
+>>>>>>> Stashed changes
   /dados/planilha-modelo:
     get:
       tags: [Dados]

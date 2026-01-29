@@ -1,3 +1,8 @@
+<<<<<<< Updated upstream
+=======
+require('dotenv').config();
+console.log('[BOOT-DB] carregando mysql2...');
+>>>>>>> Stashed changes
 const mysql = require('mysql2');
 
 const pool = mysql.createPool({
