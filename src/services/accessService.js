@@ -290,6 +290,9 @@ async function criarAcesso(dados) {
       // Mapa de dias da semana (JS: 0=domingo -> DB: DOMINGO) 
       const diasDasemana = ['DOMINGO','SEGUNDA','TERCA','QUARTA','QUINTA','SEXTA','SABADO'];
       const diaSemanaDb = diasDasemana[diaSemana];
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
       console.log(`[ACCESS-DEBUG] Consultando aulas: turma=${turmaId}, dia=${diaSemanaDb}`);

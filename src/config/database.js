@@ -1,5 +1,8 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 require('dotenv').config();
 console.log('[BOOT-DB] carregando mysql2...');
 >>>>>>> Stashed changes
