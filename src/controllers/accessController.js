@@ -75,7 +75,8 @@ const criar = async (req, res) => {
 
 const controllerGenerico = gerarController(tabela, campos, 'acesso');
 
-/** Listar acessos por id DESC (mais recentes primeiro) para a tela de monitoramento. */
+/** Listar acessos por id DESC (mais recentes primeiro) para a tela de monitoramento.
+ *  Só busca a página atual (LIMIT/OFFSET) e o total por COUNT — nunca carrega todos os registros. */
 const listar = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;

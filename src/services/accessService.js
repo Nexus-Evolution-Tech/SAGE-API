@@ -81,16 +81,17 @@ async function sincronizarAcessos(dispositivo) {
   const MARGEM_SEGUNDOS = 3600; // 1 hora: evita perder logs recentes por diferença de fuso/relógio
   let timestampInicial = Math.max(0, ts - MARGEM_SEGUNDOS);
 
-  // Obtem logs da catraca
+  // Uma requisição à catraca por dispositivo (load_objects); depois só processamos a lista em memória e gravamos no nosso banco (sem nova chamada à catraca por pessoa).
   let logs = await deviceService.obterLogsCatraca(session, link, timestampInicial);
-  // Se não veio nenhum log mas temos último acesso, pode ser timestamp errado: buscar últimas 24h
+  // Se não veio nenhum log mas temos último acesso, pode ser timestamp errado: buscar últimas 24h (mais uma requisição, só nesse caso)
   if (logs.length === 0 && ultimoAcesso) {
     const fallbackTs = Math.max(0, Math.floor(Date.now() / 1000) - 24 * 3600);
     logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
     logs = await deviceService.obterLogsCatraca(session, link, fallbackTs);
   }
 
-  // Diagnóstico: faixa de id/time na catraca e quantos passam no primeiro filtro (evita adivinhar só pelo "0 inseridos")
+  // Diagnóstico e ajuste: se o último acesso no banco está à frente do relógio da catraca, nenhum log passaria. Processar TODOS os logs já trazidos (ex.: fallback 24h) para não perder acesso de hoje (ex.: 13h).
+  let effectiveTimestampInicial = timestampInicial;
   if (logs.length > 0) {
     const ids = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
     const times = logs.map((l) => (l.time != null ? Number(l.time) : NaN)).filter((n) => !isNaN(n));
@@ -98,22 +99,25 @@ async function sincronizarAcessos(dispositivo) {
     const maxId = ids.length ? Math.max(...ids) : null;
     const minTime = times.length ? Math.min(...times) : null;
     const maxTime = times.length ? Math.max(...times) : null;
-    const passamPrimeiroFiltro = logs.filter((l) => (l.id != null && Number(l.id) > MIN_ID) && (l.time != null && Number(l.time) > timestampInicial)).length;
+    if (maxTime != null && timestampInicial > maxTime) {
+      effectiveTimestampInicial = Math.max(0, (minTime != null ? minTime - 1 : 0));
+      logger.warn(
+        `[SYNC] ${dispositivo.nome}: timestampInicial (${timestampInicial}) à frente do max time da catraca (${maxTime}). Processando todos os ${logs.length} logs já trazidos (effectiveTimestampInicial=${effectiveTimestampInicial}) para incluir acessos de hoje (ex.: 13h).`
+      );
+    }
+    const passamPrimeiroFiltro = logs.filter((l) => (l.id != null && Number(l.id) > MIN_ID) && (l.time != null && Number(l.time) > effectiveTimestampInicial)).length;
     logger.info(
-      `[SYNC] ${dispositivo.nome}: diagnóstico catraca → id [${minId}, ${maxId}], time [${minTime}, ${maxTime}], timestampInicial=${timestampInicial}, MIN_ID=${MIN_ID}, passam 1º filtro=${passamPrimeiroFiltro}/${logs.length}`
+      `[SYNC] ${dispositivo.nome}: diagnóstico catraca → id [${minId}, ${maxId}], time [${minTime}, ${maxTime}], effectiveTimestampInicial=${effectiveTimestampInicial}, MIN_ID=${MIN_ID}, passam 1º filtro=${passamPrimeiroFiltro}/${logs.length}`
     );
     if (passamPrimeiroFiltro === 0 && MIN_ID > 0 && maxId != null && maxId < MIN_ID) {
       logger.warn(
         `[SYNC] ${dispositivo.nome}: CATRACA_MIN_LOG_ID=${MIN_ID} é maior que o maior id da catraca (${maxId}). Nenhum log será processado. Use CATRACA_MIN_LOG_ID=0 ou um valor <= ${maxId}.`
       );
     }
-    if (passamPrimeiroFiltro === 0 && maxTime != null && maxTime < timestampInicial) {
-      const ultimoAcessoStr = ultimoAcesso?.data_hora ? String(ultimoAcesso.data_hora) : 'N/A';
-      logger.warn(
-        `[SYNC] ${dispositivo.nome}: timestampInicial (${timestampInicial}) está à frente do mais recente log da catraca (max time=${maxTime}). Último acesso no banco: data_hora=${ultimoAcessoStr}. Possível relógio à frente ou data gravada errada.`
-      );
-    }
   }
+
+  // Ordenar do mais recente ao mais antigo: usuário vê os últimos acessos em segundos enquanto a sync continua em background
+  logs.sort((a, b) => (Number(b?.time) || 0) - (Number(a?.time) || 0));
 
   let acessosSincronizados = 0;
   let ignoradosPessoa = 0;
@@ -122,8 +126,9 @@ async function sincronizarAcessos(dispositivo) {
   const { emitToRoom } = require('../websocket/wsServer');
   const { cacheMutation, CACHE_KEYS } = require('../cache/helpers');
 
+  // Processar lista em memória: só MySQL (SELECT/INSERT); nenhuma nova requisição à catraca.
   for (const log of logs) {
-    if (log.id <= MIN_ID || log.time <= timestampInicial) continue;
+    if (log.id <= MIN_ID || log.time <= effectiveTimestampInicial) continue;
     if (log.user_id == null || log.user_id === 0 || String(log.user_id).trim() === '') continue;
 
     const pessoa_id = userIdCatracaParaPessoaId(log.user_id);
@@ -187,7 +192,7 @@ async function sincronizarAcessos(dispositivo) {
   }
 
   logger.info(
-    `[SYNC] ${dispositivo.nome}: timestampInicial=${timestampInicial}, logs=${logs.length}, ` +
+    `[SYNC] ${dispositivo.nome}: effectiveTimestampInicial=${effectiveTimestampInicial}, logs=${logs.length}, ` +
     `inseridos=${acessosSincronizados}, ignorados(pessoa)=${ignoradosPessoa}, ignorados(duplicata)=${ignoradosDuplicata}`
   );
   // Invalidar cache da lista sempre que rodar sync (para GET /acessos devolver dados frescos)
