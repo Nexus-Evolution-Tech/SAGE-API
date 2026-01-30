@@ -46,13 +46,17 @@ function normalizarDivisao(value) {
 // Validações de Conflitos
 // ==============================
 async function validarConflitoProfessor(professorId, dia, horario, divisao, horarioIdExcluir = null) {
-  // IMPORTANTE: Professor não pode dar aula em duas divisões ao mesmo tempo
-  // Então checamos conflito SEM considerar a divisão - apenas dia + horário
+  // IMPORTANTE: Professor não pode dar aula em duas turmas/divisões ao mesmo tempo
+  // Checamos conflito SEM considerar a divisão - apenas dia + horário (um professor não é dois)
+  if (!professorId) return null;
+
   const sql = `
-    SELECT DISTINCT ha.id, ha.turma_id, ha.divisao, t.nome as turma_nome
+    SELECT DISTINCT ha.id, ha.turma_id, ha.divisao, t.nome as turma_nome, a.nome as aula_nome,
+           p.nome as professor_nome
     FROM HorarioAula ha
     JOIN Aula a ON ha.aula_id = a.id
     LEFT JOIN Turma t ON ha.turma_id = t.id
+    LEFT JOIN Pessoa p ON a.professor_id = p.id
     WHERE a.professor_id = ?
       AND ha.dia_semana = ?
       AND ha.horario = ?
@@ -256,21 +260,28 @@ const horarioAulaController = {
         });
       }
 
-      // Validar conflito de professor (não considera divisão)
+      // Validar conflito de professor (não pode dar aula em 2 turmas no mesmo dia/horário)
       const conflitoProfessor = await validarConflitoProfessor(
         professorId,
         diaDb,
         horario,
         divNorm
       );
-      // if (conflitoProfessor) {
-      //   const divisoes = conflitoProfessor.map(c => c.divisao).join(', ');
-      //   const turmas = conflitoProfessor.map(c => c.turma_nome || c.turma_id).join(', ');
-      //   console.log('❌ ERRO 409: Conflito de professor', { professorId, diaDb, horario, divisoes, turmas });
-      //   return res.status(409).json({
-      //     message: `Conflito: professor já tem aula neste horário (${divisoes} - ${turmas}). Se for a mesma turma, use divisão INT ao invés de dividir.`
-      //   });
-      // }
+      if (conflitoProfessor) {
+        const conflicts = conflitoProfessor.map(c => ({
+          type: 'professor',
+          details: {
+            professorNome: c.professor_nome || 'Professor',
+            aulaConflito: c.aula_nome || 'Aula',
+            turmaConflito: c.turma_nome || `Turma ${c.turma_id}`
+          }
+        }));
+        console.log('❌ ERRO 409: Conflito de professor', { professorId, diaDb, horario });
+        return res.status(409).json({
+          message: 'Professor já possui aula neste horário e dia',
+          conflicts
+        });
+      }
 
       // Validar conflito de sala
       const temConflitSala = await validarConflitSala(
@@ -387,18 +398,27 @@ const horarioAulaController = {
       }
 
       // Validar conflito de professor (excluindo este registro)
-      const temConflitoProfessor = await validarConflitoProfessor(
+      const conflitoProfessor = await validarConflitoProfessor(
         professorId,
         novoDia,
         novoHorario,
         novoDiv,
         id
       );
-      // if (temConflitoProfessor) {
-      //   return res.status(409).json({
-      //     message: 'Conflito: professor já tem aula neste horário e divisão'
-      //   });
-      // }
+      if (conflitoProfessor) {
+        const conflicts = conflitoProfessor.map(c => ({
+          type: 'professor',
+          details: {
+            professorNome: c.professor_nome || 'Professor',
+            aulaConflito: c.aula_nome || 'Aula',
+            turmaConflito: c.turma_nome || `Turma ${c.turma_id}`
+          }
+        }));
+        return res.status(409).json({
+          message: 'Professor já possui aula neste horário e dia',
+          conflicts
+        });
+      }
 
       // Validar conflito de sala (excluindo este registro)
       const temConflitSala = await validarConflitSala(
@@ -444,7 +464,7 @@ const horarioAulaController = {
   // ====================================
   async validar(req, res) {
     try {
-      const { turmaId, diaSemana, horario, divisao, horarioIdExcluir } = req.body;
+      const { turmaId, diaSemana, horario, divisao, aulaId, horarioIdExcluir } = req.body;
 
       if (!turmaId || !diaSemana || !horario || !divisao) {
         return res.status(400).json({
@@ -470,12 +490,45 @@ const horarioAulaController = {
         divNorm,
         horarioIdExcluir
       );
+      if (ehDuplicada) {
+        return res.status(409).json({
+          message: 'Já existe aula neste horário e divisão para esta turma',
+          conflicts: [{ type: 'duplicata', message: 'Slot já ocupado para esta turma' }]
+        });
+      }
 
-      res.json({
-        valid: !ehDuplicada,
-        hasDuplicate: ehDuplicada
-      });
+      // Validar conflito de professor (quando aulaId informado)
+      if (aulaId) {
+        const [aulaDados] = await db.query(
+          'SELECT professor_id FROM Aula WHERE id = ?',
+          [aulaId]
+        );
+        if (aulaDados.length > 0 && aulaDados[0].professor_id) {
+          const conflitoProfessor = await validarConflitoProfessor(
+            aulaDados[0].professor_id,
+            diaDb,
+            horario,
+            divNorm,
+            horarioIdExcluir
+          );
+          if (conflitoProfessor) {
+            const conflicts = conflitoProfessor.map(c => ({
+              type: 'professor',
+              details: {
+                professorNome: c.professor_nome || 'Professor',
+                aulaConflito: c.aula_nome || 'Aula',
+                turmaConflito: c.turma_nome || `Turma ${c.turma_id}`
+              }
+            }));
+            return res.status(409).json({
+              message: 'Professor já possui aula neste horário e dia',
+              conflicts
+            });
+          }
+        }
+      }
 
+      res.json({ valid: true });
     } catch (err) {
       console.error('Erro ao validar horário:', err);
       res.status(500).json({ message: 'Erro ao validar horário' });
