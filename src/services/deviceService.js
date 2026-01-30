@@ -53,11 +53,12 @@ async function verificarSessao(session, linkCatraca) {
 
 async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0) {
   try {
+    // load_objects sem filtro na API = catraca envia TODOS os access_logs (milhares). Timeout maior evita falha.
+    const loadLogsTimeoutMs = parseInt(process.env.CATRACA_LOAD_LOGS_TIMEOUT || '60000', 10);
     const response = await axiosInstance.post(
       `http://${linkCatraca}/load_objects.fcgi?session=${session}`,
-      {
-        object: 'access_logs'
-      }
+      { object: 'access_logs' },
+      { timeout: loadLogsTimeoutMs }
     );
 
     const logs = response.data.access_logs || [];
@@ -106,11 +107,74 @@ async function testarConexaoCatraca(dispositivo) {
   }
 }
 
+/**
+ * Obtém hostname e porta do servidor para onde a catraca deve enviar eventos do Monitor.
+ * Usado ao configurar o Monitor na catraca (set_configuration).
+ * Configure MONITOR_CALLBACK_HOST e MONITOR_CALLBACK_PORT no .env (IP/host acessível pela rede da catraca).
+ */
+function getMonitorCallbackAddress() {
+  const url = process.env.MONITOR_CALLBACK_URL;
+  if (url) {
+    try {
+      const u = new URL(url.startsWith('http') ? url : `http://${url}`);
+      return { hostname: u.hostname, port: u.port || '80' };
+    } catch (e) {
+      logger.warn('[MONITOR] MONITOR_CALLBACK_URL inválido, usando HOST/PORT');
+    }
+  }
+  const hostname = process.env.MONITOR_CALLBACK_HOST || process.env.HOST || 'localhost';
+  const port = process.env.MONITOR_CALLBACK_PORT || process.env.PORT || '3000';
+  return { hostname, port: String(port) };
+}
+
+/**
+ * Configura o Monitor na catraca Control iD para enviar eventos (acessos) para este servidor.
+ * Deve ser chamado ao cadastrar dispositivo ou ao testar conexão, para que o monitoramento em tempo real funcione.
+ * Documentação: https://www.controlid.com.br/docs/access-api-pt/monitor/introducao-ao-monitor/
+ * @param {object} dispositivo - { nome, endereco, porta, usuario, senha, ... }
+ * @returns {Promise<{ ok: boolean, message?: string }>}
+ */
+async function configurarMonitorNaCatraca(dispositivo) {
+  const link = linkCatraca(dispositivo);
+  const session = await obterSessao(link, dispositivo);
+  if (!session) {
+    logger.warn(`[MONITOR] Não foi possível obter sessão em ${dispositivo.nome} para configurar Monitor`);
+    return { ok: false, message: 'Sessão não obtida' };
+  }
+
+  const { hostname, port } = getMonitorCallbackAddress();
+  if (!hostname || hostname === 'localhost') {
+    logger.warn('[MONITOR] Configure MONITOR_CALLBACK_HOST (ou MONITOR_CALLBACK_URL) no .env com o IP/host acessível pela catraca');
+  }
+
+  const monitorConfig = {
+    request_timeout: '5000',
+    hostname,
+    port,
+    path: 'api/notifications/dao'
+  };
+
+  try {
+    await axiosInstance.post(
+      `http://${link}/set_configuration.fcgi?session=${session}`,
+      { monitor: monitorConfig },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+    );
+    logger.info(`[MONITOR] Monitor configurado em ${dispositivo.nome} -> ${hostname}:${port}/api/notifications/dao`);
+    return { ok: true };
+  } catch (error) {
+    logger.error(`[MONITOR] Erro ao configurar Monitor em ${dispositivo.nome}: ${error.message}`);
+    return { ok: false, message: error.message };
+  }
+}
+
 module.exports = {
   listarTodos,
   linkCatraca,
   obterSessao,
   verificarSessao,
   obterLogsCatraca,
-  testarConexaoCatraca
+  testarConexaoCatraca,
+  configurarMonitorNaCatraca,
+  getMonitorCallbackAddress
 };

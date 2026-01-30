@@ -43,7 +43,7 @@ async function getOrFetch(cacheKey, queryFn, ttl = CACHE_TTL.LONG) {
 async function invalidate(pattern) {
   try {
     const deleted = await cache.delPattern(pattern);
-    logger.info(`[CACHE INVALIDATE] Padrão '${pattern}' - ${deleted} chaves deletadas`);
+    if (deleted > 0) logger.debug(`[CACHE INVALIDATE] Padrão '${pattern}' - ${deleted} chaves deletadas`);
     return deleted;
   } catch (error) {
     logger.error(`[CACHE ERROR] Erro ao invalidar ${pattern}: ${error.message}`);

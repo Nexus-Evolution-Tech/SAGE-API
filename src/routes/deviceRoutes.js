@@ -12,6 +12,8 @@ routerExtra.get('/dispositivos/status', autenticar, dispositivosController.getSt
 routerExtra.get('/dispositivos/discover', autenticar, dispositivosController.discover);
 routerExtra.post('/dispositivos/quick-add', autenticar, dispositivosController.quickAdd);
 routerExtra.get('/dispositivos/:id/status', autenticar, dispositivosController.getStatusId);
+routerExtra.get('/dispositivos/:id/diagnostico-acessos', autenticar, dispositivosController.diagnosticoAcessos);
+routerExtra.post('/dispositivos/:id/configurar-monitor', autenticar, dispositivosController.configurarMonitor);
 
 // Depois monta o restante das rotas (inclui /:id, etc.)
 routerExtra.use(router);

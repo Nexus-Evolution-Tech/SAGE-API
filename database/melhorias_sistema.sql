@@ -120,3 +120,6 @@ DEALLOCATE PREPARE stmt;
 -- CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
 -- CREATE INDEX idx_horario_sala ON HorarioAula(sala_id);
 -- CREATE INDEX idx_horario_dia_hora ON HorarioAula(dia_semana, horario);
+
+-- Índice para relatórios de acesso (Presenca por data e pessoa)
+CREATE INDEX idx_presenca_data_pessoa ON Presenca(data, pessoa_id);

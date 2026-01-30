@@ -23,8 +23,9 @@ async function iniciarServidor() {
   await redis.initRedis();
   console.log('[BOOT] Redis inicializado');
 
-  // Iniciar servidor PRIMEIRO (não bloqueia por banco)
-  const server = app.listen(PORT, () => {
+  // Iniciar servidor em 0.0.0.0 para aceitar conexões da rede (catraca, outros PCs)
+  const HOST = process.env.HOST || '0.0.0.0';
+  const server = app.listen(PORT, HOST, () => {
     console.log('[BOOT] app.listen callback');
     
     // Inicializar WebSocket após servidor estar listening
@@ -36,7 +37,7 @@ async function iniciarServidor() {
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     logger.info('✓ Servidor SAGE-API iniciado');
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    logger.info(`  Porta: ${PORT}`);
+    logger.info(`  Escutando em: ${HOST}:${PORT}`);
     logger.info(`  Ambiente: ${NODE_ENV}`);
     logger.info(`  Documentação: http://localhost:${PORT}/docs`);
     logger.info(`  Health Check: http://localhost:${PORT}/health`);

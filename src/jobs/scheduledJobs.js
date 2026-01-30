@@ -8,7 +8,7 @@ const listarTodos = async () => {
   return result;
 };
 
-// Job de sincronização de acessos
+// Job de sincronização de acessos (a cada 10 min — backup)
 const sincronizarAcessosJob = () => {
   const cronExpression = '*/10 * * * *'; // a cada 10 minutos
 
@@ -25,6 +25,22 @@ const sincronizarAcessosJob = () => {
       logger.error(`Erro na sincronização de acessos: ${error.message}`);
     }
   }, { scheduled: true, timezone: 'America/Sao_Paulo' });
+};
+
+// Polling de acessos para monitoramento em tempo quase real (igual ao software oficial Control iD)
+// O servidor consulta as catracas periodicamente; não precisa da catraca enviar POST nem abrir firewall.
+const MONITOR_POLLING_INTERVAL_MS = parseInt(process.env.MONITOR_POLLING_INTERVAL_MS || '20000', 10); // 20 s
+
+const pollingMonitoramentoJob = () => {
+  if (MONITOR_POLLING_INTERVAL_MS <= 0) return null;
+  return setInterval(async () => {
+    try {
+      const accessService = require('../services/accessService');
+      await accessService.sincronizarTodosAcessos();
+    } catch (error) {
+      logger.debug(`[MONITOR POLLING] Erro: ${error.message}`);
+    }
+  }, MONITOR_POLLING_INTERVAL_MS);
 };
 
 // Job de health check das catracas
@@ -145,8 +161,12 @@ const iniciarJobs = () => {
   const jobs = {
     syncPendentes: verificarSyncPendentesJob(),
     healthCheck: healthCheckCatracasJob(),
-    syncAcessos: sincronizarAcessosJob()
+    syncAcessos: sincronizarAcessosJob(),
+    monitorPolling: pollingMonitoramentoJob()
   };
+  if (jobs.monitorPolling) {
+    logger.info(`[MONITOR] Polling de acessos a cada ${MONITOR_POLLING_INTERVAL_MS / 1000}s (tempo quase real)`);
+  }
   return jobs;
 };
 
@@ -155,6 +175,7 @@ const pararJobs = (jobs) => {
   if (jobs.syncPendentes) jobs.syncPendentes.stop();
   if (jobs.healthCheck) clearInterval(jobs.healthCheck);
   if (jobs.syncAcessos) jobs.syncAcessos.stop();
+  if (jobs.monitorPolling) clearInterval(jobs.monitorPolling);
 };
 
 module.exports = {
@@ -162,5 +183,6 @@ module.exports = {
   pararJobs,
   verificarSyncPendentesJob,
   healthCheckCatracasJob,
-  sincronizarAcessosJob
+  sincronizarAcessosJob,
+  pollingMonitoramentoJob
 };

@@ -90,9 +90,9 @@ function formatDataBrasil(date) {
 async function turmas(req, res) {
   try {
     const [rows] = await db.query(
-      'SELECT id, nome FROM Turma ORDER BY nome'
+      'SELECT id, nome FROM Turma WHERE nome IS NOT NULL ORDER BY nome'
     );
-    res.json(rows || []);
+    res.json(Array.isArray(rows) ? rows : []);
   } catch (err) {
     logger.error('[RELATORIO] turmas:', err.message);
     res.status(500).json({ message: 'Erro ao listar turmas', error: err.message });
@@ -226,8 +226,11 @@ async function resumo(req, res) {
         [dataStr, ...esperados]
       );
       const presencaByPessoa = {};
-      for (const pr of presencas) {
-        presencaByPessoa[pr.pessoa_id] = { atrasado: !!pr.atrasado, horario_previsto: pr.horario_previsto };
+      for (const pr of (presencas || [])) {
+        const pid = pr.pessoa_id;
+        if (pid != null) {
+          presencaByPessoa[pid] = { atrasado: !!pr.atrasado, horario_previsto: pr.horario_previsto };
+        }
       }
 
       for (const pid of esperados) {
@@ -303,10 +306,14 @@ async function detalhes(req, res) {
     const dataStrInicio = formatDataBrasil(inicio);
     const dataStrFim = formatDataBrasil(fim);
 
+    // Inclui turma (para alunos) e tipo para o frontend filtrar e exibir
     let sql = `
-      SELECT p.id AS pessoa_id, p.nome, p.tipo, pr.data, pr.atrasado, pr.horario_previsto, pr.horario_chegada
+      SELECT p.id AS pessoa_id, p.nome, p.tipo, pr.data, pr.atrasado, pr.horario_previsto, pr.horario_chegada,
+             t.nome AS turma_nome
       FROM Presenca pr
       INNER JOIN Pessoa p ON p.id = pr.pessoa_id
+      LEFT JOIN Aluno al ON al.id = p.id
+      LEFT JOIN Turma t ON t.id = al.turma_id
       WHERE pr.data >= ? AND pr.data <= ?
     `;
     const params = [dataStrInicio, dataStrFim];
@@ -314,7 +321,7 @@ async function detalhes(req, res) {
     if (grupo === 'ALUNOS') {
       sql += ` AND p.tipo = 'ALUNO'`;
       if (turma_id && turma_id !== 'TODOS') {
-        sql += ` AND EXISTS (SELECT 1 FROM Aluno a WHERE a.id = p.id AND a.turma_id = ?)`;
+        sql += ` AND al.turma_id = ?`;
         params.push(Number(turma_id));
       }
     } else if (grupo === 'FUNCIONARIOS') {
@@ -338,12 +345,16 @@ async function detalhes(req, res) {
     for (const row of presencas) {
       const key = row.pessoa_id;
       if (!byPessoa[key]) {
+        const horarioPrevisto = row.horario_previsto != null ? String(row.horario_previsto).slice(0, 5) : null;
+        const horarioChegada = row.horario_chegada != null ? String(row.horario_chegada).slice(0, 5) : null;
         byPessoa[key] = {
           id: row.pessoa_id,
           nome: row.nome,
+          tipo: row.tipo || (grupo === 'ALUNOS' ? 'ALUNO' : 'FUNCIONARIO'),
+          turma: row.turma_nome || null,
           status: row.atrasado ? 'ATRASADO' : 'NO_HORARIO',
-          horario_previsto: row.horario_previsto ? String(row.horario_previsto).slice(0, 5) : null,
-          horario_chegada: row.horario_chegada ? String(row.horario_chegada).slice(0, 5) : null,
+          horario_previsto: horarioPrevisto,
+          horario_chegada: horarioChegada,
         };
       }
     }
@@ -351,7 +362,9 @@ async function detalhes(req, res) {
     let lista = Object.values(byPessoa);
     lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
     const total = lista.length;
-    lista = lista.slice(Number(offset), Number(offset) + Number(limit));
+    const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const offsetNum = Math.max(Number(offset) || 0, 0);
+    lista = lista.slice(offsetNum, offsetNum + limitNum);
 
     res.json({ dados: lista, total });
   } catch (err) {

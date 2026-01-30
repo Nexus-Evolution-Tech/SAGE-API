@@ -65,11 +65,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// Log em INFO de qualquer requisição para o Monitor (catraca) — para debugar se o POST chega
+app.use((req, res, next) => {
+  if (req.path.toLowerCase().startsWith('/api/notifications')) {
+    logger.info(`[MONITOR] Requisição recebida: ${req.method} ${req.path} (origem: ${req.ip || req.connection?.remoteAddress || '?'})`);
+  }
+  next();
+});
+
 // Rotas de monitoramento (sem autenticação para simplificar)
 const monitoringRoutes = require('./routes/monitoringRoutes');
 app.use('/monitoring', monitoringRoutes);
 logger.info("Monitoramento disponível em: /monitoring/*");
 console.log('[BOOT-APP] monitoring routes pronta');
+
+// Diagnóstico de acessos (catraca vs banco) — sem auth em desenvolvimento para poder abrir no navegador
+const dispositivosController = require('./controllers/deviceController');
+app.get('/diagnostico-acessos/:id', (req, res) => {
+  const key = process.env.DIAGNOSTICO_KEY;
+  const isDev = process.env.NODE_ENV !== 'production';
+  if (!isDev && key !== undefined && req.query.key !== key) {
+    return res.status(401).json({ message: 'Use ?key=... (configure DIAGNOSTICO_KEY no .env)' });
+  }
+  return dispositivosController.diagnosticoAcessos(req, res);
+});
+logger.info("Diagnóstico de acessos: GET /diagnostico-acessos/:id (em dev sem auth)");
 
 // Garante diretório base de uploads na inicialização
 try {

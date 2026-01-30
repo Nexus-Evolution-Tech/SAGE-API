@@ -11,9 +11,23 @@ const logger = require('../config/logger');
 const db = require('../config/database');
 
 // GET /monitoring/state - Snapshot completo do estado
-router.get('/monitoring/state', (req, res) => {
+router.get('/monitoring/state', async (req, res) => {
   try {
     const snapshot = globalState.getSnapshot();
+    const [acessos] = await db.query(
+      `SELECT a.id, a.pessoa_id, a.dispositivo_id, a.status, a.permitido, a.data_hora, p.nome AS pessoa_nome
+       FROM Acesso a LEFT JOIN Pessoa p ON p.id = a.pessoa_id
+       ORDER BY a.id DESC LIMIT 50`
+    );
+    snapshot.recentAccesses = (acessos || []).map((a) => ({
+      id: a.id,
+      pessoa_id: a.pessoa_id,
+      dispositivo_id: a.dispositivo_id,
+      status: a.status,
+      permitido: a.permitido,
+      data_hora: a.data_hora ? new Date(a.data_hora).toISOString() : null,
+      pessoa_nome: a.pessoa_nome
+    }));
     res.json({
       timestamp: new Date().toISOString(),
       data: snapshot
