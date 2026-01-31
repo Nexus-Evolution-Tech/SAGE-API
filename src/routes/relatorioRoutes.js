@@ -7,5 +7,6 @@ const router = express.Router();
 router.get('/relatorios/turmas', autenticar, relatorioController.turmas);
 router.get('/relatorios/acesso/resumo', autenticar, relatorioController.resumo);
 router.get('/relatorios/acesso/detalhes', autenticar, relatorioController.detalhes);
+router.post('/relatorios/acesso/backfill-presenca', autenticar, relatorioController.backfillPresenca);
 
 module.exports = router;

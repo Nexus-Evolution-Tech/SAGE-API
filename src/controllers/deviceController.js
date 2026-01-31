@@ -8,7 +8,8 @@ const { cacheMutation } = require('../cache/helpers');
 const logger = require('../config/logger');
 
 const tabela = 'Dispositivo';
-const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'area_id', 'numero_serial', 'control_id_device_id'];
+// Colunas conforme o banco (sem control_id_device_id se a migration não foi rodada)
+const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
 const camposInsert = campos.filter((c) => c !== 'id');
 
 const getStatus = async (req, res) => {

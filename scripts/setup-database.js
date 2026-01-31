@@ -244,6 +244,20 @@ async function executarSeeds() {
       );
     }
 
+    // Seed: Área padrão (para dispositivos/catracas)
+    const [existingArea] = await connection.query(
+      `SELECT id FROM Area WHERE nome = 'Portaria Principal' LIMIT 1`,
+      []
+    );
+    if (existingArea.length === 0) {
+      logger.info('🌱 Inserindo área padrão: Portaria Principal');
+      await connection.query(
+        `INSERT INTO Area (nome, unidade_id, foto) VALUES ('Portaria Principal', NULL, NULL)`,
+        []
+      );
+      logger.info(' Área padrão inserida');
+    }
+
     await connection.end();
     return true;
   } catch (error) {

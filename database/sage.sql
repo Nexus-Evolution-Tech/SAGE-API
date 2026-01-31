@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS Area (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) ,
     unidade_id INT,
+    foto VARCHAR(255) NULL COMMENT 'Caminho relativo da foto (ex: areas/area_1.png)',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE SET NULL
@@ -55,6 +56,8 @@ CREATE TABLE IF NOT EXISTS Dispositivo (
     porta VARCHAR(50) ,
     usuario VARCHAR(255) ,
     senha VARCHAR(255)  COMMENT 'Precisa ser criptografada na aplicação Node.js',
+    status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO',
+    last_health_check DATETIME NULL,
     area_id INT,
     numero_serial VARCHAR(255) ,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -112,12 +115,13 @@ CREATE TABLE IF NOT EXISTS Presenca (
     pessoa_id INT NOT NULL,
     data DATE NOT NULL,
     dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
-    aulas_perdidas INT NOT NULL,
+    aulas_perdidas INT NOT NULL DEFAULT 0,
     horario_previsto TIME,
     horario_chegada TIME,
-    atrasado BOOLEAN NOT NULL,
+    atrasado BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_presenca_data_pessoa ON Presenca(data, pessoa_id);
 
 CREATE TABLE IF NOT EXISTS Responsavel (
     id INT PRIMARY KEY,

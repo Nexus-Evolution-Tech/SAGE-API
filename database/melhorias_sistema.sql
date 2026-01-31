@@ -1,11 +1,12 @@
 -- Migração: Adicionar campos para melhorias no sistema
+-- (status e last_health_check já estão no sage.sql; aqui só para DBs antigos que rodaram sage antes dessa alteração)
 
--- Adicionar coluna de status e last_health_check na tabela Dispositivo
+-- Adicionar coluna de status e last_health_check na tabela Dispositivo (ignorar se já existir)
 ALTER TABLE Dispositivo 
 ADD COLUMN status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO' AFTER senha,
 ADD COLUMN last_health_check DATETIME NULL AFTER status;
 
--- Adicionar índice para melhorar performance de queries
+-- Índice (ignorar se já existir)
 CREATE INDEX idx_dispositivo_status ON Dispositivo(status);
 
 -- Adicionar colunas na tabela sync_pendente
@@ -120,6 +121,19 @@ DEALLOCATE PREPARE stmt;
 -- CREATE UNIQUE INDEX idx_horario_turma_dia_hora ON HorarioAula(turma_id, dia_semana, horario);
 -- CREATE INDEX idx_horario_sala ON HorarioAula(sala_id);
 -- CREATE INDEX idx_horario_dia_hora ON HorarioAula(dia_semana, horario);
+
+-- Tabela Presenca (relatórios de acesso e presença) — garante existência mesmo se sage.sql for parcial
+CREATE TABLE IF NOT EXISTS Presenca (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pessoa_id INT NOT NULL,
+    data DATE NOT NULL,
+    dia_semana ENUM('DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    aulas_perdidas INT NOT NULL DEFAULT 0,
+    horario_previsto TIME,
+    horario_chegada TIME,
+    atrasado BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
+);
 
 -- Índice para relatórios de acesso (Presenca por data e pessoa)
 CREATE INDEX idx_presenca_data_pessoa ON Presenca(data, pessoa_id);
