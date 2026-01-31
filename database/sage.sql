@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS UnidadeEscolar (
     CONSTRAINT chk_cep CHECK (REGEXP_LIKE(cep, '^[0-9]{8}$')),
     telefone_contato VARCHAR(11),
     CONSTRAINT chk_telefone_contato CHECK (REGEXP_LIKE(telefone_contato, '^[0-9]{10,11}$')),
+    email VARCHAR(255) NULL COMMENT 'Email de contato da unidade',
     logo VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -296,6 +297,28 @@ CREATE TABLE IF NOT EXISTS sync_pendente (
   FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id)
 );
 
+CREATE TABLE IF NOT EXISTS RecuperacaoSenha (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  unidade_id INT NOT NULL,
+  token_hash VARCHAR(64) NOT NULL COMMENT 'Hash SHA-256 do token enviado por email',
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE CASCADE,
+  INDEX idx_token_hash (token_hash),
+  INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Configurações do sistema (promoção automática de alunos, etc.)
+CREATE TABLE IF NOT EXISTS ConfigSistema (
+  chave VARCHAR(100) PRIMARY KEY,
+  valor VARCHAR(500),
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Inicializa promoção: 0 = "nunca executou" (primeira execução rodará ao detectar ano novo)
+INSERT IGNORE INTO ConfigSistema (chave, valor) VALUES ('ultimo_ano_promocao', '0');
+
 DELIMITER $$
 
 CREATE PROCEDURE atualizar_turmas_e_status()
@@ -355,6 +378,7 @@ INSERT INTO UnidadeEscolar (
     estado,
     cep,
     telefone_contato,
+    email,
     login,
     senha
 ) VALUES (
@@ -368,6 +392,7 @@ INSERT INTO UnidadeEscolar (
     'SP',
     '06764230',
     '1147888150',
+    NULL,
     'admin',
     '$2b$10$SbfhhZqWFpCanApKJ5Ya3Ol.fwnFP6e5lV1.DBwBIYyuBgYMbENCa'
 ) ON DUPLICATE KEY UPDATE 

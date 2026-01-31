@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const logger = require('../config/logger');
 const deviceService = require('../services/deviceService');
+const promocaoAlunosService = require('../services/promocaoAlunosService');
 const db = require('../config/database');
 
 const listarTodos = async () => {
@@ -155,6 +156,33 @@ const verificarSyncPendentesJob = () => {
   }, { scheduled: true, timezone: 'America/Sao_Paulo' });
 };
 
+// Job de promoção automática de alunos (horário configurável via PROMOCAO_CRON)
+// Verifica se o ano mudou desde a última execução; se sim, roda a promoção.
+// Não depende de estar ligado em 1º de janeiro: ao subir em qualquer dia, executa se necessário.
+// Usa RM (ano matrícula) ou created_at para elegibilidade: anos_na_escola >= 1
+// Padrão: 08:10 (PC desligado à meia-noite). PROMOCAO_CRON= ou false = desabilita o job
+const promocaoAlunosJob = () => {
+  const cronVal = (process.env.PROMOCAO_CRON || '').trim();
+  if (!cronVal || cronVal === 'false' || cronVal === '0') {
+    return null;
+  }
+  const cronExpression = cronVal;
+
+  return cron.schedule(cronExpression, async () => {
+    try {
+      const { executado, anoAtual, resultado } = await promocaoAlunosService.executarPromocaoSeAnoMudou({ apenasSimulacao: false });
+
+      if (executado && resultado) {
+        logger.info(
+          `[PROMOÇÃO] Ano ${anoAtual}: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados, ${resultado.erros} erros`
+        );
+      }
+    } catch (error) {
+      logger.error(`[PROMOÇÃO] Erro na promoção automática: ${error.message}`);
+    }
+  }, { scheduled: true, timezone: 'America/Sao_Paulo' });
+};
+
 // Iniciar todos os jobs
 const iniciarJobs = () => {
   logger.info('Iniciando jobs agendados...');
@@ -162,10 +190,14 @@ const iniciarJobs = () => {
     syncPendentes: verificarSyncPendentesJob(),
     healthCheck: healthCheckCatracasJob(),
     syncAcessos: sincronizarAcessosJob(),
-    monitorPolling: pollingMonitoramentoJob()
+    monitorPolling: pollingMonitoramentoJob(),
+    promocaoAlunos: promocaoAlunosJob()
   };
   if (jobs.monitorPolling) {
     logger.info(`[MONITOR] Polling de acessos a cada ${MONITOR_POLLING_INTERVAL_MS / 1000}s (tempo quase real)`);
+  }
+  if (jobs.promocaoAlunos) {
+    logger.info(`[PROMOÇÃO] Verificação diária em: ${process.env.PROMOCAO_CRON || '10 8 * * *'} (PROMOCAO_CRON no .env)`);
   }
   return jobs;
 };
@@ -176,6 +208,7 @@ const pararJobs = (jobs) => {
   if (jobs.healthCheck) clearInterval(jobs.healthCheck);
   if (jobs.syncAcessos) jobs.syncAcessos.stop();
   if (jobs.monitorPolling) clearInterval(jobs.monitorPolling);
+  if (jobs.promocaoAlunos) jobs.promocaoAlunos.stop();
 };
 
 module.exports = {
@@ -184,5 +217,6 @@ module.exports = {
   verificarSyncPendentesJob,
   healthCheckCatracasJob,
   sincronizarAcessosJob,
-  pollingMonitoramentoJob
+  pollingMonitoramentoJob,
+  promocaoAlunosJob
 };

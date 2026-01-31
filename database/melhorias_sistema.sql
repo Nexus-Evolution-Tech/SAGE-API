@@ -1,6 +1,9 @@
 -- Migração: Adicionar campos para melhorias no sistema
 -- (status e last_health_check já estão no sage.sql; aqui só para DBs antigos que rodaram sage antes dessa alteração)
 
+-- Email da unidade escolar (configurações / contato)
+ALTER TABLE UnidadeEscolar ADD COLUMN email VARCHAR(255) NULL COMMENT 'Email de contato da unidade' AFTER telefone_contato;
+
 -- Adicionar coluna de status e last_health_check na tabela Dispositivo (ignorar se já existir)
 ALTER TABLE Dispositivo 
 ADD COLUMN status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO' AFTER senha,
@@ -137,3 +140,40 @@ CREATE TABLE IF NOT EXISTS Presenca (
 
 -- Índice para relatórios de acesso (Presenca por data e pessoa)
 CREATE INDEX idx_presenca_data_pessoa ON Presenca(data, pessoa_id);
+
+-- Horário fixo de entrada/saída por dia da semana (Administrador, Terceirizado, Professor+Admin)
+CREATE TABLE IF NOT EXISTS FuncionarioHorario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    funcionario_id INT NOT NULL,
+    dia_semana ENUM('SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO') NOT NULL,
+    hora_entrada TIME NOT NULL,
+    hora_saida TIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_func_dia (funcionario_id, dia_semana),
+    FOREIGN KEY (funcionario_id) REFERENCES Funcionario(id) ON DELETE CASCADE
+);
+
+-- Professor/ProfAdm que também é Admin: quando true, usa FuncionarioHorario em vez de HorarioAula
+ALTER TABLE Professor ADD COLUMN usar_horario_fixo BOOLEAN DEFAULT FALSE;
+
+-- Recuperação de senha (esqueci a senha) — token único por solicitação
+CREATE TABLE IF NOT EXISTS RecuperacaoSenha (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  unidade_id INT NOT NULL,
+  token_hash VARCHAR(64) NOT NULL COMMENT 'Hash SHA-256 do token enviado por email',
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE CASCADE,
+  INDEX idx_token_hash (token_hash),
+  INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Configurações do sistema (promoção automática de alunos)
+CREATE TABLE IF NOT EXISTS ConfigSistema (
+  chave VARCHAR(100) PRIMARY KEY,
+  valor VARCHAR(500),
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO ConfigSistema (chave, valor) VALUES ('ultimo_ano_promocao', '0');

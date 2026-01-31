@@ -68,6 +68,16 @@ async function iniciarServidor() {
     if (process.env.JOBS_ENABLED !== 'false') {
       jobs = iniciarJobs();
       logger.info('✓ Jobs agendados iniciados');
+
+      // Verificar promoção na subida: se ano mudou e sistema estava desligado, executa agora
+      const promocaoAlunosService = require('./src/services/promocaoAlunosService');
+      promocaoAlunosService.executarPromocaoSeAnoMudou({ apenasSimulacao: false })
+        .then(({ executado, resultado }) => {
+          if (executado && resultado) {
+            logger.info(`[PROMOÇÃO] Executado na subida: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados`);
+          }
+        })
+        .catch((err) => logger.debug(`[PROMOÇÃO] Verificação na subida: ${err.message}`));
     } else {
       logger.warn('⚠ Jobs desabilitados (JOBS_ENABLED=false)');
     }

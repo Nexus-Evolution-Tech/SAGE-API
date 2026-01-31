@@ -62,8 +62,24 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
 
   let aulasHoje = [];
 
-  // BUSCA AULAS DO DIA
-  if (pessoa.tipo === 'ALUNO') {
+  // BUSCA AULAS/HORÁRIO DO DIA
+  if (['ADMINISTRADOR', 'TERCEIRIZADO'].includes(pessoa.tipo)) {
+    try {
+      const [horarios] = await db.query(
+        `SELECT dia_semana, hora_entrada, hora_saida FROM FuncionarioHorario WHERE funcionario_id = ? AND dia_semana = ?`,
+        [pessoa.id, diaSemana]
+      );
+      if (horarios && horarios.length > 0) {
+        const h = horarios[0];
+        const entradaStr = h.hora_entrada ? String(h.hora_entrada).slice(0, 5) : null;
+        if (entradaStr) {
+          aulasHoje = [{ inicio: entradaStr, fim: h.hora_saida ? String(h.hora_saida).slice(0, 5) : entradaStr }];
+        }
+      }
+    } catch (e) {
+      if (!e.message || !e.message.includes("doesn't exist")) throw e;
+    }
+  } else if (pessoa.tipo === 'ALUNO') {
     const [alunos] = await db.query('SELECT turma_id, divisao FROM Aluno WHERE id = ?', [pessoa.id]);
     const aluno = alunos[0];
     if (!aluno || !aluno.turma_id) return;
@@ -81,17 +97,41 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
     });
 
   } else if (['PROFESSOR','PROFADM'].includes(pessoa.tipo)) {
-    const [horarios] = await db.query(`
-      SELECT ha.horario
-      FROM HorarioAula ha
-      JOIN Aula a ON ha.aula_id = a.id
-      WHERE a.professor_id = ? AND ha.dia_semana = ?
-      ORDER BY ha.horario ASC
-    `, [pessoa.id, diaSemanaHorarioAula]);
-    aulasHoje = horarios.map(h => {
-      const [inicio, fim] = h.horario.split('-');
-      return { inicio, fim };
-    });
+    let usarHorarioFixo = false;
+    try {
+      const [profRow] = await db.query('SELECT usar_horario_fixo FROM Professor WHERE id = ?', [pessoa.id]);
+      usarHorarioFixo = !!(profRow && profRow[0] && profRow[0].usar_horario_fixo);
+    } catch (e) { /* coluna pode não existir */ }
+
+    if (usarHorarioFixo) {
+      try {
+        const [horarios] = await db.query(
+          `SELECT hora_entrada, hora_saida FROM FuncionarioHorario WHERE funcionario_id = ? AND dia_semana = ?`,
+          [pessoa.id, diaSemana]
+        );
+        if (horarios && horarios.length > 0) {
+          const h = horarios[0];
+          const entradaStr = h.hora_entrada ? String(h.hora_entrada).slice(0, 5) : null;
+          if (entradaStr) {
+            aulasHoje = [{ inicio: entradaStr, fim: h.hora_saida ? String(h.hora_saida).slice(0, 5) : entradaStr }];
+          }
+        }
+      } catch (e) {
+        if (!e.message || !e.message.includes("doesn't exist")) throw e;
+      }
+    } else {
+      const [horarios] = await db.query(`
+        SELECT ha.horario
+        FROM HorarioAula ha
+        JOIN Aula a ON ha.aula_id = a.id
+        WHERE a.professor_id = ? AND ha.dia_semana = ?
+        ORDER BY ha.horario ASC
+      `, [pessoa.id, diaSemanaHorarioAula]);
+      aulasHoje = (horarios || []).map(h => {
+        const [inicio, fim] = (h.horario || '').split('-');
+        return { inicio, fim };
+      });
+    }
   }
 
   let entradaPrevista = null;

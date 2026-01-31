@@ -138,23 +138,46 @@ async function getEsperadosNoDia(dataStr, diaSemana, diaSemanaHA, grupo, turma_i
   }
 
   if (grupo === 'FUNCIONARIOS') {
-    // Apenas professores têm aula no HorarioAula; filtro por tipo reduz ao subconjunto
-    let sql = `
-      SELECT DISTINCT pr.id AS pessoa_id
-      FROM Professor pr
-      INNER JOIN Aula a ON a.professor_id = pr.id
-      INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
-      WHERE 1=1
-    `;
-    const params = [diaSemanaHA];
-    if (funcionario_tipo && funcionario_tipo !== 'TODOS' && funcionario_tipo === 'PROFESSOR') {
-      // já estamos em Professor
-    } else if (funcionario_tipo && funcionario_tipo !== 'TODOS') {
-      // ADMINISTRADOR ou TERCEIRIZADO não têm aula; retorna vazio para "esperados"
-      return [];
+    if (funcionario_tipo === 'ADMINISTRADOR') {
+      const [rows] = await db.query(
+        'SELECT ad.id AS pessoa_id FROM Administrador ad INNER JOIN Pessoa p ON p.id = ad.id WHERE p.visivel = 1'
+      );
+      return (rows || []).map(r => r.pessoa_id);
     }
-    const [rows] = await db.query(sql, params);
-    return rows.map(r => r.pessoa_id);
+    if (funcionario_tipo === 'TERCEIRIZADO') {
+      const [rows] = await db.query(
+        'SELECT t.id AS pessoa_id FROM Terceirizado t INNER JOIN Pessoa p ON p.id = t.id WHERE p.visivel = 1'
+      );
+      return (rows || []).map(r => r.pessoa_id);
+    }
+    if (funcionario_tipo === 'PROFESSOR' || funcionario_tipo === 'TODOS') {
+      let professores = [];
+      try {
+        const sql = `
+          SELECT DISTINCT pr.id AS pessoa_id
+          FROM Professor pr
+          INNER JOIN Aula a ON a.professor_id = pr.id
+          INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
+          INNER JOIN Pessoa p ON p.id = pr.id AND p.visivel = 1
+        `;
+        const [rows] = await db.query(sql, [diaSemanaHA]);
+        professores = (rows || []).map(r => r.pessoa_id);
+      } catch (e) {
+        logger.debug('[RELATORIO] getEsperadosNoDia HorarioAula prof falhou:', e.message);
+      }
+      if (professores.length === 0) {
+        const [fallback] = await db.query(
+          'SELECT pr.id AS pessoa_id FROM Professor pr INNER JOIN Pessoa p ON p.id = pr.id WHERE p.visivel = 1'
+        );
+        professores = (fallback || []).map(r => r.pessoa_id);
+      }
+      if (funcionario_tipo === 'PROFESSOR') return professores;
+      const [admRows] = await db.query('SELECT ad.id AS pessoa_id FROM Administrador ad INNER JOIN Pessoa p ON p.id = ad.id WHERE p.visivel = 1');
+      const [tercRows] = await db.query('SELECT t.id AS pessoa_id FROM Terceirizado t INNER JOIN Pessoa p ON p.id = t.id WHERE p.visivel = 1');
+      const admIds = (admRows || []).map(r => r.pessoa_id);
+      const tercIds = (tercRows || []).map(r => r.pessoa_id);
+      return [...new Set([...professores, ...admIds, ...tercIds])];
+    }
   }
 
   return [];
@@ -279,23 +302,62 @@ async function getHorarioPrevistoPorPessoa(diaSemanaHA, grupo, turma_id, funcion
     }
   } else if (grupo === 'FUNCIONARIOS') {
     try {
-      await run(`
-        SELECT pr.id AS pessoa_id, SUBSTRING_INDEX(MIN(ha.horario), '-', 1) AS hp
-        FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
-        INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
-        WHERE pr.id IN (${placeholders})
-        GROUP BY pr.id
-      `, [diaSemanaHA, ...pessoaIds]);
+      const diaFh = diaSemanaHA === 'TERÇA' ? 'TERCA' : diaSemanaHA;
+      const [fhRows] = await db.query(
+        `SELECT fh.funcionario_id AS pessoa_id, TIME_FORMAT(fh.hora_entrada, '%H:%i') AS hp
+         FROM FuncionarioHorario fh
+         WHERE fh.funcionario_id IN (${placeholders}) AND fh.dia_semana = ?`,
+        [...pessoaIds, diaFh]
+      );
+      for (const r of fhRows || []) {
+        const hp = (r.hp || '').toString().trim().slice(0, 5);
+        if (hp) map[r.pessoa_id] = { horario_previsto: hp };
+      }
+
+      const idsComHorarioFixo = Object.keys(map).map(Number);
+      const idsRestantes = pessoaIds.filter((id) => !idsComHorarioFixo.includes(Number(id)));
+
+      if (idsRestantes.length > 0) {
+        const phPlaceholders = idsRestantes.map(() => '?').join(',');
+        const [profsComFixo] = await db.query(
+          'SELECT id FROM Professor WHERE id IN (' + phPlaceholders + ') AND usar_horario_fixo = 1',
+          idsRestantes
+        );
+        const idsUsarAula = idsRestantes.filter((id) => !(profsComFixo || []).some((p) => p.id === id));
+
+        if (idsUsarAula.length > 0) {
+          const auPlaceholders = idsUsarAula.map(() => '?').join(',');
+          try {
+            const [rows] = await db.query(`
+              SELECT pr.id AS pessoa_id, SUBSTRING_INDEX(MIN(ha.horario), '-', 1) AS hp
+              FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
+              INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
+              WHERE pr.id IN (${auPlaceholders})
+              GROUP BY pr.id
+            `, [diaSemanaHA, ...idsUsarAula]);
+            for (const r of rows || []) {
+              const hp = (r.hp || '').toString().trim().slice(0, 5);
+              if (hp && !map[r.pessoa_id]) map[r.pessoa_id] = { horario_previsto: hp };
+            }
+          } catch (e) {
+            if (e.message && e.message.includes('horario')) {
+              const [rows] = await db.query(`
+                SELECT pr.id AS pessoa_id, TIME_FORMAT(MIN(ha.inicio), '%H:%i') AS hp
+                FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
+                INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
+                WHERE pr.id IN (${auPlaceholders})
+                GROUP BY pr.id
+              `, [diaSemanaHA, ...idsUsarAula]);
+              for (const r of rows || []) {
+                const hp = (r.hp || '').toString().trim().slice(0, 5);
+                if (hp && !map[r.pessoa_id]) map[r.pessoa_id] = { horario_previsto: hp };
+              }
+            }
+          }
+        }
+      }
     } catch (e) {
-      if (e.message && e.message.includes('horario')) {
-        await run(`
-          SELECT pr.id AS pessoa_id, TIME_FORMAT(MIN(ha.inicio), '%H:%i') AS hp
-          FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
-          INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
-          WHERE pr.id IN (${placeholders})
-          GROUP BY pr.id
-        `, [diaSemanaHA, ...pessoaIds]);
-      } else throw e;
+      if (!e.message || !e.message.includes("doesn't exist")) throw e;
     }
   }
   return map;
@@ -347,19 +409,121 @@ async function getPresencaFromAcesso(dataStr, esperados, presencaByPessoa, diaSe
   return presencaByPessoa;
 }
 
+/** Retorna mapa pessoa_id -> { horario_saida_previsto: "15:30" } (última aula do dia) */
+async function getHorarioSaidaPrevistoPorPessoa(diaSemanaHA, grupo, turma_id, funcionario_tipo, pessoaIds) {
+  if (!pessoaIds || pessoaIds.length === 0) return {};
+  const placeholders = pessoaIds.map(() => '?').join(',');
+  const map = {};
+  const paramsBase = [diaSemanaHA];
+  if (turma_id && turma_id !== 'TODOS') paramsBase.push(Number(turma_id));
+  paramsBase.push(...pessoaIds);
+  const diaFh = diaSemanaHA === 'TERÇA' ? 'TERCA' : diaSemanaHA;
+
+  if (grupo === 'FUNCIONARIOS') {
+    try {
+      const [fhRows] = await db.query(
+        `SELECT fh.funcionario_id AS pessoa_id, TIME_FORMAT(fh.hora_saida, '%H:%i') AS hp
+         FROM FuncionarioHorario fh
+         WHERE fh.funcionario_id IN (${placeholders}) AND fh.dia_semana = ?`,
+        [...pessoaIds, diaFh]
+      );
+      for (const r of fhRows || []) {
+        const hp = (r.hp || '').toString().trim().slice(0, 5);
+        if (hp) map[r.pessoa_id] = { horario_saida_previsto: hp };
+      }
+      const idsComFixo = Object.keys(map).map(Number);
+      const idsRestantes = pessoaIds.filter((id) => !idsComFixo.includes(Number(id)));
+      if (idsRestantes.length === 0) return map;
+      const [profsFixo] = await db.query(
+        'SELECT id FROM Professor WHERE id IN (' + idsRestantes.map(() => '?').join(',') + ') AND usar_horario_fixo = 1',
+        idsRestantes
+      );
+      const idsUsarAula = idsRestantes.filter((id) => !(profsFixo || []).some((p) => p.id === id));
+      pessoaIds = idsUsarAula;
+      if (pessoaIds.length === 0) return map;
+    } catch (e) {
+      if (!e.message || !e.message.includes("doesn't exist")) throw e;
+    }
+  }
+
+  if (grupo === 'ALUNOS') {
+    try {
+      const [rows] = await db.query(`
+        SELECT a.id AS pessoa_id, SUBSTRING_INDEX(MAX(CONCAT(SUBSTRING_INDEX(ha.horario, '-', -1), '|', ha.horario)), '-', -1) AS hp
+        FROM Aluno a INNER JOIN Pessoa p ON p.id = a.id
+        INNER JOIN HorarioAula ha ON ha.turma_id = a.turma_id AND ha.dia_semana = ?
+        WHERE p.tipo = 'ALUNO' AND p.visivel = 1 ${turma_id && turma_id !== 'TODOS' ? ' AND a.turma_id = ?' : ''} AND a.id IN (${placeholders})
+        GROUP BY a.id
+      `, paramsBase);
+      for (const r of rows || []) {
+        const hp = (r.hp || '').toString().trim().slice(0, 5);
+        if (hp) map[r.pessoa_id] = { horario_saida_previsto: hp };
+      }
+    } catch (e) {
+      if (e.message && e.message.includes('horario')) {
+        const [rows] = await db.query(`
+          SELECT a.id AS pessoa_id, TIME_FORMAT(MAX(ha.fim), '%H:%i') AS hp
+          FROM Aluno a INNER JOIN Pessoa p ON p.id = a.id
+          INNER JOIN HorarioAula ha ON ha.turma_id = a.turma_id AND ha.dia_semana = ?
+          WHERE p.tipo = 'ALUNO' AND p.visivel = 1 ${turma_id && turma_id !== 'TODOS' ? ' AND a.turma_id = ?' : ''} AND a.id IN (${placeholders})
+          GROUP BY a.id
+        `, paramsBase);
+        for (const r of rows || []) {
+          const hp = (r.hp || '').toString().trim().slice(0, 5);
+          if (hp) map[r.pessoa_id] = { horario_saida_previsto: hp };
+        }
+      }
+    }
+  } else if (grupo === 'FUNCIONARIOS' && pessoaIds.length > 0) {
+    const ph = pessoaIds.map(() => '?').join(',');
+    try {
+      const [rows] = await db.query(`
+        SELECT pr.id AS pessoa_id, SUBSTRING_INDEX(MAX(CONCAT(SUBSTRING_INDEX(ha.horario, '-', -1), '|', ha.horario)), '-', -1) AS hp
+        FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
+        INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
+        WHERE pr.id IN (${ph})
+        GROUP BY pr.id
+      `, [diaSemanaHA, ...pessoaIds]);
+      for (const r of rows || []) {
+        const hp = (r.hp || '').toString().trim().slice(0, 5);
+        if (hp && !map[r.pessoa_id]) map[r.pessoa_id] = { horario_saida_previsto: hp };
+      }
+    } catch (e) {
+      if (e.message && e.message.includes('horario')) {
+        const [rows] = await db.query(`
+          SELECT pr.id AS pessoa_id, TIME_FORMAT(MAX(ha.fim), '%H:%i') AS hp
+          FROM Professor pr INNER JOIN Aula a ON a.professor_id = pr.id
+          INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
+          WHERE pr.id IN (${ph})
+          GROUP BY pr.id
+        `, [diaSemanaHA, ...pessoaIds]);
+        for (const r of rows || []) {
+          const hp = (r.hp || '').toString().trim().slice(0, 5);
+          if (hp && !map[r.pessoa_id]) map[r.pessoa_id] = { horario_saida_previsto: hp };
+        }
+      }
+    }
+  }
+
+  return map;
+}
+
 /**
  * GET /relatorios/acesso/resumo
- * Query: grupo, turma_id, periodo, data_inicio, data_fim
+ * Query: grupo, turma_id, periodo, data_inicio, data_fim, tipo_movimento (ENTRADA|SAIDA|AMBOS)
  */
 async function resumo(req, res) {
   try {
-    const { grupo = 'ALUNOS', turma_id = 'TODOS', funcionario_tipo = 'TODOS', periodo = 'TODAY', data_inicio, data_fim } = req.query;
+    const { grupo = 'ALUNOS', turma_id = 'TODOS', funcionario_tipo = 'TODOS', periodo = 'TODAY', data_inicio, data_fim, tipo_movimento = 'ENTRADA' } = req.query;
     const [inicio, fim] = getIntervaloDatas(periodo, data_inicio, data_fim);
 
     let total = 0;
     let no_horario = 0;
     let atrasados = 0;
     let faltantes = 0;
+    let saida_no_horario = 0;
+    let saida_antes = 0;
+    let saida_depois = 0;
     const linhaPorSlot = {}; // slot -> { no_horario, atrasados, faltantes }
 
     const datas = iterarDatas(inicio, fim, d => d);
@@ -413,6 +577,83 @@ async function resumo(req, res) {
       }
     }
 
+    if (tipo_movimento === 'SAIDA') {
+      total = 0;
+      no_horario = 0;
+      atrasados = 0;
+      faltantes = 0;
+      for (const data of iterarDatas(inicio, fim, d => d)) {
+        const dataStr = formatDataBrasil(data);
+        const diaSemanaHA = getDiaSemanaHorarioAula(data);
+        const esperados = await getEsperadosNoDia(dataStr, getDiaSemanaBrasil(data), diaSemanaHA, grupo, turma_id, funcionario_tipo);
+        if (esperados.length === 0) continue;
+
+        const placeholders = esperados.map(() => '?').join(',');
+        const [ultimasSaidas] = await db.query(
+          `SELECT pessoa_id, MAX(data_hora) AS data_hora
+           FROM Acesso WHERE pessoa_id IN (${placeholders}) AND status = 'SAIDA'
+             AND data_hora >= ? AND data_hora <= ?
+           GROUP BY pessoa_id`,
+          [...esperados, dataStr + ' 00:00:00', dataStr + ' 23:59:59']
+        );
+
+        const saidaByPessoa = {};
+        for (const row of ultimasSaidas || []) {
+          const dataHora = row.data_hora instanceof Date ? row.data_hora : new Date(row.data_hora);
+          saidaByPessoa[row.pessoa_id] = dataHora;
+        }
+
+        const saidaPrevistoMap = await getHorarioSaidaPrevistoPorPessoa(diaSemanaHA, grupo, turma_id, funcionario_tipo, esperados);
+
+        for (const pid of esperados) {
+          total += 1;
+          const saidaHora = saidaByPessoa[pid];
+          if (!saidaHora) { faltantes += 1; continue; }
+
+          const info = saidaPrevistoMap[pid];
+          if (!info?.horario_saida_previsto) {
+            saida_no_horario += 1;
+            continue;
+          }
+
+          const [h, m] = info.horario_saida_previsto.split(':').map(Number);
+          const ano = saidaHora.getFullYear();
+          const mes = saidaHora.getMonth();
+          const dia = saidaHora.getDate();
+          const previsto = new Date(ano, mes, dia, h, m, 0, 0);
+          const toleranciaAntes = new Date(previsto.getTime() - TOLERANCIA_ATRASO_MINUTOS * 60000);
+          const toleranciaDepois = new Date(previsto.getTime() + TOLERANCIA_ATRASO_MINUTOS * 60000);
+
+          if (saidaHora < toleranciaAntes) saida_antes += 1;
+          else if (saidaHora > toleranciaDepois) saida_depois += 1;
+          else saida_no_horario += 1;
+        }
+      }
+
+      const dados_pizza = [
+        { label: 'Saiu no horário', value: saida_no_horario, color: '#4CAF50' },
+        { label: 'Saiu antes', value: saida_antes, color: '#94a3b8' },
+        { label: 'Saiu depois', value: saida_depois, color: '#FFC107' },
+        { label: 'Sem saída registrada', value: faltantes, color: '#F44336' },
+      ];
+
+      return res.json({
+        metricas: {
+          total,
+          no_horario: saida_no_horario,
+          atrasados: saida_depois,
+          faltantes: saida_antes + faltantes,
+          saida_no_horario,
+          saida_antes,
+          saida_depois,
+          percentual_presenca: total > 0 ? Math.round((saida_no_horario / total) * 1000) / 10 : 0,
+        },
+        dados_pizza,
+        dados_linha: [],
+        tipo_movimento: 'SAIDA',
+      });
+    }
+
     const percentual_presenca = total > 0 ? Math.round(((no_horario + atrasados) / total) * 1000) / 10 : 0;
 
     const dados_pizza = [
@@ -449,12 +690,11 @@ async function resumo(req, res) {
 
 /**
  * GET /relatorios/acesso/detalhes
- * Query: grupo, turma_id, funcionario_tipo, periodo, data_inicio, data_fim, limit, offset
- * Lista quem tem Presenca no período (ou Acesso ENTRADA como fallback), filtrado por grupo/turma/tipo.
+ * Query: grupo, turma_id, funcionario_tipo, periodo, data_inicio, data_fim, limit, offset, tipo_movimento
  */
 async function detalhes(req, res) {
   try {
-    const { grupo = 'ALUNOS', turma_id = 'TODOS', funcionario_tipo = 'TODOS', periodo = 'TODAY', data_inicio, data_fim, limit = 20, offset = 0 } = req.query;
+    const { grupo = 'ALUNOS', turma_id = 'TODOS', funcionario_tipo = 'TODOS', periodo = 'TODAY', data_inicio, data_fim, limit = 20, offset = 0, tipo_movimento = 'ENTRADA' } = req.query;
     const [inicio, fim] = getIntervaloDatas(periodo, data_inicio, data_fim);
     const dataStrInicio = formatDataBrasil(inicio);
     const dataStrFim = formatDataBrasil(fim);
@@ -606,9 +846,152 @@ async function backfillPresenca(req, res) {
   }
 }
 
+/**
+ * GET /relatorios/pessoa/:id/historico
+ * Histórico completo de presença e acessos de uma pessoa.
+ * Query: data_inicio, data_fim, limit, offset
+ */
+async function historicoPessoa(req, res) {
+  try {
+    const pessoaId = Number(req.params.id);
+    const { data_inicio, data_fim, limit = 50, offset = 0 } = req.query;
+
+    if (!pessoaId || isNaN(pessoaId)) {
+      return res.status(400).json({ message: 'ID da pessoa inválido' });
+    }
+
+    const [pessoas] = await db.query(
+      `SELECT p.id, p.nome, p.tipo, t.nome AS turma_nome
+       FROM Pessoa p
+       LEFT JOIN Aluno al ON al.id = p.id
+       LEFT JOIN Turma t ON t.id = al.turma_id
+       WHERE p.id = ?`,
+      [pessoaId]
+    );
+    const pessoa = pessoas && pessoas[0];
+    if (!pessoa) {
+      return res.status(404).json({ message: 'Pessoa não encontrada' });
+    }
+
+    const hoje = getHojeBrasil();
+    const dataFim = data_fim ? new Date(data_fim) : new Date(hoje);
+    const dataInicio = data_inicio ? new Date(data_inicio) : (() => {
+      const d = new Date(hoje);
+      d.setDate(d.getDate() - 30);
+      return d;
+    })();
+    const dataStrInicio = formatDataBrasil(dataInicio);
+    const dataStrFim = formatDataBrasil(dataFim);
+
+    const limitNum = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const offsetNum = Math.max(Number(offset) || 0, 0);
+
+    const [presencas] = await db.query(
+      `SELECT data, atrasado, horario_previsto, horario_chegada, aulas_perdidas
+       FROM Presenca WHERE pessoa_id = ? AND data >= ? AND data <= ?
+       ORDER BY data DESC, horario_chegada DESC`,
+      [pessoaId, dataStrInicio, dataStrFim]
+    );
+
+    const [acessos] = await db.query(
+      `SELECT a.id, a.data_hora, a.status, a.permitido, a.metodo_auth, d.nome AS dispositivo_nome
+       FROM Acesso a
+       LEFT JOIN Dispositivo d ON d.id = a.dispositivo_id
+       WHERE a.pessoa_id = ? AND DATE(a.data_hora) >= ? AND DATE(a.data_hora) <= ?
+       ORDER BY a.data_hora ASC`,
+      [pessoaId, dataStrInicio, dataStrFim]
+    );
+
+    const toDataStr = (val) => {
+      if (!val) return null;
+      if (val instanceof Date) return formatDataBrasil(val);
+      if (typeof val === 'string' && val.length >= 10) return val.slice(0, 10);
+      return String(val).slice(0, 10);
+    };
+
+    const toHora = (val) => {
+      if (!val) return null;
+      const d = val instanceof Date ? val : new Date(val);
+      return Number.isNaN(d.getTime()) ? null : d.toTimeString().slice(0, 5);
+    };
+
+    const presencaPorData = {};
+    for (const pr of presencas || []) {
+      const ds = toDataStr(pr.data);
+      if (ds) presencaPorData[ds] = {
+        atrasado: !!pr.atrasado,
+        horario_previsto: pr.horario_previsto ? String(pr.horario_previsto).slice(0, 5) : null,
+        horario_chegada: pr.horario_chegada ? String(pr.horario_chegada).slice(0, 5) : null,
+        aulas_perdidas: pr.aulas_perdidas || 0,
+      };
+    }
+
+    const acessosPorData = {};
+    for (const ac of acessos || []) {
+      const ds = formatDataBrasil(ac.data_hora);
+      if (!acessosPorData[ds]) acessosPorData[ds] = { entradas: [], saidas: [] };
+      const hora = toHora(ac.data_hora);
+      if (ac.status === 'ENTRADA') acessosPorData[ds].entradas.push(hora);
+      else if (ac.status === 'SAIDA') acessosPorData[ds].saidas.push(hora);
+    }
+
+    const datasUnicas = new Set([...Object.keys(presencaPorData), ...Object.keys(acessosPorData)]);
+    const historico = [];
+    for (const dataStr of [...datasUnicas].sort().reverse()) {
+      const pr = presencaPorData[dataStr];
+      const ac = acessosPorData[dataStr];
+      const entrada = ac?.entradas?.[0] ?? pr?.horario_chegada ?? null;
+      const saida = ac?.saidas?.length ? ac.saidas[ac.saidas.length - 1] : null;
+      const status = pr ? (pr.atrasado ? 'ATRASADO' : 'NO_HORARIO') : (entrada ? 'NO_HORARIO' : null);
+      const observacoes = [];
+      if (pr && !pr.atrasado && status) observacoes.push('No horário');
+      if (pr && pr.atrasado) observacoes.push('Atrasado');
+      if (pr && pr.aulas_perdidas > 0) observacoes.push(`${pr.aulas_perdidas} aula(s) perdida(s)`);
+      historico.push({
+        data: dataStr,
+        horario_entrada: entrada,
+        horario_saida: saida,
+        status,
+        observacoes: observacoes.join('; ') || null,
+        _sort: new Date(dataStr).getTime(),
+      });
+    }
+    historico.sort((a, b) => (b._sort || 0) - (a._sort || 0));
+    historico.forEach((h) => delete h._sort);
+
+    const total = historico.length;
+    const historicoPaginado = historico.slice(offsetNum, offsetNum + limitNum);
+
+    const dadosLinha = historico.map((h) => ({
+      data: h.data,
+      label: h.data,
+      no_horario: h.status === 'NO_HORARIO' ? 1 : 0,
+      atrasados: h.status === 'ATRASADO' ? 1 : 0,
+      faltantes: !h.status && !h.horario_entrada ? 1 : 0,
+    }));
+
+    res.json({
+      pessoa: {
+        id: pessoa.id,
+        nome: pessoa.nome,
+        tipo: pessoa.tipo,
+        turma: pessoa.turma_nome,
+      },
+      historico: historicoPaginado,
+      dados_linha: dadosLinha,
+      total,
+      periodo: { inicio: dataStrInicio, fim: dataStrFim },
+    });
+  } catch (err) {
+    logger.error('[RELATORIO] historicoPessoa:', err.message);
+    res.status(500).json({ message: 'Erro ao buscar histórico', error: err.message });
+  }
+}
+
 module.exports = {
   turmas,
   resumo,
   detalhes,
   backfillPresenca,
+  historicoPessoa,
 };
