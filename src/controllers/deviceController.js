@@ -1,3 +1,4 @@
+const path = require('path');
 const deviceService = require('../services/deviceService');
 const gerarController = require('./genericControllerFactory');
 const { buscarTodos } = require('../utils/generic-db-utils');
@@ -8,7 +9,14 @@ const { cacheMutation } = require('../cache/helpers');
 const logger = require('../config/logger');
 
 const tabela = 'Dispositivo';
-// Colunas conforme o banco (sem control_id_device_id se a migration não foi rodada)
+
+/** Valida id de dispositivo (params): deve ser inteiro positivo. Retorna id numérico ou null. */
+function parseDispositivoId(idParam) {
+  const n = parseInt(idParam, 10);
+  if (Number.isNaN(n) || n < 1) return null;
+  return n;
+}
+// Colunas conforme o banco (control_id_device_id e ultimo_log_id_sincronizado vêm de migrations; para sync usamos SELECT * em accessService)
 const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
 const camposInsert = campos.filter((c) => c !== 'id');
 
@@ -44,7 +52,10 @@ const getStatus = async (req, res) => {
 };
 
 const getStatusId = async (req, res) => {
-  const { id } = req.params;
+  const id = parseDispositivoId(req.params.id);
+  if (id == null) {
+    return res.status(400).json({ message: 'ID do dispositivo inválido' });
+  }
   const dispositivos = await buscarTodos(tabela, campos);
 
   if (!dispositivos) {
@@ -85,7 +96,10 @@ function formatarUserId(user_id) {
 /** Diagnóstico: compara logs da catraca com Acesso no banco (últimas 24h). */
 async function diagnosticoAcessos(req, res) {
   try {
-    const { id } = req.params;
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
@@ -137,10 +151,116 @@ async function diagnosticoAcessos(req, res) {
   }
 }
 
+/** Retorna se a catraca tem muitos logs antigos (para exibir modal "zerar ou continuar"). */
+async function logsInfo(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const result = await deviceService.obterQuantidadeOuAmostraLogsCatraca(dispositivo);
+    if (result.error) {
+      return res.status(502).json({ hasManyOldLogs: false, error: result.error });
+    }
+    return res.json({
+      hasManyOldLogs: result.hasManyOldLogs,
+      estimatedCount: result.estimatedCount
+    });
+  } catch (error) {
+    logger.error(`Erro ao obter logs-info: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao obter informações de logs', error: error.message });
+  }
+}
+
+/** Zera os access_logs na catraca (faz backup antes, opcionalmente apaga acessos no sistema e reseta ultimo_log_id_sincronizado). */
+async function zerarLogs(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const apagarAcessosNoSistema = req.body?.apagarAcessosNoSistema === true;
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+
+    // 1) Backup antes de zerar
+    let backupResult;
+    try {
+      backupResult = await deviceService.gerarBackupLogsCatraca(dispositivo);
+      logger.info(`[ZERAR] Backup gerado: ${backupResult.filename} (${backupResult.totalLines} linhas)`);
+    } catch (backupErr) {
+      logger.error(`[ZERAR] Falha no backup: ${backupErr.message}`);
+      return res.status(502).json({ message: 'Falha ao gerar backup antes de zerar. Operação cancelada.', error: backupErr.message });
+    }
+
+    // 2) Zerar na catraca
+    const zerarResult = await deviceService.zerarAccessLogsCatraca(dispositivo);
+    if (!zerarResult.ok) {
+      return res.status(502).json({ message: zerarResult.message || 'Falha ao zerar logs na catraca' });
+    }
+
+    // 3) Opcional: apagar acessos desse dispositivo no SAGE
+    if (apagarAcessosNoSistema) {
+      const [deleteResult] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
+      logger.info(`[ZERAR] Acessos do dispositivo ${id} apagados no sistema: ${deleteResult.affectedRows} registros`);
+    }
+
+    // 4) Resetar ultimo_log_id_sincronizado para próxima sync começar do zero
+    await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+
+    return res.json({
+      message: 'Logs da catraca zerados com sucesso. Backup gerado antes da operação.',
+      backup: { filename: backupResult.filename, totalLines: backupResult.totalLines },
+      apagarAcessosNoSistema
+    });
+  } catch (error) {
+    logger.error(`Erro ao zerar logs: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao zerar logs', error: error.message });
+  }
+}
+
+/** Gera backup dos access_logs da catraca (chunks em JSONL) e devolve o arquivo para download. */
+async function backupLogs(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const { filePath, filename } = await deviceService.gerarBackupLogsCatraca(dispositivo);
+    const backupsDir = path.resolve(process.cwd(), 'backups');
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+      logger.warn(`[BACKUP] Tentativa de download com path fora de backups: ${resolvedPath}`);
+      return res.status(403).json({ message: 'Caminho do backup inválido' });
+    }
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.download(filePath, filename, (err) => {
+      if (err) logger.debug(`Download backup ${filename}: ${err.message}`);
+    });
+  } catch (error) {
+    logger.error(`Erro ao gerar backup de logs: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao gerar backup', error: error.message });
+  }
+}
+
 /** Configura o Monitor na catraca (para dispositivos já cadastrados). */
 async function configurarMonitor(req, res) {
   try {
-    const { id } = req.params;
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
@@ -191,6 +311,9 @@ module.exports = {
   criar,
   getStatus,
   getStatusId,
+  logsInfo,
+  backupLogs,
+  zerarLogs,
   configurarMonitor,
   diagnosticoAcessos,
   async discover(req, res) {

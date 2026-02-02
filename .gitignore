@@ -14,6 +14,7 @@ yarn-error.log*
 
 # Local generated files
 exports/
+backups/
 uploads/
 src/uploads/
 models/*.xlsx

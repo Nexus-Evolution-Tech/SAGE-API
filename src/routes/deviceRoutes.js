@@ -13,6 +13,9 @@ routerExtra.get('/dispositivos/discover', autenticar, dispositivosController.dis
 routerExtra.post('/dispositivos/quick-add', autenticar, dispositivosController.quickAdd);
 routerExtra.get('/dispositivos/:id/status', autenticar, dispositivosController.getStatusId);
 routerExtra.get('/dispositivos/:id/diagnostico-acessos', autenticar, dispositivosController.diagnosticoAcessos);
+routerExtra.get('/dispositivos/:id/logs-info', autenticar, dispositivosController.logsInfo);
+routerExtra.post('/dispositivos/:id/backup-logs', autenticar, dispositivosController.backupLogs);
+routerExtra.post('/dispositivos/:id/zerar-logs', autenticar, dispositivosController.zerarLogs);
 routerExtra.post('/dispositivos/:id/configurar-monitor', autenticar, dispositivosController.configurarMonitor);
 
 // Depois monta o restante das rotas (inclui /:id, etc.)

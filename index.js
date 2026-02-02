@@ -78,6 +78,17 @@ async function iniciarServidor() {
           }
         })
         .catch((err) => logger.debug(`[PROMOÇÃO] Verificação na subida: ${err.message}`));
+
+      // Sync imediata no boot: puxar da catraca tudo que acumulou enquanto o sistema estava desligado
+      const accessService = require('./src/services/accessService');
+      setImmediate(() => {
+        accessService.sincronizarTodosAcessos()
+          .then((resultados) => {
+            const total = resultados.reduce((acc, r) => acc + (r.acessosSincronizados || 0), 0);
+            if (total > 0) logger.info(`[BOOT] Sync inicial: ${total} acessos sincronizados`);
+          })
+          .catch((err) => logger.debug(`[BOOT] Sync inicial: ${err.message}`));
+      });
     } else {
       logger.warn('⚠ Jobs desabilitados (JOBS_ENABLED=false)');
     }

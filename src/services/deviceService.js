@@ -1,5 +1,9 @@
 const axiosInstance = require('../config/axios');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../config/logger');
+
+const CHUNK_SIZE = parseInt(process.env.CATRACA_BACKUP_CHUNK_SIZE || '2000', 10);
 
 async function listarTodos() {
   try {
@@ -51,26 +55,178 @@ async function verificarSessao(session, linkCatraca) {
   }
 }
 
-async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0) {
+/**
+ * Obtém logs de acesso da catraca (load_objects).
+ * @param {string} session - Sessão Control iD
+ * @param {string} linkCatraca - endereco:porta
+ * @param {number} timestampInicial - Filtrar em JS logs com time > timestampInicial (legado)
+ * @param {object} options - Opcional: { lastLogId, limit, offset } para reduzir payload
+ *   - lastLogId: pedir só access_logs com id > lastLogId (where na API)
+ *   - limit, offset: paginação na API
+ * @returns {Promise<Array>} access_logs
+ */
+async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0, options = {}) {
   try {
-    // load_objects sem filtro na API = catraca envia TODOS os access_logs (milhares). Timeout maior evita falha.
     const loadLogsTimeoutMs = parseInt(process.env.CATRACA_LOAD_LOGS_TIMEOUT || '60000', 10);
+    const body = { object: 'access_logs' };
+
+    if (options.lastLogId != null && Number(options.lastLogId) >= 0) {
+      body.where = { access_logs: { id: { '>': Number(options.lastLogId) } } };
+    }
+    if (options.limit != null && options.limit > 0) {
+      body.limit = options.limit;
+    }
+    if (options.offset != null && options.offset >= 0 && body.limit != null) {
+      body.offset = options.offset;
+    }
+    if (options.order != null) {
+      body.order = options.order;
+    }
+
     const response = await axiosInstance.post(
       `http://${linkCatraca}/load_objects.fcgi?session=${session}`,
-      { object: 'access_logs' },
+      body,
       { timeout: loadLogsTimeoutMs }
     );
 
     const logs = response.data.access_logs || [];
-
-    // Filtra logs com timestamp maior que timestampInicial
-    const logsFiltrados = logs.filter(log => log.time > timestampInicial);
+    const logsFiltrados = timestampInicial > 0
+      ? logs.filter(log => log.time > timestampInicial)
+      : logs;
 
     logger.debug(`${logsFiltrados.length} logs obtidos da catraca`);
     return logsFiltrados;
   } catch (error) {
     logger.errorWithStack('Erro ao obter logs da catraca', error);
     return [];
+  }
+}
+
+/**
+ * Verifica se a catraca tem muitos logs (amostra leve para decidir "zerar ou continuar").
+ * Chama load_objects com limit para não trazer os 49k.
+ * @param {object} dispositivo - Dispositivo do banco
+ * @param {object} options - { limit?: number } (default 5000). Se a resposta tiver length >= limit, considera "muitos dados antigos".
+ * @returns {Promise<{ hasManyOldLogs: boolean, estimatedCount?: number, error?: string }>}
+ */
+async function obterQuantidadeOuAmostraLogsCatraca(dispositivo, options = {}) {
+  const threshold = options.limit ?? parseInt(process.env.CATRACA_LOGS_INFO_THRESHOLD || '5000', 10);
+  const link = linkCatraca(dispositivo);
+  const session = await obterSessao(link, dispositivo);
+  if (!session) {
+    return { hasManyOldLogs: false, error: 'Sessão não obtida' };
+  }
+  try {
+    const loadLogsTimeoutMs = parseInt(process.env.CATRACA_LOAD_LOGS_TIMEOUT || '60000', 10);
+    const body = {
+      object: 'access_logs',
+      limit: threshold,
+      offset: 0,
+      order: ['descending', 'id']
+    };
+    const response = await axiosInstance.post(
+      `http://${link}/load_objects.fcgi?session=${session}`,
+      body,
+      { timeout: loadLogsTimeoutMs }
+    );
+    const logs = response.data.access_logs || [];
+    const hasManyOldLogs = logs.length >= threshold;
+    return {
+      hasManyOldLogs,
+      estimatedCount: hasManyOldLogs ? Math.max(logs.length, threshold) : logs.length
+    };
+  } catch (error) {
+    logger.errorWithStack('Erro ao obter amostra de logs da catraca', error);
+    return { hasManyOldLogs: false, error: error.message };
+  }
+}
+
+/**
+ * Gera backup dos access_logs da catraca em chunks (JSONL).
+ * @param {object} dispositivo - Dispositivo do banco
+ * @returns {Promise<{ filePath: string, filename: string, totalLines: number }>}
+ */
+async function gerarBackupLogsCatraca(dispositivo) {
+  const link = linkCatraca(dispositivo);
+  const session = await obterSessao(link, dispositivo);
+  if (!session) {
+    throw new Error('Sessão não obtida na catraca');
+  }
+
+  const backupsDir = path.resolve(process.cwd(), 'backups');
+  if (!fs.existsSync(backupsDir)) {
+    fs.mkdirSync(backupsDir, { recursive: true });
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `acessos_catraca_${dispositivo.id}_${timestamp}.jsonl`;
+  const filePath = path.join(backupsDir, filename);
+
+  const loadLogsTimeoutMs = parseInt(process.env.CATRACA_LOAD_LOGS_TIMEOUT || '60000', 10);
+  let offset = 0;
+  let totalLines = 0;
+  const writeStream = fs.createWriteStream(filePath, { flags: 'a' });
+
+  try {
+    while (true) {
+      const body = {
+        object: 'access_logs',
+        limit: CHUNK_SIZE,
+        offset
+      };
+      const response = await axiosInstance.post(
+        `http://${link}/load_objects.fcgi?session=${session}`,
+        body,
+        { timeout: loadLogsTimeoutMs }
+      );
+      const logs = response.data.access_logs || [];
+      for (const log of logs) {
+        writeStream.write(JSON.stringify(log) + '\n');
+        totalLines++;
+      }
+      logger.debug(`[BACKUP] ${dispositivo.nome}: chunk offset=${offset}, got ${logs.length}, total=${totalLines}`);
+      if (logs.length < CHUNK_SIZE) break;
+      offset += CHUNK_SIZE;
+    }
+    return new Promise((resolve, reject) => {
+      writeStream.on('finish', () => resolve({ filePath, filename, totalLines }));
+      writeStream.on('error', reject);
+      writeStream.end();
+    });
+  } catch (error) {
+    writeStream.destroy();
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    throw error;
+  }
+}
+
+/**
+ * Zera (apaga) todos os access_logs na catraca Control iD.
+ * Documentação: https://www.controlid.com.br/docs/access-api-pt/objetos/destruir-objetos/
+ * @param {object} dispositivo - Dispositivo do banco
+ * @returns {Promise<{ ok: boolean, changes?: number, message?: string }>}
+ */
+async function zerarAccessLogsCatraca(dispositivo) {
+  const link = linkCatraca(dispositivo);
+  const session = await obterSessao(link, dispositivo);
+  if (!session) {
+    return { ok: false, message: 'Sessão não obtida na catraca' };
+  }
+  try {
+    const body = {
+      object: 'access_logs',
+      where: { access_logs: { id: { '>=': 0 } } }
+    };
+    const response = await axiosInstance.post(
+      `http://${link}/destroy_objects.fcgi?session=${session}`,
+      body,
+      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
+    );
+    const changes = response.data?.changes;
+    logger.info(`[ZERAR] ${dispositivo.nome}: access_logs zerados (changes=${changes ?? 'n/a'})`);
+    return { ok: true, changes };
+  } catch (error) {
+    logger.errorWithStack(`Erro ao zerar access_logs na catraca ${dispositivo.nome}`, error);
+    return { ok: false, message: error.message };
   }
 }
 
@@ -147,11 +303,18 @@ async function configurarMonitorNaCatraca(dispositivo) {
     logger.warn('[MONITOR] Configure MONITOR_CALLBACK_HOST (ou MONITOR_CALLBACK_URL) no .env com o IP/host acessível pela catraca');
   }
 
+  let pathMonitor = 'api/notifications/dao';
+  const secretToken = process.env.MONITOR_CALLBACK_TOKEN;
+  if (secretToken && secretToken.length > 0) {
+    pathMonitor = `api/notifications/dao?token=${encodeURIComponent(secretToken)}`;
+    logger.info('[MONITOR] URL do callback configurada com token (segurança)');
+  }
+
   const monitorConfig = {
     request_timeout: '5000',
     hostname,
     port,
-    path: 'api/notifications/dao'
+    path: pathMonitor
   };
 
   try {
@@ -160,7 +323,7 @@ async function configurarMonitorNaCatraca(dispositivo) {
       { monitor: monitorConfig },
       { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
     );
-    logger.info(`[MONITOR] Monitor configurado em ${dispositivo.nome} -> ${hostname}:${port}/api/notifications/dao`);
+    logger.info(`[MONITOR] Monitor configurado em ${dispositivo.nome} -> ${hostname}:${port}/${pathMonitor}`);
     return { ok: true };
   } catch (error) {
     logger.error(`[MONITOR] Erro ao configurar Monitor em ${dispositivo.nome}: ${error.message}`);
@@ -174,6 +337,9 @@ module.exports = {
   obterSessao,
   verificarSessao,
   obterLogsCatraca,
+  obterQuantidadeOuAmostraLogsCatraca,
+  gerarBackupLogsCatraca,
+  zerarAccessLogsCatraca,
   testarConexaoCatraca,
   configurarMonitorNaCatraca,
   getMonitorCallbackAddress

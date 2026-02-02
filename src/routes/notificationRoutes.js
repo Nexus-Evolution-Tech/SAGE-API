@@ -1,16 +1,18 @@
 /**
  * Rotas para receber notificações do Monitor da Control iD.
  * A catraca envia POST para estes endpoints quando há eventos (acessos, etc.).
- * Não exige autenticação JWT — a requisição vem do equipamento.
+ * Segurança: use MONITOR_CALLBACK_TOKEN e/ou MONITOR_IP_WHITELIST no .env (ver docs/SEGURANCA_CATRACA_E_MONITORAMENTO.md).
  * Documentação: https://www.controlid.com.br/docs/access-api-pt/monitor/introducao-ao-monitor/
  */
 const express = require('express');
 const router = express.Router();
+const monitorCallbackAuth = require('../middlewares/monitorCallbackAuth');
 const { processarNotificacaoMonitorDao } = require('../services/accessService');
 const logger = require('../config/logger');
 
 // POST /api/notifications/dao — alterações em access_logs, templates, cards, alarm_logs
-router.post('/api/notifications/dao', async (req, res) => {
+// Middleware opcional: token (query ?token= ou header X-Monitor-Token) e/ou IP whitelist quando configurados
+router.post('/api/notifications/dao', monitorCallbackAuth, async (req, res) => {
   try {
     const payload = req.body || {};
     const deviceId = payload.device_id;

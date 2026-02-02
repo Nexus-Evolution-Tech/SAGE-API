@@ -147,8 +147,10 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
     await controlId.deletarCartao(catracaUserId, link, sessionAdm, dispositivo, 'QRCODE');
     await controlId.criarCartao(catracaUserId, value, link, session, dispositivo, resultados);
 
-    // UPLOAD_PHOTO
-    await controlId.criarImagemUser(catracaUserId, link, session, dispositivo);
+    // UPLOAD_PHOTO (opcional: catracas antigas sem módulo facial não suportam; use CATRACA_SKIP_USER_IMAGE=true para não tentar)
+    if (process.env.CATRACA_SKIP_USER_IMAGE !== 'true' && process.env.CATRACA_SKIP_USER_IMAGE !== '1') {
+      await controlId.criarImagemUser(catracaUserId, link, session, dispositivo);
+    }
 
     logger.info(` Pessoa ${id} editada em ${dispositivo.nome}`);
     return { dispositivo: dispositivo.nome, sucesso: true };

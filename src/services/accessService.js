@@ -81,13 +81,17 @@ async function sincronizarAcessos(dispositivo) {
   const MARGEM_SEGUNDOS = 3600; // 1 hora: evita perder logs recentes por diferença de fuso/relógio
   let timestampInicial = Math.max(0, ts - MARGEM_SEGUNDOS);
 
+  // Opção de pedir só logs com id > ultimo_log_id_sincronizado (reduz carga quando há muitos registros na catraca)
+  const lastLogId = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : null;
+  const loadOptions = lastLogId != null && lastLogId >= 0 ? { lastLogId } : {};
+
   // Uma requisição à catraca por dispositivo (load_objects); depois só processamos a lista em memória e gravamos no nosso banco (sem nova chamada à catraca por pessoa).
-  let logs = await deviceService.obterLogsCatraca(session, link, timestampInicial);
+  let logs = await deviceService.obterLogsCatraca(session, link, timestampInicial, loadOptions);
   // Se não veio nenhum log mas temos último acesso, pode ser timestamp errado: buscar últimas 24h (mais uma requisição, só nesse caso)
-  if (logs.length === 0 && ultimoAcesso) {
+  if (logs.length === 0 && ultimoAcesso && lastLogId == null) {
     const fallbackTs = Math.max(0, Math.floor(Date.now() / 1000) - 24 * 3600);
     logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
-    logs = await deviceService.obterLogsCatraca(session, link, fallbackTs);
+    logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
   }
 
   // Diagnóstico e ajuste: se o último acesso no banco está à frente do relógio da catraca, nenhum log passaria. Processar TODOS os logs já trazidos (ex.: fallback 24h) para não perder acesso de hoje (ex.: 13h).
@@ -195,6 +199,24 @@ async function sincronizarAcessos(dispositivo) {
     `[SYNC] ${dispositivo.nome}: effectiveTimestampInicial=${effectiveTimestampInicial}, logs=${logs.length}, ` +
     `inseridos=${acessosSincronizados}, ignorados(pessoa)=${ignoradosPessoa}, ignorados(duplicata)=${ignoradosDuplicata}`
   );
+
+  // Persistir maior log.id da catraca para próxima sync pedir só id > ultimo_log_id_sincronizado
+  const logIds = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
+  if (logIds.length > 0) {
+    const maxLogId = Math.max(...logIds);
+    const currentMax = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : 0;
+    const newMax = Math.max(maxLogId, currentMax);
+    try {
+      await db.query(
+        'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
+        [newMax, dispositivo.id]
+      );
+      logger.debug(`[SYNC] ${dispositivo.nome}: ultimo_log_id_sincronizado = ${newMax}`);
+    } catch (e) {
+      logger.debug(`[SYNC] Não foi possível atualizar ultimo_log_id_sincronizado: ${e.message}`);
+    }
+  }
+
   // Invalidar cache da lista sempre que rodar sync (para GET /acessos devolver dados frescos)
   try {
     await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
@@ -325,6 +347,9 @@ async function processarNotificacaoMonitorDao(payload) {
     }
   }
 
+  const maxEventAgeSeconds = parseInt(process.env.MONITOR_MAX_EVENT_AGE_SECONDS || '300', 10); // 5 min padrão (proteção replay)
+  const nowUnix = Math.floor(Date.now() / 1000);
+
   for (const change of objectChanges) {
     if (change.object !== 'access_logs' || change.type !== 'inserted' || !change.values) {
       result.ignorados++;
@@ -335,14 +360,25 @@ async function processarNotificacaoMonitorDao(payload) {
     const time = v.time != null ? Number(v.time) : null;
     const user_id_catraca = v.user_id != null ? Number(v.user_id) : null;
     const portal_id = v.portal_id != null ? Number(v.portal_id) : 1;
-    const card_value = String(v.card_value != null ? v.card_value : '');
+    let card_value = String(v.card_value != null ? v.card_value : '');
+    if (card_value.length > 64) card_value = card_value.slice(0, 64);
 
-    if (time == null) {
+    if (time == null || Number.isNaN(time)) {
+      result.ignorados++;
+      continue;
+    }
+
+    if (maxEventAgeSeconds > 0 && (nowUnix - time > maxEventAgeSeconds || time > nowUnix + 60)) {
+      logger.debug(`[MONITOR DAO] Evento ignorado (replay/antigo): time=${time}, now=${nowUnix}, maxAge=${maxEventAgeSeconds}s`);
       result.ignorados++;
       continue;
     }
 
     const pessoa_id = userIdCatracaParaPessoaId(user_id_catraca);
+    if (pessoa_id == null || !Number.isInteger(pessoa_id) || pessoa_id < 1) {
+      result.ignorados++;
+      continue;
+    }
     const data_hora = timestampParaData(time);
     const status = identificarAcesso(portal_id);
     const metodo_auth = mapearMetodo(card_value);

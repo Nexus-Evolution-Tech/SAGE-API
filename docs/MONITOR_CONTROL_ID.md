@@ -44,7 +44,7 @@ Para **dispositivos já cadastrados**, você pode:
 - Abrir a tela de Dispositivos e clicar em **Verificar status** em cada um (a configuração do Monitor é reaplicada quando o status é ONLINE), ou  
 - Chamar **POST /dispositivos/:id/configurar-monitor** (com autenticação) para forçar a configuração em um dispositivo.
 
-### 2.2. Endpoint no backend
+### 2.2. Endpoint no backend e segurança
 
 O backend expõe o endpoint que a catraca chama quando há eventos:
 
@@ -54,12 +54,19 @@ Exemplo: se a SAGE-API roda em `http://192.168.1.100:3000`, a URL final é:
 
 - `http://192.168.1.100:3000/api/notifications/dao`
 
-Não é necessário token/JWT; a requisição vem do equipamento.
+**Segurança (recomendado em produção):** para não deixar a porta “aberta” para qualquer um, o sistema suporta:
+
+1. **Token compartilhado**: no `.env` defina `MONITOR_CALLBACK_TOKEN=CHAVE_SECRETA`. O sistema configura a catraca com a URL `api/notifications/dao?token=CHAVE_SECRETA`; o servidor só processa o POST se o token bater (401 se inválido).
+2. **Whitelist de IP**: no `.env` defina `MONITOR_IP_WHITELIST=IP_CATRACA1,IP_CATRACA2`. O servidor rejeita 403 se o IP da requisição não estiver na lista.
+3. **Validação de timestamp**: eventos com mais de 5 minutos são descartados (proteção contra replay). Ajuste com `MONITOR_MAX_EVENT_AGE_SECONDS=300`.
+
+Passo a passo completo para o técnico (firewall, VLAN, HTTPS, token, whitelist): **[SEGURANCA_CATRACA_E_MONITORAMENTO.md](SEGURANCA_CATRACA_E_MONITORAMENTO.md)** — seção “Monitor da catraca (callback)”.
 
 ### 2.3. Rede e firewall
 
 - A **catraca** precisa conseguir fazer **POST** do IP dela até o IP:porta do servidor (ex.: 192.168.0.64:3000).
-- Verifique firewall e VLAN: se a catraca e o servidor estiverem em redes diferentes, libere essa comunicação.
+- **Recomendação de segurança:** libere a porta **apenas** para os IPs das catracas (ou da VLAN das catracas), não para “qualquer um”. Use `MONITOR_IP_WHITELIST` no .env para o servidor rejeitar IPs não autorizados.
+- Verifique firewall e VLAN: se a catraca e o servidor estiverem em redes diferentes, libere essa comunicação. Ideal: catracas em sub-rede separada (VLAN) dos PCs e Wi-Fi de visitantes.
 - **Windows:** se a API roda no seu PC, libere a porta no Firewall do Windows (entrada para a porta 3000) ou desative temporariamente para testar.
 
 ### Testar se o servidor recebe o POST
