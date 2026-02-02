@@ -38,6 +38,27 @@ const executar = async (req, res) => {
   }
 };
 
+/**
+ * POST /promocao/reverter
+ * Reverte alunos finalizados por engano (CONCLUIDO → EM CURSO, turma_id → null).
+ * Query params:
+ *   - confirmar=sim  → aplica a reversão (obrigatório para alterar dados)
+ */
+const reverter = async (req, res) => {
+  try {
+    const confirmar = req.query.confirmar === 'sim' || req.query.confirmar === '1';
+    const resultado = await promocaoAlunosService.reverterFinalizados(confirmar);
+    res.json(resultado);
+  } catch (error) {
+    logger.error(`[PROMOÇÃO] Erro ao reverter finalizados: ${error.message}`);
+    res.status(500).json({
+      message: 'Erro ao reverter alunos finalizados',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
-  executar
+  executar,
+  reverter
 };

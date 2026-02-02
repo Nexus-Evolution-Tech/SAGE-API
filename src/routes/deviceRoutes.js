@@ -17,6 +17,7 @@ routerExtra.get('/dispositivos/:id/logs-info', autenticar, dispositivosControlle
 routerExtra.post('/dispositivos/:id/backup-logs', autenticar, dispositivosController.backupLogs);
 routerExtra.post('/dispositivos/:id/zerar-logs', autenticar, dispositivosController.zerarLogs);
 routerExtra.post('/dispositivos/:id/configurar-monitor', autenticar, dispositivosController.configurarMonitor);
+routerExtra.post('/dispositivos/:id/toggle-sync', autenticar, dispositivosController.toggleSync);
 
 // Depois monta o restante das rotas (inclui /:id, etc.)
 routerExtra.use(router);

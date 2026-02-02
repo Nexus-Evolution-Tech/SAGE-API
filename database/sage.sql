@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS Dispositivo (
     last_health_check DATETIME NULL,
     area_id INT,
     numero_serial VARCHAR(255) ,
+    sync_ativo BOOLEAN DEFAULT TRUE COMMENT 'Ativa ou desativa a sincronização automática para este dispositivo',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (area_id) REFERENCES Area(id) ON DELETE SET NULL

@@ -20,6 +20,11 @@ async function sincronizarTodasPessoasNasCatracas() {
 
 async function verificarSyncPendentes(dispositivo) {
   try {
+    // Verifica se a sincronização está ativa para este dispositivo
+    if (dispositivo.sync_ativo === false || dispositivo.sync_ativo === 0) {
+      return; // Não sincroniza se estiver desativado
+    }
+    
     // 1. Obter registros da tabela sync_pendente
     const pendentes = await global.db('sync_pendente').select('*').where('dispositivo_id', dispositivo.id).get();
 

@@ -107,6 +107,13 @@ const verificarSyncPendentesJob = () => {
           const dispositivo = dispositivoResult?.[0];
           if (!dispositivo) continue;
 
+          // Verifica se a sincronização está desativada para este dispositivo
+          if (dispositivo.sync_ativo === false || dispositivo.sync_ativo === 0) {
+            logger.debug(`Sync desativado para catraca ${dispositivo.nome || dispositivoId}, ignorando pendentes`);
+            offlineDevices.add(dispositivoId); // Marca como "offline" para não processar os pendentes
+            continue;
+          }
+
           const isOnline = await deviceService.testarConexaoCatraca(dispositivo);
           if (!isOnline) {
             offlineDevices.add(dispositivoId);

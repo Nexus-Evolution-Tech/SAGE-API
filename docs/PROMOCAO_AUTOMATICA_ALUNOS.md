@@ -4,9 +4,11 @@ Quando o ano letivo muda, o SAGE promove automaticamente os alunos para a série
 
 ## Como Funciona
 
-1. **Padrão das turmas**: O nome segue `Nº X - Sufixo`, ex: `1º A - MTec-PI Desenvolvimento de Sistemas`
-2. **Promoção**: Aluno em `1º A - MTec-PI DS` → `2º A - MTec-PI DS` (se a turma existir)
-3. **Finalização**: Se não existe próxima turma (ex: curso de 1 ano como `1º A - TI-N - Informática`):
+1. **Padrão das turmas**: O nome segue `Nº X - Sufixo`, ex: `1º A - MTec-PI Desenvolvimento de Sistemas`, `1º B - MTec-PI Desenvolvimento de Sistemas`.
+2. **Promoção**: Só altera o **número** da série, mantendo o resto (letra + curso). Ex.:
+   - `1º B - MTec-PI Desenvolvimento de Sistemas` → `2º B - MTec-PI Desenvolvimento de Sistemas` → `3º B - MTec-PI Desenvolvimento de Sistemas`
+   - `1º A - MTec-N Informática para Internet` → `2º A - MTec-N Informática para Internet`; não existe 3º → finalizado.
+3. **Finalização**: Se a próxima turma (mesmo nome com número+1) não existir no banco. Transferência entre turmas (ex.: 1º A → 1º B) é sempre **manual**.
    - Status do aluno → `CONCLUIDO`
    - Se existir turma "Finalizado" na unidade → aluno vai para ela
    - Caso contrário → `turma_id = NULL`
@@ -23,7 +25,7 @@ Ex.: Aluno com RM 2025 em 2026 tem 1 ano na escola → promove 1º→2º. Em 202
 
 ## Quando Roda (não depende de estar ligado em 1º de janeiro)
 
-- **Na subida da API**: Ao iniciar o servidor, verifica se o ano mudou e executa se necessário
+- **Na subida da API**: Ao iniciar o servidor, verifica se o ano mudou e executa se necessário (pode ser desligado com `PROMOCAO_NA_SUBIDA=false`)
 - **Job diário**: Horário configurável via `PROMOCAO_CRON` no `.env` (padrão: 08:10)
 - **Tabela ConfigSistema**: Armazena `ultimo_ano_promocao` para não rodar duas vezes no mesmo ano
 
@@ -33,15 +35,30 @@ O PC fica desligado à meia-noite? Configure um horário em que esteja ligado:
 # Ex.: 08:10 da manhã (padrão)
 PROMOCAO_CRON=10 8 * * *
 
-# Ou 07:00, ou 18:30 em dias úteis
-PROMOCAO_CRON=0 7 * * *
-PROMOCAO_CRON=30 18 * * 1-5
+# Desabilitar promoção na subida do servidor (evita finalizar todos se as turmas 2º/3º ainda não existirem)
+PROMOCAO_NA_SUBIDA=false
 
-# Desabilitar: deixe vazio ou false
+# Desabilitar job diário: deixe vazio ou false
 PROMOCAO_CRON=
 ```
 
-Assim, mesmo que o sistema fique desligado em 1º de janeiro, ao subir em qualquer dia a promoção será executada.
+Assim, mesmo que o sistema fique desligado em 1º de janeiro, ao subir em qualquer dia a promoção será executada (se `PROMOCAO_NA_SUBIDA` não for `false`).
+
+### Se todos os alunos viraram "Finalizado" ou "Sem turma"
+
+Isso acontece quando a **promoção roda** (na subida ou no cron) e **as turmas do próximo ano ainda não existem** no banco (ex.: turmas "2º A - ...", "3º A - ..."). A lógica considera "não existe próxima turma" e **finaliza** o aluno (status CONCLUIDO, turma_id = turma "Finalizado" ou null). No front, turmas passam a aparecer só "Sem turma" e "Finalizado".
+
+**Solução:**
+
+1. **Reverter** os alunos finalizados por engano (todos voltam para EM CURSO e turma_id = null; depois reatribua turmas por planilha ou manualmente):
+   ```bash
+   # Ver quantos seriam revertidos (não altera nada)
+   curl -X POST "http://localhost:3000/promocao/reverter" -H "Authorization: Bearer SEU_TOKEN"
+
+   # Aplicar a reversão
+   curl -X POST "http://localhost:3000/promocao/reverter?confirmar=sim" -H "Authorization: Bearer SEU_TOKEN"
+   ```
+2. **Evitar de novo**: no `.env` use `PROMOCAO_NA_SUBIDA=false` e cadastre as turmas do próximo ano antes de rodar a promoção manualmente (`POST /promocao/executar`).
 
 ## Execução Manual
 
@@ -60,6 +77,46 @@ curl -X POST "http://localhost:3000/promocao/executar" \
 curl -X POST "http://localhost:3000/promocao/executar?unidade_id=1" \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
+
+### Reverter alunos finalizados por engano
+
+Se a promoção finalizou alunos que ainda não tinham concluído o curso, use uma das opções abaixo.
+
+**Opção 1 – Script (recomendado)**
+
+Na pasta do projeto SAGE-API:
+
+```bash
+# Ver quantos seriam revertidos (não altera nada). O script pede login e senha da escola.
+node scripts/reverter-finalizados.js
+
+# Aplicar a reversão (todos CONCLUIDO → EM CURSO, turma_id → null)
+node scripts/reverter-finalizados.js --confirmar
+```
+
+Opcional: no `.env` defina `ESCOLA_USUARIO` e `ESCOLA_SENHA` (e, se quiser, `API_URL`, `UNIDADE_ID`) para não digitar no terminal.
+
+**Opção 2 – cURL (com token)**
+
+1. Fazer login para obter o token:
+   ```bash
+   curl -X POST "http://localhost:3000/escolas/login/1" -H "Content-Type: application/json" -d "{\"usuario\":\"SEU_LOGIN\",\"senha\":\"SUA_SENHA\"}"
+   ```
+   Na resposta, copie o valor de `token`.
+
+2. Consultar quantos seriam revertidos (não altera):
+   ```bash
+   curl -X POST "http://localhost:3000/promocao/reverter" -H "Authorization: Bearer SEU_TOKEN"
+   ```
+
+3. Aplicar a reversão:
+   ```bash
+   curl -X POST "http://localhost:3000/promocao/reverter?confirmar=sim" -H "Authorization: Bearer SEU_TOKEN"
+   ```
+
+Substitua `SEU_TOKEN` pelo token obtido no login e `http://localhost:3000` pela URL da sua API (e `/escolas/login/1` pelo ID da sua unidade, se for diferente de 1).
+
+Depois da reversão, reatribua as turmas aos alunos (reimportar planilha com a coluna Turma correta ou editar manualmente).
 
 ## Setup (npm start em máquina zerada)
 

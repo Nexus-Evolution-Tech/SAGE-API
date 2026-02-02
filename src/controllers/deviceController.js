@@ -18,7 +18,7 @@ function parseDispositivoId(idParam) {
   return n;
 }
 // Colunas conforme o banco (control_id_device_id e ultimo_log_id_sincronizado vêm de migrations; para sync usamos SELECT * em accessService)
-const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
+const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'sync_ativo', 'created_at', 'updated_at'];
 const camposInsert = campos.filter((c) => c !== 'id');
 
 const getStatus = async (req, res) => {
@@ -294,6 +294,47 @@ async function configurarMonitor(req, res) {
   }
 }
 
+/** Ativa ou desativa a sincronização automática para um dispositivo específico */
+async function toggleSync(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    
+    const { sync_ativo } = req.body;
+    if (sync_ativo === undefined || typeof sync_ativo !== 'boolean') {
+      return res.status(400).json({ message: 'Campo sync_ativo é obrigatório e deve ser booleano (true/false)' });
+    }
+    
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    
+    await db.query(`UPDATE ${tabela} SET sync_ativo = ? WHERE id = ?`, [sync_ativo, id]);
+    await cacheMutation(async () => null, [`${tabela}:*`]);
+    
+    const statusMsg = sync_ativo ? 'ativada' : 'desativada';
+    logger.info(`Sincronização ${statusMsg} para dispositivo ${dispositivo.nome} (ID: ${id})`);
+    
+    emitNotification({
+      title: `Sincronização ${statusMsg}`,
+      message: `A sincronização automática foi ${statusMsg} para o dispositivo "${dispositivo.nome}"`,
+      type: 'success',
+    });
+    
+    return res.json({ 
+      message: `Sincronização ${statusMsg} com sucesso`,
+      dispositivo: dispositivo.nome,
+      sync_ativo 
+    });
+  } catch (error) {
+    logger.error(`Erro ao alterar sincronização: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao alterar sincronização', error: error.message });
+  }
+}
+
 const controllerGenerico = gerarController(tabela, campos, 'dispositivo');
 
 /** Criar dispositivo e já configurar o Monitor na catraca para monitoramento em tempo real */
@@ -333,6 +374,7 @@ module.exports = {
   backupLogs,
   zerarLogs,
   configurarMonitor,
+  toggleSync,
   diagnosticoAcessos,
   async discover(req, res) {
     try {

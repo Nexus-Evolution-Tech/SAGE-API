@@ -2,8 +2,12 @@
  * Serviço de Promoção Automática de Alunos
  *
  * Promove alunos de turma quando o ano letivo muda:
- * - "1º A - MTec-PI Desenvolvimento de Sistemas" → "2º A - MTec-PI Desenvolvimento de Sistemas"
- * - Se não existe próxima turma → status CONCLUIDO (ou turma "Finalizado")
+ * - Só altera o NÚMERO da série, mantendo o resto do nome (letra + curso).
+ *   Ex.: 1º B - MTec-PI Desenvolvimento de Sistemas → 2º B - MTec-PI Desenvolvimento de Sistemas
+ *        2º B - MTec-PI Desenvolvimento de Sistemas → 3º B - MTec-PI Desenvolvimento de Sistemas
+ * - Se a próxima turma (mesmo nome com número+1) não existir → status CONCLUIDO (ou turma "Finalizado").
+ *   Ex.: 2º A - MTec-N Informática para Internet → não existe 3º → finalizado.
+ * - Transferência entre turmas (ex.: 1º A → 1º B) é sempre manual.
  *
  * Critério de elegibilidade (aluno deve ter completado pelo menos 1 ano):
  * - RM: primeiros 4 dígitos = ano de matrícula (ex: 20252930067 → 2025)
@@ -159,12 +163,12 @@ async function executarPromocao(options = {}) {
             aluno_id: aluno.aluno_id,
             turma_atual: aluno.turma_nome,
             acao: 'ignorado',
-            motivo: 'Nome da turma não segue o padrão Nº X - Sufixo'
+            motivo: 'Nome da turma não segue o padrão Nº X - Sufixo (ex.: 1º A - Curso)'
           });
           continue;
         }
 
-        // Buscar se existe a próxima turma
+        // Próxima turma = mesmo nome com número+1 (ex.: 1º B - MTec-PI DS → 2º B - MTec-PI DS)
         const proximaTurma = await buscarTurmaPorNome(
           nomeProximaTurma,
           aluno.curso_id,
@@ -173,7 +177,6 @@ async function executarPromocao(options = {}) {
         );
 
         if (proximaTurma) {
-          // Existe próxima turma → promover
           if (!apenasSimulacao) {
             await db.query(
               'UPDATE Aluno SET turma_id = ? WHERE id = ?',
@@ -188,7 +191,7 @@ async function executarPromocao(options = {}) {
             acao: 'promovido'
           });
         } else {
-          // Não existe próxima turma → finalizar o aluno
+          // Não existe próxima turma → finalizar (transferência para outra turma é manual)
           const turmaFinalizado = await buscarTurmaFinalizado(aluno.unidade_id);
 
           if (!apenasSimulacao) {
@@ -291,11 +294,44 @@ async function executarPromocaoSeAnoMudou(options = {}) {
   return { executado: true, anoAtual, ultimoAno, resultado };
 }
 
+/**
+ * Reverte alunos que foram finalizados por engano (status CONCLUIDO → EM CURSO, turma_id → null).
+ * Útil quando a promoção rodou e as turmas do próximo ano ainda não existiam.
+ * Os alunos ficam "Sem turma" e precisam ser reatribuídos (reimportar planilha ou editar manualmente).
+ *
+ * @param {boolean} confirmar - Se false, não altera nada (segurança)
+ * @returns {Promise<{ revertidos: number, message: string }>}
+ */
+async function reverterFinalizados(confirmar = false) {
+  if (!confirmar) {
+    const [rows] = await db.query(
+      "SELECT COUNT(*) as total FROM Aluno WHERE status = 'CONCLUIDO'"
+    );
+    const total = rows?.[0]?.total ?? 0;
+    return {
+      revertidos: 0,
+      totalFinalizados: total,
+      message: `Há ${total} aluno(s) com status CONCLUIDO. Chame novamente com ?confirmar=sim para reverter (status → EM CURSO, turma_id → null).`
+    };
+  }
+
+  const [result] = await db.query(
+    "UPDATE Aluno SET status = 'EM CURSO', turma_id = NULL WHERE status = 'CONCLUIDO'"
+  );
+  const revertidos = result?.affectedRows ?? 0;
+  logger.info(`[PROMOÇÃO] Revertidos ${revertidos} aluno(s) de CONCLUIDO para EM CURSO (turma_id = null).`);
+  return {
+    revertidos,
+    message: `${revertidos} aluno(s) revertidos para EM CURSO sem turma. Reatribua as turmas (reimportar planilha ou editar manualmente).`
+  };
+}
+
 module.exports = {
   executarPromocao,
   executarPromocaoSeAnoMudou,
   verificarSeDeveRodarPromocao,
   atualizarUltimoAnoPromocao,
+  reverterFinalizados,
   extrairAnoDoRM,
   obterNomeProximaTurma,
   extrairNumeroESufixo,
