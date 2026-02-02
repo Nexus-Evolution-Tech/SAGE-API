@@ -1,6 +1,13 @@
 # Monitor Control iD — Acessos em tempo real na tela de monitoramento
 
-Para que os **acessos reais da catraca** apareçam na tela de monitoramento, o SAGE usa **duas formas** (como o software oficial da Control iD):
+Para que os **acessos reais da catraca** apareçam na tela de monitoramento, o SAGE usa **duas formas** (como o software oficial da Control iD).
+
+### Escolhendo o modo de operação
+
+- **Se o cliente NÃO puder abrir a porta do servidor** (firewall/VPN): use **apenas Polling**. No `.env` deixe `MONITOR_USE_PUSH=false` (ou não defina). O servidor consulta as catracas a cada X segundos; não é preciso a catraca enviar POST nem abrir firewall.
+- **Se o cliente autorizar abrir a porta** e quiser eventos em tempo real (push): defina `MONITOR_USE_PUSH=true` no `.env`, configure `MONITOR_CALLBACK_HOST`/`MONITOR_CALLBACK_PORT` e libere a porta no firewall. O sistema configurará a catraca para enviar POST ao servidor.
+
+Em **Configurações → Ferramentas – Catraca** a interface mostra o modo atual (Polling ou Monitor push) e permite chamar manualmente: sincronizar, backup dos logs e configurar Monitor na catraca.
 
 ---
 

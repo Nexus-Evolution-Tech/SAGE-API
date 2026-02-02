@@ -4,6 +4,7 @@ const path = require('path');
 const autenticar = require('../middlewares/autenticar');
 const { importarPlanilha } = require('../services/importService');
 const { exportarDados } = require('../services/exportService');
+const { emitNotification } = require('../services/notificationService');
 const logger = require('../config/logger');
 
 const router = express.Router();
@@ -91,6 +92,12 @@ router.get('/dados/exportar', autenticar, async (req, res) => {
     const exportPath = path.resolve(`exports/exportacao_${timestamp}.xlsx`);
 
     await exportarDados(exportPath);
+
+    emitNotification({
+      title: 'Exportação pronta',
+      message: 'O arquivo de exportação foi gerado e está disponível para download.',
+      type: 'success',
+    });
 
     res.download(exportPath, path.basename(exportPath), (err) => {
       if (err) {

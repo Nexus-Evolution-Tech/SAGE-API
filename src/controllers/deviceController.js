@@ -7,6 +7,7 @@ const { criarRegistro } = require('../utils/generic-db-utils');
 const db = require('../config/database');
 const { cacheMutation } = require('../cache/helpers');
 const logger = require('../config/logger');
+const { emitNotification } = require('../services/notificationService');
 
 const tabela = 'Dispositivo';
 
@@ -166,6 +167,13 @@ async function logsInfo(req, res) {
     if (result.error) {
       return res.status(502).json({ hasManyOldLogs: false, error: result.error });
     }
+    if (result.hasManyOldLogs) {
+      emitNotification({
+        title: 'Muitos logs na catraca',
+        message: `"${dispositivo.nome}" possui muitos logs antigos (estimativa: ${result.estimatedCount ?? 'alta'}). Considere fazer backup e zerar para melhor desempenho.`,
+        type: 'warning',
+      });
+    }
     return res.json({
       hasManyOldLogs: result.hasManyOldLogs,
       estimatedCount: result.estimatedCount
@@ -269,9 +277,19 @@ async function configurarMonitor(req, res) {
     if (result.ok) {
       return res.json({ message: 'Monitor configurado na catraca', dispositivo: dispositivo.nome });
     }
+    emitNotification({
+      title: 'Falha ao configurar Monitor',
+      message: `${dispositivo.nome}: ${result.message || 'Não foi possível configurar o callback na catraca.'}`,
+      type: 'error',
+    });
     return res.status(502).json({ message: result.message || 'Falha ao configurar Monitor' });
   } catch (error) {
     logger.error(`Erro ao configurar Monitor: ${error.message}`);
+    emitNotification({
+      title: 'Falha ao configurar Monitor',
+      message: `${error.message}`,
+      type: 'error',
+    });
     return res.status(500).json({ message: 'Erro ao configurar Monitor', error: error.message });
   }
 }

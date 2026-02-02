@@ -21,7 +21,7 @@ ADD COLUMN last_attempt DATETIME NULL AFTER retry_count;
 -- Adicionar índices para melhorar performance
 CREATE INDEX idx_sync_pessoa_dispositivo ON sync_pendente(pessoa_id, dispositivo_id);
 CREATE INDEX idx_sync_operation ON sync_pendente(operation);
-CREATE INDEX idx_sync_created ON sync_pendente(created_at);
+CREATE INDEX idx_sync_data_tentativa ON sync_pendente(data_tentativa);
 -- Evita duplicidade por pessoa/dispositivo/operação e elimina SELECTs de deduplicação na aplicação
 -- ALTER TABLE sync_pendente ADD UNIQUE KEY uniq_sync_pendente (pessoa_id, dispositivo_id, operation);
 

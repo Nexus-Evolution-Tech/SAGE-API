@@ -339,6 +339,21 @@ async function setupBancoDados() {
     }
   }
 
+  // 4.2 Aplicar migrações incrementais (migration_*.sql) — idempotentes
+  const migrationFiles = await fs.readdir(migrationsDir).catch(() => []);
+  const migrations = migrationFiles
+    .filter((f) => f.startsWith('migration_') && f.endsWith('.sql'))
+    .sort();
+  for (const file of migrations) {
+    const migrationPath = path.join(migrationsDir, file);
+    try {
+      await executarMigration(migrationPath);
+    } catch (error) {
+      logger.error(`    Erro ao executar ${file}: ${error.message}`);
+      throw error;
+    }
+  }
+
   // 5. Validar estrutura
   logger.info('\n5️⃣ Validando estrutura...');
   await executarSeeds();

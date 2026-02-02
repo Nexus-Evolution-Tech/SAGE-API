@@ -110,31 +110,13 @@ async function turmas(req, res) {
  */
 async function getEsperadosNoDia(dataStr, diaSemana, diaSemanaHA, grupo, turma_id, funcionario_tipo) {
   if (grupo === 'ALUNOS') {
-    try {
-      let sql = `
-        SELECT DISTINCT a.id AS pessoa_id
-        FROM Aluno a
-        INNER JOIN Pessoa p ON p.id = a.id
-        INNER JOIN HorarioAula ha ON ha.turma_id = a.turma_id AND ha.dia_semana = ?
-        WHERE p.tipo = 'ALUNO' AND p.visivel = 1
-      `;
-      const params = [diaSemanaHA];
-      if (turma_id && turma_id !== 'TODOS') {
-        sql += ' AND a.turma_id = ?';
-        params.push(Number(turma_id));
-      }
-      const [rows] = await db.query(sql, params);
-      if (rows.length > 0) return rows.map(r => r.pessoa_id);
-    } catch (e) {
-      logger.debug('[RELATORIO] getEsperadosNoDia HorarioAula falhou, usando fallback Alunos:', e.message);
-    }
-    const [fallback] = await db.query(
+    const [rows] = await db.query(
       `SELECT a.id AS pessoa_id FROM Aluno a INNER JOIN Pessoa p ON p.id = a.id
        WHERE p.tipo = 'ALUNO' AND p.visivel = 1 AND a.turma_id IS NOT NULL
        ${turma_id && turma_id !== 'TODOS' ? ' AND a.turma_id = ?' : ''}`,
       turma_id && turma_id !== 'TODOS' ? [Number(turma_id)] : []
     );
-    return (fallback || []).map(r => r.pessoa_id);
+    return (rows || []).map(r => r.pessoa_id);
   }
 
   if (grupo === 'FUNCIONARIOS') {
@@ -151,26 +133,10 @@ async function getEsperadosNoDia(dataStr, diaSemana, diaSemanaHA, grupo, turma_i
       return (rows || []).map(r => r.pessoa_id);
     }
     if (funcionario_tipo === 'PROFESSOR' || funcionario_tipo === 'TODOS') {
-      let professores = [];
-      try {
-        const sql = `
-          SELECT DISTINCT pr.id AS pessoa_id
-          FROM Professor pr
-          INNER JOIN Aula a ON a.professor_id = pr.id
-          INNER JOIN HorarioAula ha ON ha.aula_id = a.id AND ha.dia_semana = ?
-          INNER JOIN Pessoa p ON p.id = pr.id AND p.visivel = 1
-        `;
-        const [rows] = await db.query(sql, [diaSemanaHA]);
-        professores = (rows || []).map(r => r.pessoa_id);
-      } catch (e) {
-        logger.debug('[RELATORIO] getEsperadosNoDia HorarioAula prof falhou:', e.message);
-      }
-      if (professores.length === 0) {
-        const [fallback] = await db.query(
-          'SELECT pr.id AS pessoa_id FROM Professor pr INNER JOIN Pessoa p ON p.id = pr.id WHERE p.visivel = 1'
-        );
-        professores = (fallback || []).map(r => r.pessoa_id);
-      }
+      const [profRows] = await db.query(
+        'SELECT pr.id AS pessoa_id FROM Professor pr INNER JOIN Pessoa p ON p.id = pr.id WHERE p.visivel = 1'
+      );
+      const professores = (profRows || []).map(r => r.pessoa_id);
       if (funcionario_tipo === 'PROFESSOR') return professores;
       const [admRows] = await db.query('SELECT ad.id AS pessoa_id FROM Administrador ad INNER JOIN Pessoa p ON p.id = ad.id WHERE p.visivel = 1');
       const [tercRows] = await db.query('SELECT t.id AS pessoa_id FROM Terceirizado t INNER JOIN Pessoa p ON p.id = t.id WHERE p.visivel = 1');

@@ -129,6 +129,7 @@ async function sincronizarAcessos(dispositivo) {
   const globalState = require('../state/globalState');
   const { emitToRoom } = require('../websocket/wsServer');
   const { cacheMutation, CACHE_KEYS } = require('../cache/helpers');
+  const { emitNotification } = require('./notificationService');
 
   // Processar lista em memória: só MySQL (SELECT/INSERT); nenhuma nova requisição à catraca.
   for (const log of logs) {
@@ -223,6 +224,13 @@ async function sincronizarAcessos(dispositivo) {
   } catch (e) { /* ignorar */ }
   if (acessosSincronizados > 0) {
     logger.info(`[SYNC] ${dispositivo.nome}: ${acessosSincronizados} novo(s) acesso(s) inserido(s)`);
+    try {
+      emitNotification({
+        title: 'Sincronização de acessos concluída',
+        message: `${acessosSincronizados} acesso(s) sincronizado(s) para ${dispositivo.nome}.`,
+        type: 'info',
+      });
+    } catch (e) { /* ignorar */ }
   }
 
   return {
@@ -376,6 +384,7 @@ async function processarNotificacaoMonitorDao(payload) {
 
     const pessoa_id = userIdCatracaParaPessoaId(user_id_catraca);
     if (pessoa_id == null || !Number.isInteger(pessoa_id) || pessoa_id < 1) {
+      tentativasNegadas++;
       result.ignorados++;
       continue;
     }
@@ -387,6 +396,7 @@ async function processarNotificacaoMonitorDao(payload) {
     const [pessoaResult] = await db.query('SELECT id, nome FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
     const pessoa = pessoaResult[0];
     if (!pessoa) {
+      tentativasNegadas++;
       logger.debug(`[MONITOR DAO] Pessoa id ${pessoa_id} não existe, ignorando log`);
       result.ignorados++;
       continue;
@@ -431,6 +441,20 @@ async function processarNotificacaoMonitorDao(payload) {
   if (result.processados > 0) {
     try {
       await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
+      emitNotification({
+        title: 'Sincronização de acessos concluída',
+        message: `${result.processados} acesso(s) registrado(s) via Monitor (catraca).`,
+        type: 'info',
+      });
+    } catch (e) { /* ignorar */ }
+  }
+  if (tentativasNegadas > 0) {
+    try {
+      emitNotification({
+        title: 'Acesso negado / tentativa inválida',
+        message: `${tentativasNegadas} tentativa(s) de acesso com identificação não cadastrada.`,
+        type: 'warning',
+      });
     } catch (e) { /* ignorar */ }
   }
 

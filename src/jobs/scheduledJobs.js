@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const logger = require('../config/logger');
 const deviceService = require('../services/deviceService');
 const promocaoAlunosService = require('../services/promocaoAlunosService');
+const { emitNotification } = require('../services/notificationService');
 const db = require('../config/database');
 
 const listarTodos = async () => {
@@ -54,11 +55,20 @@ const healthCheckCatracasJob = () => {
 
       for (const dispositivo of dispositivos) {
         try {
+          const statusAnterior = (dispositivo.status || '').toUpperCase();
           const isOnline = await deviceService.testarConexaoCatraca(dispositivo);
+          const novoStatus = isOnline ? 'ONLINE' : 'OFFLINE';
           await db.query(
             'UPDATE Dispositivo SET status = ?, last_health_check = ? WHERE id = ?',
-            [isOnline ? 'ONLINE' : 'OFFLINE', new Date(), dispositivo.id]
+            [novoStatus, new Date(), dispositivo.id]
           );
+          if (statusAnterior === 'ONLINE' && novoStatus === 'OFFLINE') {
+            emitNotification({
+              title: 'Catraca offline',
+              message: `O dispositivo "${dispositivo.nome}" está offline. Verifique a conexão.`,
+              type: 'warning',
+            });
+          }
         } catch (err) {
           logger.debug(`Health check falhou para ${dispositivo.nome}: ${err.message}`);
         }
@@ -176,9 +186,19 @@ const promocaoAlunosJob = () => {
         logger.info(
           `[PROMOÇÃO] Ano ${anoAtual}: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados, ${resultado.erros} erros`
         );
+        emitNotification({
+          title: 'Promoção automática executada',
+          message: `Ano ${anoAtual}: ${resultado.promovidos} aluno(s) promovido(s), ${resultado.finalizados} finalizado(s).`,
+          type: 'info',
+        });
       }
     } catch (error) {
       logger.error(`[PROMOÇÃO] Erro na promoção automática: ${error.message}`);
+      emitNotification({
+        title: 'Erro na promoção automática',
+        message: error.message,
+        type: 'error',
+      });
     }
   }, { scheduled: true, timezone: 'America/Sao_Paulo' });
 };

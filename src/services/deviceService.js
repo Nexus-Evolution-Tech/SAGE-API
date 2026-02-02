@@ -291,6 +291,11 @@ function getMonitorCallbackAddress() {
  * @returns {Promise<{ ok: boolean, message?: string }>}
  */
 async function configurarMonitorNaCatraca(dispositivo) {
+  // Modo apenas polling: não configurar push na catraca (cliente não abre porta)
+  if (process.env.MONITOR_USE_PUSH !== 'true') {
+    logger.debug('[MONITOR] MONITOR_USE_PUSH não está true; não configurando callback na catraca (modo polling)');
+    return { ok: false, message: 'Sistema configurado apenas para polling. Para usar Monitor (push), defina MONITOR_USE_PUSH=true no .env e abra a porta no firewall.' };
+  }
   const link = linkCatraca(dispositivo);
   const session = await obterSessao(link, dispositivo);
   if (!session) {

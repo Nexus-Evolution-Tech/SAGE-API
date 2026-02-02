@@ -3,6 +3,7 @@ const db = require('../config/database');
 const logger = require('../config/logger');
 const { hashSenha } = require('../utils/criptografia');
 const { enviarEmailRecuperacaoSenha } = require('../services/emailService');
+const { emitNotification } = require('../services/notificationService');
 
 const TOKEN_BYTES = 32;
 const EXPIRACAO_HORAS = 1;
@@ -96,6 +97,12 @@ async function redefinirSenha(req, res) {
 
     await db.query('UPDATE UnidadeEscolar SET senha = ? WHERE id = ?', [senhaHash, registro.unidade_id]);
     await db.query('UPDATE RecuperacaoSenha SET used_at = NOW() WHERE id = ?', [registro.id]);
+
+    emitNotification({
+      title: 'Senha redefinida com sucesso',
+      message: 'Sua senha foi alterada. Faça login com a nova senha.',
+      type: 'success',
+    });
 
     return res.status(200).json({
       message: 'Senha alterada com sucesso. Faça login com a nova senha.',
