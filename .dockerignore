@@ -1,0 +1,42 @@
+# Dependências (instaladas no build)
+node_modules
+
+# Ambiente e secrets (vem do host via env_file no compose)
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Logs e arquivos gerados localmente
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+exports/
+backups/
+uploads/
+src/uploads/
+
+# Git e IDE
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Redis dump
+dump.rdb
+
+# Documentação (opcional; remova se quiser incluir no image)
+docs/
+*.md
+!README.md
+
+# Planilhas temporárias (manter apenas modelos)
+models/*.xlsx
+!models/*-Modelo.xlsx
