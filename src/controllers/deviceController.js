@@ -8,6 +8,10 @@ const db = require('../config/database');
 const { cacheMutation } = require('../cache/helpers');
 const logger = require('../config/logger');
 const { emitNotification } = require('../services/notificationService');
+const { isSyncEnabled } = require('../utils/syncFlags');
+const { limparUsuariosPorPrefixo11 } = require('../utils/controlId-utils');
+const globalState = require('../state/globalState');
+const catracaImportService = require('../services/catracaImportService');
 
 const tabela = 'Dispositivo';
 
@@ -18,7 +22,7 @@ function parseDispositivoId(idParam) {
   return n;
 }
 // Colunas conforme o banco (control_id_device_id e ultimo_log_id_sincronizado vêm de migrations; para sync usamos SELECT * em accessService)
-const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
+const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'sync_enabled', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
 const camposInsert = campos.filter((c) => c !== 'id');
 
 const getStatus = async (req, res) => {
@@ -30,6 +34,11 @@ const getStatus = async (req, res) => {
   }
 
   for (const dispositivo of dispositivos) {
+    if (!isSyncEnabled(dispositivo.sync_enabled)) {
+      statusDispositivos.push({ id: dispositivo.id, nome: dispositivo.nome, status: 'SYNC_DESATIVADA' });
+      continue;
+    }
+
     const link = deviceService.linkCatraca(dispositivo);
     const session = await deviceService.obterSessao(link, dispositivo);
 
@@ -67,6 +76,10 @@ const getStatusId = async (req, res) => {
 
   if (!dispositivo) {
     return res.status(404).json({ message: 'Dispositivo não encontrado' });
+  }
+
+  if (!isSyncEnabled(dispositivo.sync_enabled)) {
+    return res.json({ id: dispositivo.id, nome: dispositivo.nome, status: 'SYNC_DESATIVADA' });
   }
 
   const link = deviceService.linkCatraca(dispositivo);
@@ -186,11 +199,11 @@ async function logsInfo(req, res) {
 
 /** Zera os access_logs na catraca (faz backup antes, opcionalmente apaga acessos no sistema e reseta ultimo_log_id_sincronizado). */
 async function zerarLogs(req, res) {
+  const id = parseDispositivoId(req.params.id);
+  if (id == null) {
+    return res.status(400).json({ message: 'ID do dispositivo inválido' });
+  }
   try {
-    const id = parseDispositivoId(req.params.id);
-    if (id == null) {
-      return res.status(400).json({ message: 'ID do dispositivo inválido' });
-    }
     const apagarAcessosNoSistema = req.body?.apagarAcessosNoSistema === true;
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) {
@@ -207,29 +220,308 @@ async function zerarLogs(req, res) {
       return res.status(502).json({ message: 'Falha ao gerar backup antes de zerar. Operação cancelada.', error: backupErr.message });
     }
 
-    // 2) Zerar na catraca
-    const zerarResult = await deviceService.zerarAccessLogsCatraca(dispositivo);
-    if (!zerarResult.ok) {
-      return res.status(502).json({ message: zerarResult.message || 'Falha ao zerar logs na catraca' });
+    // Marcar dispositivo como "zerando" para sync/polling não bater na mesma catraca durante o delete
+    globalState.setZerandoDispositivo(id, true);
+    try {
+      // 1.5) Aguardar a catraca se recuperar do backup (evita 503 por sobrecarga)
+      const delayAposBackupMs = parseInt(process.env.CATRACA_DELAY_APOS_BACKUP_MS || '15000', 10);
+      if (delayAposBackupMs > 0) {
+        logger.info(`[ZERAR] Aguardando ${delayAposBackupMs / 1000}s antes de zerar (CATRACA_DELAY_APOS_BACKUP_MS)`);
+        await new Promise((r) => setTimeout(r, delayAposBackupMs));
+      }
+
+      // 2) Zerar na catraca (pode demorar até CATRACA_ZERAR_LOGS_TIMEOUT_MS, ex. 3 min)
+      const zerarResult = await deviceService.zerarAccessLogsCatraca(dispositivo);
+      if (!zerarResult.ok) {
+        return res.status(502).json({ message: zerarResult.message || 'Falha ao zerar logs na catraca' });
+      }
+
+      // 3) Opcional: apagar acessos desse dispositivo no SAGE
+      if (apagarAcessosNoSistema) {
+        const [deleteResult] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
+        logger.info(`[ZERAR] Acessos do dispositivo ${id} apagados no sistema: ${deleteResult.affectedRows} registros`);
+      }
+
+      // 4) Resetar ultimo_log_id_sincronizado para próxima sync começar do zero
+      await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+
+      return res.json({
+        message: 'Logs da catraca zerados com sucesso. Backup gerado antes da operação.',
+        backup: { filename: backupResult.filename, totalLines: backupResult.totalLines },
+        apagarAcessosNoSistema
+      });
+    } finally {
+      globalState.setZerandoDispositivo(id, false);
     }
-
-    // 3) Opcional: apagar acessos desse dispositivo no SAGE
-    if (apagarAcessosNoSistema) {
-      const [deleteResult] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
-      logger.info(`[ZERAR] Acessos do dispositivo ${id} apagados no sistema: ${deleteResult.affectedRows} registros`);
-    }
-
-    // 4) Resetar ultimo_log_id_sincronizado para próxima sync começar do zero
-    await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
-
-    return res.json({
-      message: 'Logs da catraca zerados com sucesso. Backup gerado antes da operação.',
-      backup: { filename: backupResult.filename, totalLines: backupResult.totalLines },
-      apagarAcessosNoSistema
-    });
   } catch (error) {
+    if (id != null) globalState.setZerandoDispositivo(id, false);
     logger.error(`Erro ao zerar logs: ${error.message}`);
     return res.status(500).json({ message: 'Erro ao zerar logs', error: error.message });
+  }
+}
+
+/** Lista um tipo de objeto da catraca (users, areas, groups, etc.) — somente leitura. */
+async function listarObjetosCatraca(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    const objectType = (req.params.objectType || '').toLowerCase().trim();
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    if (!deviceService.OBJETOS_CATRACA_LISTAVEIS.includes(objectType)) {
+      return res.status(400).json({
+        message: `Tipo de objeto inválido. Permitidos: ${deviceService.OBJETOS_CATRACA_LISTAVEIS.join(', ')}`
+      });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : undefined;
+    const { data } = await deviceService.loadObjectsFromCatraca(dispositivo, objectType, { limit, offset });
+    return res.json({ objectType, data, total: data.length });
+  } catch (error) {
+    logger.error(`Erro ao listar objetos da catraca: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao listar objetos da catraca', error: error.message });
+  }
+}
+
+/** Remove um objeto na catraca por id (ex.: usuário, área, grupo). DELETE /dispositivos/:id/catraca/objetos/:objectType/:objectId */
+async function deletarObjetoCatraca(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    const objectType = (req.params.objectType || '').toLowerCase().trim();
+    const objectIdRaw = req.params.objectId;
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const objectId = objectIdRaw ? parseInt(objectIdRaw, 10) : NaN;
+    if (!Number.isInteger(objectId)) {
+      return res.status(400).json({ message: 'ID do objeto inválido' });
+    }
+    const allowedForDelete = ['users', 'areas', 'groups', 'cards', 'qrcodes', 'access_rules', 'portals', 'time_zones', 'time_spans', 'scheduled_unlocks'];
+    if (!allowedForDelete.includes(objectType)) {
+      return res.status(400).json({ message: `Tipo não permitido para exclusão. Permitidos: ${allowedForDelete.join(', ')}` });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const where = { [objectType]: { id: objectId } };
+    const result = await deviceService.destroyObjectsOnCatraca(dispositivo, objectType, where);
+    if (!result.ok) {
+      return res.status(502).json({ message: result.message || 'Falha ao remover objeto na catraca' });
+    }
+    return res.json({ message: `${objectType} removido na catraca`, changes: result.changes });
+  } catch (error) {
+    logger.error(`Erro ao deletar objeto na catraca: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao deletar objeto na catraca', error: error.message });
+  }
+}
+
+/** Lista os tipos de objeto da catraca disponíveis para backup/zerar por tipo (ferramentas). */
+async function listarTiposObjetosCatraca(req, res) {
+  try {
+    return res.json({ objectTypes: deviceService.OBJETOS_CATRACA_FERRAMENTAS });
+  } catch (error) {
+    logger.error(`Erro ao listar tipos de objetos: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao listar tipos', error: error.message });
+  }
+}
+
+/** Gera backup de um único tipo de objeto na catraca e devolve o arquivo para download. */
+async function backupPorTipo(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    const objectType = (req.params.objectType || '').toLowerCase().trim();
+    if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    if (!objectType) return res.status(400).json({ message: 'Tipo de objeto é obrigatório' });
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    const result = await deviceService.backupPorTipo(dispositivo, objectType);
+    const backupsDir = path.resolve(process.cwd(), 'backups');
+    const resolvedPath = path.resolve(result.filePath);
+    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+      logger.warn(`[BACKUP POR TIPO] Path fora de backups: ${resolvedPath}`);
+      return res.status(403).json({ message: 'Caminho do backup inválido' });
+    }
+    const isJsonl = result.filename.endsWith('.jsonl');
+    res.setHeader('Content-Type', isJsonl ? 'application/x-ndjson' : 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.download(result.filePath, result.filename, (err) => {
+      if (err) logger.debug(`Download backup ${result.filename}: ${err.message}`);
+    });
+  } catch (error) {
+    if (error.message && (error.message.includes('Tipo inválido') || error.message.includes('não suportado') || error.message.includes('não permitido'))) {
+      return res.status(400).json({ message: error.message });
+    }
+    logger.error(`Erro ao gerar backup por tipo: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao gerar backup', error: error.message });
+  }
+}
+
+/** Zera (apaga) todos os objetos de um único tipo na catraca. Para access_logs usa delay e bloqueio de sync. */
+async function zerarPorTipo(req, res) {
+  const id = parseDispositivoId(req.params.id);
+  const objectType = (req.params.objectType || '').toLowerCase().trim();
+  if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
+  if (!objectType) return res.status(400).json({ message: 'Tipo de objeto é obrigatório' });
+  try {
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    if (objectType === 'access_logs') {
+      globalState.setZerandoDispositivo(id, true);
+      try {
+        const delayAposBackupMs = parseInt(process.env.CATRACA_DELAY_APOS_BACKUP_MS || '15000', 10);
+        if (delayAposBackupMs > 0) {
+          logger.info(`[ZERAR POR TIPO] Aguardando ${delayAposBackupMs / 1000}s antes de zerar access_logs`);
+          await new Promise((r) => setTimeout(r, delayAposBackupMs));
+        }
+        const result = await deviceService.zerarPorTipo(dispositivo, objectType);
+        if (!result.ok) return res.status(502).json({ message: result.message || 'Falha ao zerar' });
+        await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+        return res.json({ message: 'Logs da catraca zerados.', changes: result.changes });
+      } finally {
+        globalState.setZerandoDispositivo(id, false);
+      }
+    }
+    const result = await deviceService.zerarPorTipo(dispositivo, objectType);
+    if (!result.ok) return res.status(502).json({ message: result.message || 'Falha ao zerar' });
+    return res.json({ message: `${objectType} zerado na catraca.`, changes: result.changes });
+  } catch (error) {
+    if (id != null && objectType === 'access_logs') globalState.setZerandoDispositivo(id, false);
+    logger.error(`Erro ao zerar por tipo: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao zerar', error: error.message });
+  }
+}
+
+/** Importa áreas e usuários da catraca para o SAGE na ordem correta (Area → Pessoa). Body: { unidade_id?: number, skipAreas?: boolean, skipUsers?: boolean, tipo_pessoa?: string } */
+async function importFromCatraca(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const { unidade_id, skipAreas, skipUsers, tipo_pessoa } = req.body || {};
+    const result = await catracaImportService.importarDaCatracaParaSage(dispositivo, {
+      unidade_id,
+      skipAreas: !!skipAreas,
+      skipUsers: !!skipUsers,
+      tipo_pessoa: tipo_pessoa || 'ALUNO'
+    });
+    return res.json({
+      message: 'Importação da catraca para o SAGE concluída (ordem: Area → Pessoa).',
+      ...result,
+      ordem: catracaImportService.getOrdemImportacaoSage()
+    });
+  } catch (error) {
+    logger.error(`Erro ao importar da catraca: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao importar da catraca', error: error.message });
+  }
+}
+
+/** Apaga todos os objetos na catraca (usuários, áreas, grupos, logs). Use após backup para deixar a catraca vazia. */
+async function zerarTudo(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    const result = await deviceService.zerarTudoNaCatraca(dispositivo);
+    if (!result.ok) return res.status(502).json({ message: result.message, summary: result.summary, erros: result.erros });
+    return res.json({ message: result.message || 'Catraca zerada.', summary: result.summary });
+  } catch (error) {
+    logger.error(`Erro ao zerar catraca: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao zerar catraca', error: error.message });
+  }
+}
+
+/**
+ * Começar do zero: zera a catraca e, opcionalmente, dados no SAGE (acessos, áreas, pessoas).
+ * Body: { apagarAcessosNoSistema?: boolean, apagarAreasNoSistema?: boolean, apagarPessoasNoSistema?: boolean }
+ */
+async function comecarDoZero(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    const { apagarAcessosNoSistema, apagarAreasNoSistema, apagarPessoasNoSistema } = req.body || {};
+
+    const result = await deviceService.zerarTudoNaCatraca(dispositivo);
+    if (!result.ok) return res.status(502).json({ message: result.message, summary: result.summary, erros: result.erros });
+
+    const sageRemovidos = { acessos: 0, areas: 0, pessoas: 0 };
+    await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+
+    if (apagarAcessosNoSistema) {
+      const [r] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
+      sageRemovidos.acessos = r.affectedRows;
+    }
+    if (apagarAreasNoSistema) {
+      await db.query('UPDATE Dispositivo SET area_id = NULL');
+      const [r] = await db.query('DELETE FROM Area');
+      sageRemovidos.areas = r.affectedRows;
+    }
+    if (apagarPessoasNoSistema) {
+      await db.query('DELETE FROM Presenca');
+      await db.query('DELETE FROM SolicitacaoAcesso');
+      await db.query('DELETE FROM HorarioAula');
+      await db.query('DELETE FROM Aula');
+      await db.query('DELETE FROM Professor');
+      await db.query('DELETE FROM Administrador');
+      await db.query('DELETE FROM Terceirizado');
+      await db.query('DELETE FROM Funcionario');
+      await db.query('DELETE FROM Aluno');
+      await db.query('DELETE FROM Responsavel');
+      await db.query('DELETE FROM Acesso');
+      try { await db.query('DELETE FROM sync_pendente'); } catch (_) {}
+      const [r] = await db.query('DELETE FROM Pessoa');
+      sageRemovidos.pessoas = r.affectedRows;
+    }
+
+    return res.json({
+      message: 'Catraca zerada e, no SAGE, os dados selecionados foram apagados. Cadastre do zero.',
+      catraca: result.summary,
+      sageRemovidos
+    });
+  } catch (error) {
+    logger.error(`Erro ao começar do zero: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao começar do zero', error: error.message });
+  }
+}
+
+/** Gera backup completo da catraca (users, areas, groups, portals, etc.) em um JSON para download. */
+async function backupCompleto(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    const { filePath, filename, summary } = await deviceService.gerarBackupCompletoCatraca(dispositivo);
+    const backupsDir = path.resolve(process.cwd(), 'backups');
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+      logger.warn(`[BACKUP COMPLETO] Path fora de backups: ${resolvedPath}`);
+      return res.status(403).json({ message: 'Caminho do backup inválido' });
+    }
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.download(filePath, filename, (err) => {
+      if (err) logger.debug(`Download backup completo ${filename}: ${err.message}`);
+    });
+  } catch (error) {
+    logger.error(`Erro ao gerar backup completo: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao gerar backup completo', error: error.message });
   }
 }
 
@@ -324,6 +616,18 @@ async function criar(req, res) {
   }
 }
 
+async function limparUsuarios(req, res){
+  try {
+    await limparUsuariosPorPrefixo11();
+    res.status(204).json({
+      message: 'Usuários removidos com sucesso',
+    });
+  } catch (error) {
+    logger.error(`Erro ao remover usuários: ${error.message}`);
+    res.status(500).json({ message: 'Erro ao remover usuários', error: error.message });
+  }
+}
+
 module.exports = {
   ...controllerGenerico,
   criar,
@@ -331,9 +635,19 @@ module.exports = {
   getStatusId,
   logsInfo,
   backupLogs,
+  backupCompleto,
   zerarLogs,
+  listarObjetosCatraca,
+  deletarObjetoCatraca,
+  listarTiposObjetosCatraca,
+  backupPorTipo,
+  zerarPorTipo,
+  importFromCatraca,
+  zerarTudo,
+  comecarDoZero,
   configurarMonitor,
   diagnosticoAcessos,
+  limparUsuarios,
   async discover(req, res) {
     try {
       const { cidr, ports, timeout, concurrency } = req.query;

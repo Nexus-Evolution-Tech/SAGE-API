@@ -4,18 +4,23 @@ const deviceService = require('../services/deviceService');
 const promocaoAlunosService = require('../services/promocaoAlunosService');
 const { emitNotification } = require('../services/notificationService');
 const db = require('../config/database');
+const { isSyncEnabled } = require('../utils/syncFlags');
 
 const listarTodos = async () => {
   const [result] = await db.query('SELECT * FROM Dispositivo');
   return result;
 };
 
+const CATRACA_SYNC_ENABLED = (process.env.CATRACA_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
+
 // Job de sincronização de acessos (a cada 10 min — backup)
 const sincronizarAcessosJob = () => {
+  if (!CATRACA_SYNC_ENABLED) return null;
   const cronExpression = '*/10 * * * *'; // a cada 10 minutos
 
   return cron.schedule(cronExpression, async () => {
     try {
+      if (!CATRACA_SYNC_ENABLED) return;
       logger.info('Iniciando sincronização automática de acessos');
 
       const accessService = require('../services/accessService');
@@ -34,8 +39,9 @@ const sincronizarAcessosJob = () => {
 const MONITOR_POLLING_INTERVAL_MS = parseInt(process.env.MONITOR_POLLING_INTERVAL_MS || '20000', 10); // 20 s
 
 const pollingMonitoramentoJob = () => {
-  if (MONITOR_POLLING_INTERVAL_MS <= 0) return null;
+  if (!CATRACA_SYNC_ENABLED || MONITOR_POLLING_INTERVAL_MS <= 0) return null;
   return setInterval(async () => {
+    if (!CATRACA_SYNC_ENABLED) return;
     try {
       const accessService = require('../services/accessService');
       await accessService.sincronizarTodosAcessos();
@@ -47,6 +53,7 @@ const pollingMonitoramentoJob = () => {
 
 // Job de health check das catracas
 const healthCheckCatracasJob = () => {
+  if (!CATRACA_SYNC_ENABLED) return null;
   const intervalMs = parseInt(process.env.HEALTH_CHECK_INTERVAL || '60000'); // 1 min
 
   return setInterval(async () => {
@@ -54,6 +61,10 @@ const healthCheckCatracasJob = () => {
       const dispositivos = await listarTodos();
 
       for (const dispositivo of dispositivos) {
+        if (!isSyncEnabled(dispositivo?.sync_enabled)) {
+          logger.debug(`Health check ignorado para ${dispositivo.nome}: sincronização desativada`);
+          continue;
+        }
         try {
           const statusAnterior = (dispositivo.status || '').toUpperCase();
           const isOnline = await deviceService.testarConexaoCatraca(dispositivo);
@@ -81,9 +92,11 @@ const healthCheckCatracasJob = () => {
 
 // Job de sincronizações pendentes
 const verificarSyncPendentesJob = () => {
+  if (!CATRACA_SYNC_ENABLED) return null;
   const cronExpression = process.env.SYNC_CHECK_INTERVAL || '*/1 * * * *';
 
   return cron.schedule(cronExpression, async () => {
+    if (!CATRACA_SYNC_ENABLED) return;
     logger.info('Iniciando job de verificação de sincronizações pendentes');
 
     try {
@@ -99,6 +112,7 @@ const verificarSyncPendentesJob = () => {
       }
 
       const offlineDevices = new Set();
+      const disabledDevices = new Set();
       const dispositivosUnicos = [...new Set(pendentes.map(p => p.dispositivo_id).filter(Boolean))];
 
       for (const dispositivoId of dispositivosUnicos) {
@@ -106,6 +120,12 @@ const verificarSyncPendentesJob = () => {
           const [dispositivoResult] = await db.query('SELECT * FROM Dispositivo WHERE id = ? LIMIT 1', [dispositivoId]);
           const dispositivo = dispositivoResult?.[0];
           if (!dispositivo) continue;
+
+          if (!isSyncEnabled(dispositivo?.sync_enabled)) {
+            disabledDevices.add(dispositivoId);
+            logger.info(`Sincronização pendente ignorada: ${dispositivo.nome} com sync desativada`);
+            continue;
+          }
 
           const isOnline = await deviceService.testarConexaoCatraca(dispositivo);
           if (!isOnline) {
@@ -122,6 +142,14 @@ const verificarSyncPendentesJob = () => {
 
       for (const registro of pendentes) {
         try {
+          if (registro.dispositivo_id && disabledDevices.has(registro.dispositivo_id)) {
+            await db.query(
+              'UPDATE sync_pendente SET last_attempt = ?, error_message = ? WHERE id = ?',
+              [new Date(), 'Sincronização desativada para o dispositivo', registro.id]
+            );
+            continue;
+          }
+
           if (offlineDevices.has(registro.dispositivo_id)) {
             await db.query(
               'UPDATE sync_pendente SET retry_count = retry_count + 1, last_attempt = ? WHERE id = ?',
@@ -206,6 +234,9 @@ const promocaoAlunosJob = () => {
 // Iniciar todos os jobs
 const iniciarJobs = () => {
   logger.info('Iniciando jobs agendados...');
+  if (!CATRACA_SYNC_ENABLED) {
+    logger.warn('⚠ Sincronização com catracas desabilitada (CATRACA_SYNC_ENABLED=false)');
+  }
   const jobs = {
     syncPendentes: verificarSyncPendentesJob(),
     healthCheck: healthCheckCatracasJob(),

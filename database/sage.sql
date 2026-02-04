@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS Dispositivo (
     usuario VARCHAR(255) ,
     senha VARCHAR(255)  COMMENT 'Precisa ser criptografada na aplicação Node.js',
     status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO',
+    sync_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '0 desativa sincronização automática',
     last_health_check DATETIME NULL,
     area_id INT,
     numero_serial VARCHAR(255) ,
