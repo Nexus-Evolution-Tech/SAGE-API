@@ -18,7 +18,7 @@ function parseDispositivoId(idParam) {
   return n;
 }
 // Colunas conforme o banco (control_id_device_id e ultimo_log_id_sincronizado vêm de migrations; para sync usamos SELECT * em accessService)
-const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'created_at', 'updated_at'];
+const campos = ['id', 'nome', 'modelo', 'endereco', 'porta', 'usuario', 'senha', 'status', 'last_health_check', 'area_id', 'numero_serial', 'sincronizar', 'created_at', 'updated_at'];
 const camposInsert = campos.filter((c) => c !== 'id');
 
 const getStatus = async (req, res) => {
@@ -364,7 +364,8 @@ module.exports = {
         usuario,
         senha,
         area_id: area_id || null,
-        numero_serial: numero_serial || null
+        numero_serial: numero_serial || null,
+        sincronizar: (req.body.sincronizar === true || req.body.sincronizar === 1) ? 1 : 0
       };
 
       await criarRegistro(tabela, payload);

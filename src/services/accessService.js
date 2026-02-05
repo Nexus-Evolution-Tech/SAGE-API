@@ -56,11 +56,15 @@ function calcularIdade(dataNascimento) {
   return idade;
 }
 
-// Sincroniza acessos de um dispositivo
-async function sincronizarAcessos(dispositivo) {
+// Sincroniza acessos de um dispositivo.
+// options.monitorOnly = true: busca só os últimos N logs (monitoramento leve, não atualiza ultimo_log_id_sincronizado).
+async function sincronizarAcessos(dispositivo, options = {}) {
   const MIN_ID = parseInt(process.env.CATRACA_MIN_LOG_ID || '0', 10); // 0 = não filtrar por id (só por timestamp)
   const logger = require('../config/logger');
-  if (MIN_ID > 0) {
+  const monitorOnly = options.monitorOnly === true;
+  const monitorLimit = parseInt(process.env.MONITOR_SYNC_LIMIT || '200', 10);
+
+  if (MIN_ID > 0 && !monitorOnly) {
     logger.debug(`[SYNC] ${dispositivo.nome}: ignorando logs da catraca com id <= ${MIN_ID} (CATRACA_MIN_LOG_ID)`);
   }
 
@@ -71,27 +75,50 @@ async function sincronizarAcessos(dispositivo) {
     return { sucesso: false, message: `Erro ao obter sessão com a catraca ${dispositivo.nome}` };
   }
 
-  // Último acesso sincronizado: usar id DESC (mesmo critério da tela) e recuar 1h para não perder logs por fuso/relógio
-  const [ultimoAcessoResult] = await db.query(
-    'SELECT * FROM Acesso WHERE dispositivo_id = ? ORDER BY id DESC LIMIT 1',
-    [dispositivo.id]
-  );
-  const ultimoAcesso = ultimoAcessoResult[0];
-  const ts = ultimoAcesso ? dataHoraParaTimestampUnix(ultimoAcesso.data_hora) : 0;
-  const MARGEM_SEGUNDOS = 3600; // 1 hora: evita perder logs recentes por diferença de fuso/relógio
-  let timestampInicial = Math.max(0, ts - MARGEM_SEGUNDOS);
+  // Modo monitor: só os últimos N logs (ordem descendente), sem puxar histórico pesado
+  let loadOptions = {};
+  let timestampInicial = 0;
+  if (monitorOnly) {
+    loadOptions = { limit: Math.max(50, Math.min(monitorLimit, 500)), order: ['descending', 'id'] };
+  } else {
+    // Último acesso sincronizado: usar id DESC (mesmo critério da tela) e recuar 1h para não perder logs por fuso/relógio
+    const [ultimoAcessoResult] = await db.query(
+      'SELECT * FROM Acesso WHERE dispositivo_id = ? ORDER BY id DESC LIMIT 1',
+      [dispositivo.id]
+    );
+    const ultimoAcesso = ultimoAcessoResult[0];
+    const ts = ultimoAcesso ? dataHoraParaTimestampUnix(ultimoAcesso.data_hora) : 0;
+    const MARGEM_SEGUNDOS = 3600; // 1 hora: evita perder logs recentes por diferença de fuso/relógio
+    timestampInicial = Math.max(0, ts - MARGEM_SEGUNDOS);
 
-  // Opção de pedir só logs com id > ultimo_log_id_sincronizado (reduz carga quando há muitos registros na catraca)
-  const lastLogId = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : null;
-  const loadOptions = lastLogId != null && lastLogId >= 0 ? { lastLogId } : {};
+    // Opção de pedir só logs com id > ultimo_log_id_sincronizado (reduz carga quando há muitos registros na catraca)
+    const lastLogId = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : null;
+    loadOptions = lastLogId != null && lastLogId >= 0 ? { lastLogId } : {};
+  }
 
   // Uma requisição à catraca por dispositivo (load_objects); depois só processamos a lista em memória e gravamos no nosso banco (sem nova chamada à catraca por pessoa).
   let logs = await deviceService.obterLogsCatraca(session, link, timestampInicial, loadOptions);
-  // Se não veio nenhum log mas temos último acesso, pode ser timestamp errado: buscar últimas 24h (mais uma requisição, só nesse caso)
-  if (logs.length === 0 && ultimoAcesso && lastLogId == null) {
-    const fallbackTs = Math.max(0, Math.floor(Date.now() / 1000) - 24 * 3600);
-    logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
-    logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
+
+  // Proteção: se a API da catraca ignorar limit e devolver 49k, em modo monitor processamos só os primeiros N para não travar
+  const maxProcessarMonitor = Math.max(50, Math.min(monitorLimit, 500));
+  if (monitorOnly && logs.length > maxProcessarMonitor) {
+    logger.debug(`[MONITOR] ${dispositivo.nome}: API devolveu ${logs.length} logs; processando só os ${maxProcessarMonitor} mais recentes`);
+    logs = logs.slice(0, maxProcessarMonitor);
+  }
+
+  // Se não veio nenhum log mas temos último acesso, pode ser timestamp errado: buscar últimas 24h (mais uma requisição, só em modo full)
+  if (!monitorOnly && logs.length === 0) {
+    const [ultimoAcessoResult2] = await db.query(
+      'SELECT * FROM Acesso WHERE dispositivo_id = ? ORDER BY id DESC LIMIT 1',
+      [dispositivo.id]
+    );
+    const ultimoAcesso = ultimoAcessoResult2[0];
+    const lastLogId = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : null;
+    if (ultimoAcesso && lastLogId == null) {
+      const fallbackTs = Math.max(0, Math.floor(Date.now() / 1000) - 24 * 3600);
+      logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
+      logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
+    }
   }
 
   // Diagnóstico e ajuste: se o último acesso no banco está à frente do relógio da catraca, nenhum log passaria. Processar TODOS os logs já trazidos (ex.: fallback 24h) para não perder acesso de hoje (ex.: 13h).
@@ -201,20 +228,22 @@ async function sincronizarAcessos(dispositivo) {
     `inseridos=${acessosSincronizados}, ignorados(pessoa)=${ignoradosPessoa}, ignorados(duplicata)=${ignoradosDuplicata}`
   );
 
-  // Persistir maior log.id da catraca para próxima sync pedir só id > ultimo_log_id_sincronizado
-  const logIds = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
-  if (logIds.length > 0) {
-    const maxLogId = Math.max(...logIds);
-    const currentMax = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : 0;
-    const newMax = Math.max(maxLogId, currentMax);
-    try {
-      await db.query(
-        'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
-        [newMax, dispositivo.id]
-      );
-      logger.debug(`[SYNC] ${dispositivo.nome}: ultimo_log_id_sincronizado = ${newMax}`);
-    } catch (e) {
-      logger.debug(`[SYNC] Não foi possível atualizar ultimo_log_id_sincronizado: ${e.message}`);
+  // Persistir maior log.id da catraca para próxima sync pedir só id > ultimo_log_id_sincronizado (apenas em sync full, não em monitor)
+  if (!monitorOnly) {
+    const logIds = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
+    if (logIds.length > 0) {
+      const maxLogId = Math.max(...logIds);
+      const currentMax = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : 0;
+      const newMax = Math.max(maxLogId, currentMax);
+      try {
+        await db.query(
+          'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
+          [newMax, dispositivo.id]
+        );
+        logger.debug(`[SYNC] ${dispositivo.nome}: ultimo_log_id_sincronizado = ${newMax}`);
+      } catch (e) {
+        logger.debug(`[SYNC] Não foi possível atualizar ultimo_log_id_sincronizado: ${e.message}`);
+      }
     }
   }
 
@@ -242,15 +271,32 @@ async function sincronizarAcessos(dispositivo) {
   };
 }
 
-// Sincroniza todos os dispositivos
+// Sincroniza todos os dispositivos com sincronizar = 1 (sync pesada: boot + cron 10min)
 async function sincronizarTodosAcessos() {
-  const [dispositivos] = await db.query('SELECT * FROM Dispositivo');
+  const [dispositivos] = await db.query(
+    "SELECT * FROM Dispositivo WHERE COALESCE(sincronizar, 1) = 1"
+  );
   const resultados = [];
 
   if (!dispositivos || dispositivos.length === 0) return resultados;
 
   for (const dispositivo of dispositivos) {
     const resultado = await sincronizarAcessos(dispositivo);
+    resultados.push(resultado);
+  }
+
+  return resultados;
+}
+
+// Monitoramento leve: últimos N logs de TODOS os dispositivos (polling 20s). Não atualiza ultimo_log_id_sincronizado.
+async function sincronizarTodosAcessosMonitor() {
+  const [dispositivos] = await db.query('SELECT * FROM Dispositivo');
+  const resultados = [];
+
+  if (!dispositivos || dispositivos.length === 0) return resultados;
+
+  for (const dispositivo of dispositivos) {
+    const resultado = await sincronizarAcessos(dispositivo, { monitorOnly: true });
     resultados.push(resultado);
   }
 
@@ -464,6 +510,7 @@ async function processarNotificacaoMonitorDao(payload) {
 module.exports = {
   sincronizarAcessos,
   sincronizarTodosAcessos,
+  sincronizarTodosAcessosMonitor,
   criarAcesso,
   processarNotificacaoMonitorDao
 };

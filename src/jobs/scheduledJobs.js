@@ -33,12 +33,13 @@ const sincronizarAcessosJob = () => {
 // O servidor consulta as catracas periodicamente; não precisa da catraca enviar POST nem abrir firewall.
 const MONITOR_POLLING_INTERVAL_MS = parseInt(process.env.MONITOR_POLLING_INTERVAL_MS || '20000', 10); // 20 s
 
+// Polling leve: só últimos N logs por dispositivo (não puxa histórico pesado). Monitoramento continua para todos.
 const pollingMonitoramentoJob = () => {
   if (MONITOR_POLLING_INTERVAL_MS <= 0) return null;
   return setInterval(async () => {
     try {
       const accessService = require('../services/accessService');
-      await accessService.sincronizarTodosAcessos();
+      await accessService.sincronizarTodosAcessosMonitor();
     } catch (error) {
       logger.debug(`[MONITOR POLLING] Erro: ${error.message}`);
     }

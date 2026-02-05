@@ -215,7 +215,7 @@ async function upsertCatracas(sheet, summary) {
     }
 
     await db.query(
-      'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, area_id, numero_serial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, area_id, numero_serial, sincronizar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         nome,
         cleanValue(row.Modelo),
@@ -224,7 +224,8 @@ async function upsertCatracas(sheet, summary) {
         cleanValue(row['Usuário'] || row.Usuario),
         cleanValue(row.Senha),
         null,
-        cleanValue(row['Número Serial'] || row['Numero Serial'])
+        cleanValue(row['Número Serial'] || row['Numero Serial']),
+        0
       ]
     );
 
