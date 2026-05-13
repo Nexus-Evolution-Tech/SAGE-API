@@ -1,0 +1,15 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: SAGE-API
+  description: Auto generated entity
+  tags:
+    - github
+  annotations:
+    github.com/project-slug: Nexus-Evolution-Tech/SAGE-API
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform-team
+
