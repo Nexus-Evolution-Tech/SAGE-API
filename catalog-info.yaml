@@ -11,5 +11,5 @@ metadata:
 spec:
   type: service
   lifecycle: production
-  owner: group:default/platform-team
+  owner: guests
 
