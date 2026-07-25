@@ -61,8 +61,16 @@ async function listarTodos() {
     logger.debug(`${dispositivos.length} dispositivos encontrados`);
     return dispositivos;
   } catch (error) {
+    // RNF-4 — nenhuma falha silenciosa.
+    //
+    // Antes daqui havia `return []`. Se a consulta ao banco falhasse (conexão caiu, pool esgotado,
+    // tabela travada), o sistema enxergava "nenhuma catraca cadastrada" e simplesmente não fazia
+    // nada: sem erro, sem alerta, sem sincronizar ninguém.
+    //
+    // É pior que a falha de rede da catraca — aqui o sistema inteiro vira um no-op silencioso.
+    // Numa escola, um dia sem registrar acesso, descoberto só quando faltar o relatório.
     logger.errorWithStack('Erro ao listar dispositivos', error);
-    return [];
+    throw new Error(`Falha ao consultar dispositivos no banco: ${error.message}`, { cause: error });
   }
 }
 

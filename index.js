@@ -163,14 +163,26 @@ async function iniciarServidor() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 
-  // Capturar erros não tratados (log apenas, não mata o processo)
+  // Rede de segurança do processo.
+  //
+  // uncaughtException: o estado do processo é indeterminado depois disso, então encerrar é o
+  // certo — o serviço do Windows reinicia (Fase 2, E3). Melhor um reinício de segundos do que
+  // seguir operando com estado corrompido.
   process.on('uncaughtException', (error) => {
-    logger.errorWithStack('✗ Uncaught Exception', error);
+    logger.errorWithStack('✗ Uncaught Exception — encerrando para o serviço reiniciar', error);
     process.exit(1);
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.debug(`✗ Unhandled Rejection (ignorada): ${reason}`);
+  // unhandledRejection: NÃO derruba o processo (a escola não pode ficar sem sistema por uma
+  // promise solta), mas precisa ser ALTO.
+  //
+  // RNF-4: antes isto era `logger.debug(...(ignorada))`. Em produção o nível é `info` ou acima,
+  // então toda promise rejeitada sem tratamento desaparecia sem deixar rastro — o sistema
+  // "funcionando" enquanto engolia erro. É a mesma falha silenciosa que corrigimos no caminho da
+  // catraca, só que no nível do processo, onde é ainda mais difícil de perceber.
+  process.on('unhandledRejection', (reason) => {
+    const erro = reason instanceof Error ? reason : new Error(String(reason));
+    logger.errorWithStack('✗ Unhandled Rejection — promise rejeitada sem tratamento', erro);
   });
 }
 
