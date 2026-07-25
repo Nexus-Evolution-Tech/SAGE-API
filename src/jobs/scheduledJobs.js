@@ -236,6 +236,58 @@ const promocaoAlunosJob = () => {
 };
 
 // Iniciar todos os jobs
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Job de backup do banco (E4). "Backup não verificado não é backup": além de
+// gerar, o job RESTAURA num banco temporário e confere as contagens.
+//
+// Padrão catch-up: o PC da escola é desligado, então além do horário agendado a
+// verificação roda também na subida, se o último backup estiver velho demais.
+// Cron puro perderia silenciosamente todo dia em que a máquina estivesse off.
+// ─────────────────────────────────────────────────────────────────────────────
+const backupBancoJob = () => {
+  const cronVal = (process.env.BACKUP_CRON || '0 3 * * *').trim();
+  if (!cronVal || cronVal.toLowerCase() === 'false') {
+    logger.warn('[BACKUP] Job desabilitado (BACKUP_CRON vazio ou false)');
+    return null;
+  }
+  return cron.schedule(cronVal, async () => {
+    await executarBackupComVerificacao('agendado');
+  });
+};
+
+/**
+ * Gera backup, verifica por restauração real e aplica retenção.
+ * Nunca lança: o job não pode derrubar o processo. Mas TAMBÉM nunca falha calado (RNF-4).
+ */
+async function executarBackupComVerificacao(origem = 'agendado') {
+  const backupBanco = require('../services/backupBanco');
+  try {
+    const gerado = await backupBanco.gerarBackup();
+
+    // A verificação é cara (restaura tudo). Num HD mecânico isso pesa, então é opcionalmente
+    // menos frequente que o backup — mas o padrão é verificar, porque backup não verificado
+    // não protege ninguém.
+    if (process.env.BACKUP_VERIFICAR !== 'false') {
+      const v = await backupBanco.verificarBackup(gerado.caminho);
+      if (!v.ok) {
+        logger.error(
+          `[BACKUP] (${origem}) VERIFICAÇÃO FALHOU em ${gerado.nome}: ${v.problemas.join('; ')}. ` +
+          'O arquivo existe mas NÃO serve para restaurar.'
+        );
+        return { ok: false, problemas: v.problemas };
+      }
+    }
+
+    await backupBanco.aplicarRetencao();
+    logger.info(`[BACKUP] (${origem}) Concluído e verificado: ${gerado.nome}`);
+    return { ok: true, arquivo: gerado.nome };
+  } catch (erro) {
+    logger.errorWithStack(`[BACKUP] (${origem}) Falha ao gerar backup`, erro);
+    return { ok: false, problemas: [erro.message] };
+  }
+}
+
 const iniciarJobs = () => {
   logger.info('Iniciando jobs agendados...');
   if (!CATRACA_SYNC_ENABLED) {
@@ -246,7 +298,8 @@ const iniciarJobs = () => {
     healthCheck: healthCheckCatracasJob(),
     syncAcessos: sincronizarAcessosJob(),
     monitorPolling: pollingMonitoramentoJob(),
-    promocaoAlunos: promocaoAlunosJob()
+    promocaoAlunos: promocaoAlunosJob(),
+    backupBanco: backupBancoJob()
   };
   if (jobs.monitorPolling) {
     logger.info(`[MONITOR] Polling de acessos a cada ${MONITOR_POLLING_INTERVAL_MS / 1000}s (tempo quase real)`);
@@ -264,10 +317,13 @@ const pararJobs = (jobs) => {
   if (jobs.syncAcessos) jobs.syncAcessos.stop();
   if (jobs.monitorPolling) clearInterval(jobs.monitorPolling);
   if (jobs.promocaoAlunos) jobs.promocaoAlunos.stop();
+  if (jobs.backupBanco) jobs.backupBanco.stop();
 };
 
 module.exports = {
   iniciarJobs,
+  backupBancoJob,
+  executarBackupComVerificacao,
   pararJobs,
   verificarSyncPendentesJob,
   healthCheckCatracasJob,

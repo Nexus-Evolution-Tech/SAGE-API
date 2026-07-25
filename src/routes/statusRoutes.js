@@ -19,6 +19,7 @@ const express = require('express');
 const saudeDispositivos = require('../services/saudeDispositivos');
 const db = require('../config/database');
 const logger = require('../config/logger');
+const backupBanco = require('../services/backupBanco');
 
 const router = express.Router();
 
@@ -72,6 +73,34 @@ router.get('/status', async (req, res) => {
     logger.error(`[STATUS] Não foi possível ler sync_pendente: ${erro.message}`);
   }
 
+  // 4) Backup — "backup não verificado não é backup" (E4). Se ninguém nunca restaurou, a escola
+  //    tem uma promessa, não uma garantia. Por isso o status mostra a idade do último arquivo.
+  let ultimoBackup = null;
+  try {
+    const arquivos = await backupBanco.listarBackups();
+    if (arquivos.length === 0) {
+      problemas.push('Nenhum backup do banco foi gerado ainda. Os dados não estão protegidos contra perda.');
+    } else {
+      const recente = arquivos[0];
+      const horas = (Date.now() - new Date(recente.modificadoEm).getTime()) / 3600000;
+      ultimoBackup = {
+        nome: recente.nome,
+        geradoEm: recente.modificadoEm,
+        bytes: recente.bytes,
+        horasAtras: Math.round(horas)
+      };
+      if (horas > 48) {
+        problemas.push(
+          `O último backup do banco tem ${Math.round(horas / 24)} dia(s). ` +
+            'Verifique se o computador fica ligado no horário do backup automático.'
+        );
+      }
+    }
+  } catch (erro) {
+    logger.error(`[STATUS] Não foi possível verificar backups: ${erro.message}`);
+    problemas.push('Não foi possível verificar os backups do banco.');
+  }
+
   const tudoBem = problemas.length === 0 && banco.ok;
 
   res.json({
@@ -84,6 +113,7 @@ router.get('/status', async (req, res) => {
     banco,
     dispositivos,
     sincronizacaoPendente: pendencias,
+    ultimoBackup,
     versao: process.env.API_VERSION || null,
     ligadoDesde: new Date(Date.now() - Math.floor(process.uptime() * 1000)).toISOString(),
     verificadoEm: new Date().toISOString(),

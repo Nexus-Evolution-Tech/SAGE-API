@@ -91,6 +91,29 @@ async function iniciarServidor() {
         logger.info('[PROMOÇÃO] Promoção na subida desabilitada (PROMOCAO_NA_SUBIDA=false)');
       }
 
+      // Backup catch-up: o PC da escola e desligado, entao o horario agendado pode nunca chegar.
+      // Na subida, se o ultimo backup estiver velho demais, roda agora. Sem isto, uma maquina
+      // ligada so das 9h as 17h nunca faria o backup das 3h -- e ninguem perceberia.
+      if (process.env.BACKUP_CRON !== 'false') {
+        setImmediate(async () => {
+          try {
+            const backupBanco = require('./src/services/backupBanco');
+            const { executarBackupComVerificacao } = require('./src/jobs/scheduledJobs');
+            const arquivos = await backupBanco.listarBackups();
+            const horasDesdeUltimo = arquivos.length === 0
+              ? Infinity
+              : (Date.now() - new Date(arquivos[0].modificadoEm).getTime()) / 3600000;
+            const limite = parseInt(process.env.BACKUP_MAX_HORAS || '24', 10);
+            if (horasDesdeUltimo > limite) {
+              logger.info(`[BACKUP] Último backup tem ${Math.round(horasDesdeUltimo)}h (limite ${limite}h) — executando na subida`);
+              await executarBackupComVerificacao('subida');
+            }
+          } catch (err) {
+            logger.errorWithStack('[BACKUP] Falha na verificação de subida', err);
+          }
+        });
+      }
+
       // Sync imediata no boot: puxar da catraca tudo que acumulou enquanto o sistema estava desligado
       const catracaSyncEnabled = (process.env.CATRACA_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
       if (catracaSyncEnabled) {
