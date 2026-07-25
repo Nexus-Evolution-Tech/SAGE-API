@@ -176,15 +176,22 @@ describe('Q3 — load_objects de access_logs devolve TODOS os logs e demora', ()
     await sim.stop();
   });
 
-  it('com latência acima do timeout do cliente, obterLogsCatraca degrada para lista vazia (não estoura)', async () => {
+  // ATUALIZADO NA FASE 2. Este teste nasceu como caracterização e afirmava que
+  // `obterLogsCatraca` "degrada para lista vazia" no timeout. Ele estava certo sobre o
+  // comportamento de então — e esse comportamento era justamente o defeito (RNF-4): a lista vazia
+  // tornava a falha indistinguível de "não há acessos novos".
+  //
+  // Este é o risco que a spec da Fase 1 alertava: teste de caracterização congela o bug junto com
+  // o acerto. Ao corrigir, o teste falhou e obrigou uma decisão consciente, que é exatamente o
+  // papel dele. Agora afirma o contrato novo. Ver test/sem-falhas-silenciosas.test.js.
+  it('com latência acima do timeout do cliente, obterLogsCatraca LANÇA (não devolve lista vazia)', async () => {
     const sim = await createCatracaSimulator({ quirks: { latenciaAccessLogsMs: 800 } });
     sim.seedAccessLogs(50, { idInicial: 1 });
     const session = await comSessao(sim);
     process.env.CATRACA_LOAD_LOGS_TIMEOUT = '150';
     process.env.CATRACA_RETRY_ATTEMPTS = '0';
-    const { obterLogsCatraca } = require('../src/services/deviceService');
-    const logs = await obterLogsCatraca(session, sim.url, 0, {});
-    expect(logs).toEqual([]);
+    const { obterLogsCatraca, ErroDispositivo } = require('../src/services/deviceService');
+    await expect(obterLogsCatraca(session, sim.url, 0, {})).rejects.toThrow(ErroDispositivo);
     delete process.env.CATRACA_LOAD_LOGS_TIMEOUT;
     delete process.env.CATRACA_RETRY_ATTEMPTS;
     await sim.stop();

@@ -121,7 +121,25 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   }
 
   // Uma requisição à catraca por dispositivo (load_objects); depois só processamos a lista em memória e gravamos no nosso banco (sem nova chamada à catraca por pessoa).
-  let logs = await deviceService.obterLogsCatraca(session, link, timestampInicial, loadOptions);
+  // RNF-4: obterLogsCatraca agora LANÇA em caso de falha, em vez de devolver [] — antes era
+  // impossível distinguir "catraca offline" de "sem acessos novos". Aqui a falha vira um
+  // resultado explícito, para o chamador e a tela de status saberem o que aconteceu.
+  let logs;
+  try {
+    logs = await deviceService.obterLogsCatraca(session, link, timestampInicial, loadOptions);
+  } catch (erro) {
+    logger.error(`[SYNC] ${dispositivo.nome}: falha ao obter logs — ${erro.message}`);
+    return {
+      sucesso: false,
+      message: `Falha ao obter logs de ${dispositivo.nome}: ${erro.message}`,
+      dispositivo_id: dispositivo.id,
+      nome: dispositivo.nome,
+      acessosSincronizados: 0,
+      falhaDispositivo: true,
+      dispositivoAlcancavel: erro.dispositivoAlcancavel === true,
+      diagnostico: typeof erro.paraDiagnostico === 'function' ? erro.paraDiagnostico() : undefined
+    };
+  }
 
   // Proteção: se a API da catraca ignorar limit e devolver 49k, em modo monitor processamos só os primeiros N para não travar
   const maxProcessarMonitor = Math.max(50, Math.min(monitorLimit, 500));
@@ -141,7 +159,13 @@ async function sincronizarAcessos(dispositivo, options = {}) {
     if (ultimoAcesso && lastLogId == null) {
       const fallbackTs = Math.max(0, Math.floor(Date.now() / 1000) - 24 * 3600);
       logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
-      logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
+      try {
+        logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
+      } catch (erro) {
+        // O fallback é uma tentativa extra e best-effort: se falhar, mantemos a lista vazia da
+        // primeira chamada (que teve sucesso) e seguimos. Registrado, nunca engolido.
+        logger.warn(`[SYNC] ${dispositivo.nome}: fallback de 24h também falhou — ${erro.message}`);
+      }
     }
     // TODO(F2b): a versão de `nao-funcional` fazia este fallback SEMPRE que logs.length === 0,
     // sem exigir `lastLogId == null`. Ela cobre um modo de falha real e já observado: se

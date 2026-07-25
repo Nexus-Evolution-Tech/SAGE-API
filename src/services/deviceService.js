@@ -2,6 +2,7 @@ const axiosInstance = require('../config/axios');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../config/logger');
+const ErroDispositivo = require('../errors/ErroDispositivo');
 const { ORDEM_ZERAR_CATRACA } = require('../config/syncOrder');
 
 const CHUNK_SIZE = parseInt(process.env.CATRACA_BACKUP_CHUNK_SIZE || '2000', 10);
@@ -145,8 +146,16 @@ async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0, opti
     }
     return logsFiltrados;
   } catch (error) {
+    // RNF-4 — nenhuma falha silenciosa.
+    //
+    // Antes daqui havia `return []`. Isso tornava uma catraca offline, um timeout ou uma sessão
+    // expirada INDISTINGUÍVEIS de "catraca saudável, sem acessos novos". O sistema seguia
+    // reportando sucesso enquanto perdia dados, e ninguém tinha como saber.
+    //
+    // Agora: lista vazia significa, sem ambiguidade, "a catraca respondeu e não há logs novos".
+    // Falha lança, para o chamador decidir (retry, marcar dispositivo, exibir na tela de status).
     logger.errorWithStack('Erro ao obter logs da catraca', error);
-    return [];
+    throw ErroDispositivo.deErroHttp('Falha ao obter logs da catraca', error, { linkCatraca });
   }
 }
 
@@ -661,6 +670,7 @@ module.exports = {
   obterSessao,
   verificarSessao,
   obterLogsCatraca,
+  ErroDispositivo,
   obterQuantidadeOuAmostraLogsCatraca,
   loadObjectsFromCatraca,
   gerarBackupCompletoCatraca,

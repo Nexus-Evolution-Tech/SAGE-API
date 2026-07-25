@@ -124,7 +124,22 @@ async function diagnosticoAcessos(req, res) {
       return res.status(502).json({ message: 'Não foi possível obter sessão na catraca' });
     }
     const ts24h = Math.floor(Date.now() / 1000) - 86400;
-    const logsCatraca = await deviceService.obterLogsCatraca(session, link, ts24h);
+    // RNF-4: falha ao falar com a catraca agora lança. Num endpoint de DIAGNÓSTICO, devolver
+    // "0 logs" quando na verdade não deu para conversar com o equipamento seria o pior resultado
+    // possível — é justamente aqui que a pessoa vem para descobrir o que está errado.
+    let logsCatraca;
+    try {
+      logsCatraca = await deviceService.obterLogsCatraca(session, link, ts24h);
+    } catch (erro) {
+      logger.error(`[DIAGNOSTICO] ${dispositivo.nome}: falha ao obter logs — ${erro.message}`);
+      return res.status(502).json({
+        message: `Não foi possível obter os logs da catraca ${dispositivo.nome}`,
+        dispositivo_id: id,
+        dispositivo_nome: dispositivo.nome,
+        dispositivoAlcancavel: erro.dispositivoAlcancavel === true,
+        detalhe: typeof erro.paraDiagnostico === 'function' ? erro.paraDiagnostico() : String(erro.message)
+      });
+    }
     const [acessosNosso] = await db.query(
       `SELECT a.id, a.pessoa_id, a.dispositivo_id, a.status, a.data_hora, p.nome AS pessoa_nome
        FROM Acesso a LEFT JOIN Pessoa p ON p.id = a.pessoa_id
