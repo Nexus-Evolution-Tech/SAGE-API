@@ -405,6 +405,10 @@ async function processarNotificacaoMonitorDao(payload) {
   const { cacheMutation, invalidateMultiple, CACHE_KEYS } = require('../cache/helpers');
 
   const result = { processados: 0, ignorados: 0, erros: [] };
+  // Contador de tentativas com identificação não cadastrada. Era usado nas linhas abaixo sem
+  // nunca ter sido declarado, o que lançava ReferenceError (o `++` lê antes de escrever, então
+  // falha inclusive em modo não-strict). Coberto por test/regressao-monitor-dao.test.js.
+  let tentativasNegadas = 0;
   const deviceIdControlId = payload.device_id != null ? Number(payload.device_id) : null;
   const objectChanges = Array.isArray(payload.object_changes) ? payload.object_changes : [];
 
