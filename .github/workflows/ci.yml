@@ -1,0 +1,94 @@
+name: CI
+
+# Fase 1 — rede de segurança. O objetivo deste pipeline é impedir que um merge vermelho entre.
+# Ele roda com MySQL de verdade (não SQLite fingindo ser MySQL): as diferenças de fuso, ENUM e
+# constraint são justamente o que precisamos testar.
+on:
+  push:
+    branches: [main, integration, 'f*/**']
+  pull_request:
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        # 8.4 LTS: é a versão que o instalador deve levar para as escolas. Testar em outra
+        # versão daria uma confiança que não corresponde ao que roda em produção.
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: senha_de_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psenha_de_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: senha_de_ci
+      JWT_SECRET: chave_de_ci_com_mais_de_32_caracteres_aleatorios
+      NODE_ENV: test
+      LOG_LEVEL: error
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # --ignore-scripts: o postinstall cria .env e é interativo por natureza; no CI as
+      # variáveis já vêm do ambiente.
+      - name: Instalar dependências
+        run: npm ci --ignore-scripts
+
+      - name: Verificar sintaxe de todos os arquivos JS
+        run: |
+          falhou=0
+          for f in $(git ls-files '*.js' | grep -v node_modules); do
+            node --check "$f" || { echo "ERRO DE SINTAXE: $f"; falhou=1; }
+          done
+          exit $falhou
+
+      - name: Testes
+        run: npx vitest run
+
+      # Guarda específica contra o achado A-2 (docs/ACHADOS-INSTALADOR.md): o instalador já
+      # reportou sucesso enquanto criava ZERO tabelas. Aqui provamos que uma instalação limpa
+      # realmente provisiona o banco — e que o processo falha alto quando não provisiona.
+      - name: Instalador provisiona o banco de verdade
+        env:
+          DB_NAME: sage_ci_instalacao
+        run: |
+          node scripts/setup-database.js
+          total=$(mysql -h 127.0.0.1 -u root -psenha_de_ci -N -e \
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sage_ci_instalacao'")
+          echo "tabelas criadas: $total"
+          if [ "$total" -lt 20 ]; then
+            echo "FALHA: instalacao criou apenas $total tabelas"
+            exit 1
+          fi
+
+      - name: Instalador falha alto quando uma migration quebra
+        env:
+          DB_NAME: sage_ci_falha
+        run: |
+          bad=database/migration_zzz_ci_falha_proposital.sql
+          echo "ALTER TABLE TabelaQueNaoExiste ADD COLUMN x INT;" > "$bad"
+          set +e
+          node scripts/setup-database.js
+          rc=$?
+          set -e
+          rm -f "$bad"
+          if [ "$rc" -eq 0 ]; then
+            echo "FALHA: instalador terminou com 0 mesmo com migration quebrada (regressao do A-2)"
+            exit 1
+          fi
+          echo "ok: instalador terminou com $rc"
