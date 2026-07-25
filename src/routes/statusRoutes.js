@@ -20,6 +20,7 @@ const saudeDispositivos = require('../services/saudeDispositivos');
 const db = require('../config/database');
 const logger = require('../config/logger');
 const backupBanco = require('../services/backupBanco');
+const diagnostico = require('../services/diagnostico');
 
 const router = express.Router();
 
@@ -119,6 +120,34 @@ router.get('/status', async (req, res) => {
     verificadoEm: new Date().toISOString(),
     tempoDeRespostaMs: Date.now() - inicio
   });
+});
+
+/**
+ * Bundle de diagnóstico — o caminho que sempre funciona (RNF-12).
+ *
+ * Sem autenticação, pelo mesmo motivo de /status: é o que a pessoa precisa conseguir gerar
+ * justamente quando o sistema está com problema, inclusive problema de login. A segurança aqui
+ * vem de o conteúdo passar inteiro pelo sanitizador — nenhum dado pessoal e nenhum segredo saem.
+ * Segredo aparece apenas como [DEFINIDO]/[NAO_DEFINIDO], o que responde "está configurado?" sem
+ * revelar nada.
+ */
+router.get('/diagnostico', async (req, res) => {
+  try {
+    const bundle = await diagnostico.gerarBundle({ db, backupBanco });
+    const nome = diagnostico.nomeArquivoBundle();
+
+    if (req.query.download === '1') {
+      res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+      res.setHeader('Content-Type', 'application/json');
+    }
+    return res.json(bundle);
+  } catch (erro) {
+    logger.errorWithStack('[DIAGNOSTICO] Falha ao gerar bundle', erro);
+    return res.status(500).json({
+      message: 'Não foi possível gerar o diagnóstico.',
+      detalhe: erro.message
+    });
+  }
 });
 
 module.exports = router;
