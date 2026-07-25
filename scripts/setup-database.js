@@ -310,7 +310,12 @@ async function setupBancoDados() {
     const filePath = path.join(migrationsDir, 'sage.sql');
     try {
       await fs.access(filePath);
-      await executarMigration(filePath);
+      // A-2: executarMigration NAO lanca — ela captura tudo e devolve false. Ignorar esse
+      // retorno era o motivo de a instalacao falhar inteira e ainda terminar com exit 0.
+      const ok = await executarMigration(filePath);
+      if (!ok) {
+        throw new Error('sage.sql falhou — veja os erros acima');
+      }
     } catch (error) {
       if (error.code === 'ENOENT') {
         logger.error('   ❌ Arquivo sage.sql não encontrado em /database');
@@ -329,7 +334,10 @@ async function setupBancoDados() {
   const melhoriasPath = path.join(migrationsDir, 'melhorias_sistema.sql');
   try {
     await fs.access(melhoriasPath);
-    await executarMigration(melhoriasPath);
+    const ok = await executarMigration(melhoriasPath);
+    if (!ok) {
+      throw new Error('melhorias_sistema.sql falhou — veja os erros acima');
+    }
   } catch (error) {
     if (error.code === 'ENOENT') {
       logger.warn('   Arquivo melhorias_sistema.sql não encontrado em /database; pulando.');
@@ -347,7 +355,10 @@ async function setupBancoDados() {
   for (const file of migrations) {
     const migrationPath = path.join(migrationsDir, file);
     try {
-      await executarMigration(migrationPath);
+      const ok = await executarMigration(migrationPath);
+      if (!ok) {
+        throw new Error(`${file} falhou — veja os erros acima`);
+      }
     } catch (error) {
       logger.error(`    Erro ao executar ${file}: ${error.message}`);
       throw error;
@@ -357,6 +368,33 @@ async function setupBancoDados() {
   // 5. Validar estrutura
   logger.info('\n5️⃣ Validando estrutura...');
   await executarSeeds();
+
+  // 5.1 (A-2) Nunca declarar sucesso sem conferir. Antes daqui, a instalação podia criar ZERO
+  // tabelas e ainda assim reportar "concluído com sucesso" e sair com código 0 — que é o pior
+  // modo de falha possível numa escola: "instalei, deu certo" e nada funciona.
+  const TABELAS_ESSENCIAIS = ['UnidadeEscolar', 'Pessoa', 'Dispositivo', 'Acesso', 'Turma'];
+  const conexaoValidacao = await mysql.createConnection({ ...dbConfig, database: dbName });
+  try {
+    const [linhas] = await conexaoValidacao.query(
+      `SELECT LOWER(TABLE_NAME) AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?`,
+      [dbName]
+    );
+    const existentes = new Set(linhas.map((l) => l.t));
+    const faltando = TABELAS_ESSENCIAIS.filter((t) => !existentes.has(t.toLowerCase()));
+    if (existentes.size === 0) {
+      throw new Error(
+        `Nenhuma tabela foi criada em '${dbName}'. A instalação NÃO foi concluída.`
+      );
+    }
+    if (faltando.length > 0) {
+      throw new Error(
+        `Instalação incompleta em '${dbName}': faltam as tabelas ${faltando.join(', ')}.`
+      );
+    }
+    logger.info(`    ${existentes.size} tabelas verificadas em '${dbName}'`);
+  } finally {
+    await conexaoValidacao.end().catch(() => {});
+  }
 
   logger.info('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   logger.info(' Setup do banco de dados concluído com sucesso!');
