@@ -30,8 +30,15 @@ let temBanco = false;
 let sim = null;
 let dispositivoId = null;
 
-/** Roda uma sincronização num processo SEPARADO, para podermos matá-lo de verdade. */
-function rodarSyncEmProcessoSeparado({ matarAposMs = null } = {}) {
+/**
+ * Roda uma sincronização num processo SEPARADO, para podermos matá-lo de verdade.
+ *
+ * `matarApósInserir`: mata quando o banco já tiver ao menos N acessos. Deliberadamente baseado em
+ * PROGRESSO REAL, e não em tempo: a primeira versão deste teste matava após 700ms e era
+ * intermitente — sob carga, a janela mudava e às vezes o processo já havia terminado. Teste que
+ * falha às vezes ensina o time a ignorar teste vermelho, o que é pior que não ter o teste.
+ */
+function rodarSyncEmProcessoSeparado({ matarAposInserir = null } = {}) {
   const cfg = configConexao();
   const script = `
     process.env.CATRACA_MIN_LOG_ID = '0';
@@ -62,11 +69,18 @@ function rodarSyncEmProcessoSeparado({ matarAposMs = null } = {}) {
     proc.stderr.on('data', (d) => { saida += d.toString(); });
 
     let matado = false;
-    if (matarAposMs != null) {
-      setTimeout(() => {
-        matado = true;
-        proc.kill('SIGKILL'); // queda de energia: sem shutdown gracioso
-      }, matarAposMs);
+    if (matarAposInserir != null) {
+      const observador = setInterval(async () => {
+        try {
+          const n = await contarAcessos();
+          if (n >= matarAposInserir) {
+            clearInterval(observador);
+            matado = true;
+            proc.kill('SIGKILL'); // queda de energia: sem shutdown gracioso
+          }
+        } catch { /* banco ocupado; tenta de novo no próximo tick */ }
+      }, 20);
+      proc.on('close', () => clearInterval(observador));
     }
 
     proc.on('close', (code, signal) => resolve({ code, signal, saida, matado }));
@@ -154,24 +168,28 @@ describe('E3 — matar o processo no meio da sync e convergir ao subir', () => {
     }
 
     // 1) Sincronização interrompida por SIGKILL
-    const primeira = await rodarSyncEmProcessoSeparado({ matarAposMs: 700 });
+    const primeira = await rodarSyncEmProcessoSeparado({ matarAposInserir: 30 });
 
     const aposQueda = await contarAcessos();
     const ponteiroAposQueda = await ponteiro();
 
-    // Se o processo terminou sozinho antes de morrermos, o teste não exercita o que queria.
-    // Isso não é falha do sistema, é falha do teste — e precisa ser dito, não escondido.
-    if (!primeira.matado || primeira.signal !== 'SIGKILL') {
-      console.warn(
-        `[AVISO] A sync terminou antes do SIGKILL (${aposQueda} acessos). ` +
-        'O cenário de queda no meio não foi exercitado nesta execução.'
-      );
-    }
+    // O cenário TEM de ter sido exercitado. Se o processo não foi morto no meio, este teste não
+    // provou nada — e isso precisa reprovar, não virar aviso que ninguém lê.
+    expect(primeira.matado).toBe(true);
+    expect(primeira.signal).toBe('SIGKILL');
+    // Morreu no meio: já gravou algo, mas não tudo.
+    expect(aposQueda).toBeGreaterThanOrEqual(30);
+    expect(aposQueda).toBeLessThan(TOTAL_LOGS);
 
     // 2) O ponteiro NÃO pode ter avançado numa sync interrompida. Se tivesse avançado, os logs
     //    não gravados seriam pulados para sempre — perda silenciosa.
-    if (primeira.matado && primeira.signal === 'SIGKILL') {
-      expect(ponteiroAposQueda == null || ponteiroAposQueda === 0).toBe(true);
+    // O ponteiro pode ter avançado (avanço progressivo), mas NUNCA além do que foi gravado —
+    // se passasse do gravado, os logs do meio seriam pulados para sempre.
+    if (ponteiroAposQueda != null) {
+      const [[maior]] = await banco.pool.query(
+        'SELECT COUNT(*) AS n FROM Acesso WHERE dispositivo_id = ?', [dispositivoId]
+      );
+      expect(Number(ponteiroAposQueda)).toBeLessThanOrEqual(maior.n);
     }
 
     // 3) Sobe de novo e deixa terminar

@@ -123,6 +123,24 @@ async function sincronizarAcessos(dispositivo, options = {}) {
     // Opção de pedir só logs com id > ultimo_log_id_sincronizado (reduz carga quando há muitos registros na catraca)
     const lastLogId = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : null;
     loadOptions = lastLogId != null && lastLogId >= 0 ? { lastLogId } : {};
+
+    // 🔴 Quando temos ponteiro, o filtro por timestamp é DESLIGADO — ele é uma heurística, e aqui
+    // era ativamente nocivo.
+    //
+    // Provado por execução: o pool usa `timezone: '-03:00'`, então o driver interpreta o DATETIME
+    // (que gravamos em UTC) como se fosse -03:00 e devolve um instante 3h NO FUTURO. Logo:
+    //   timestampInicial = tempoReal + 10800 − 3600 = tempoReal + 7200
+    // ou seja, a janela de retomada pulava 2 horas de logs, permanentemente. Com logs a cada 90s,
+    // isso descartava 80 de 120 acessos. Ver test/recuperacao-apos-queda.test.js.
+    //
+    // O ponteiro por id é exato e não depende de fuso. O timestamp segue valendo apenas na
+    // PRIMEIRA sincronização (quando não há ponteiro), onde ele é 0 e não filtra nada.
+    //
+    // A causa raiz (round-trip de DATETIME com 3h de desvio) afeta também exibição e relatório, e
+    // é tratada na Fase 6 (armazenar em UTC, converter só na borda). Ver test/fuso-horario.test.js.
+    if (lastLogId != null && lastLogId >= 0) {
+      timestampInicial = 0;
+    }
   }
 
   // Uma requisição à catraca por dispositivo (load_objects); depois só processamos a lista em memória e gravamos no nosso banco (sem nova chamada à catraca por pessoa).
