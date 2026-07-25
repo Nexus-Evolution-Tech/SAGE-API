@@ -69,15 +69,21 @@ async function iniciarServidor() {
       jobs = iniciarJobs();
       logger.info('✓ Jobs agendados iniciados');
 
-      // Verificar promoção na subida: se ano mudou e sistema estava desligado, executa agora
-      const promocaoAlunosService = require('./src/services/promocaoAlunosService');
-      promocaoAlunosService.executarPromocaoSeAnoMudou({ apenasSimulacao: false })
-        .then(({ executado, resultado }) => {
-          if (executado && resultado) {
-            logger.info(`[PROMOÇÃO] Executado na subida: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados`);
-          }
-        })
-        .catch((err) => logger.debug(`[PROMOÇÃO] Verificação na subida: ${err.message}`));
+      // Verificar promoção na subida: se ano mudou e sistema estava desligado, executa agora.
+      // Desative com PROMOCAO_NA_SUBIDA=false para evitar finalizar todos quando as turmas do próximo ano ainda não existirem.
+      const promocaoNaSubida = process.env.PROMOCAO_NA_SUBIDA !== 'false';
+      if (promocaoNaSubida) {
+        const promocaoAlunosService = require('./src/services/promocaoAlunosService');
+        promocaoAlunosService.executarPromocaoSeAnoMudou({ apenasSimulacao: false })
+          .then(({ executado, resultado }) => {
+            if (executado && resultado) {
+              logger.info(`[PROMOÇÃO] Executado na subida: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados`);
+            }
+          })
+          .catch((err) => logger.debug(`[PROMOÇÃO] Verificação na subida: ${err.message}`));
+      } else {
+        logger.info('[PROMOÇÃO] Promoção na subida desabilitada (PROMOCAO_NA_SUBIDA=false)');
+      }
 
       // Sync imediata no boot: puxar da catraca tudo que acumulou enquanto o sistema estava desligado
       const catracaSyncEnabled = (process.env.CATRACA_SYNC_ENABLED || 'true').toLowerCase() !== 'false';

@@ -84,6 +84,8 @@ const listar = async (req, res) => {
 
     try {
         const cacheKey = `acessos:list:page${page}:limit${limit}`;
+        // TTL curto para página 1 (monitoramento) para F5/refetch mostrar novo acesso logo
+        const ttl = page === 1 && limit <= 50 ? CACHE_TTL.SHORT : CACHE_TTL.MEDIUM;
         const result = await cacheQuery(
             cacheKey,
             async () => {
@@ -100,7 +102,7 @@ const listar = async (req, res) => {
                     totalPages: Math.ceil(total / limit)
                 };
             },
-            CACHE_TTL.MEDIUM
+            ttl
         );
         res.json(result);
     } catch (error) {

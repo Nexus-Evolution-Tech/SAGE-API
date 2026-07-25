@@ -7,6 +7,11 @@ const globalState = require('../state/globalState');
 // Deve ser o MESMO valor do controlIdService (catracaUserId = offset + pessoa.id)
 const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '111000000');
 
+// Mapeamento portal_id → entrada/saída. Na catraca, o sentido do giro é configurado por portal:
+// normalmente giro à esquerda = portal de entrada, giro à direita = portal de saída (ou o contrário).
+const ENTRADA_PORTAL_ID = parseInt(process.env.CATRACA_ENTRADA_PORTAL_ID || '1', 10);
+const SAIDA_PORTAL_ID = parseInt(process.env.CATRACA_SAIDA_PORTAL_ID || '2', 10);
+
 function formatarUserId(user_id) {
   const str = String(user_id).replace(/^0+/, '');
   return parseInt(str.slice(-7), 10);
@@ -26,9 +31,14 @@ function mapearMetodo(value) {
   return value.length === 8 ? 'QRCODE' : 'CARTAO_RFID';
 }
 
-// Determina se é entrada ou saída
+// Determina se é entrada ou saída pelo portal_id (sentido do giro na catraca: esquerda/direita).
+// Portal de entrada = normalmente giro à esquerda; portal de saída = giro à direita (configurável no equipamento).
 function identificarAcesso(portal_id) {
-  return portal_id === 1 ? 'ENTRADA' : 'SAIDA';
+  const pid = portal_id != null ? Number(portal_id) : ENTRADA_PORTAL_ID;
+  if (pid === SAIDA_PORTAL_ID) return 'SAIDA';
+  if (pid === ENTRADA_PORTAL_ID) return 'ENTRADA';
+  // Fallback: portal_id 1 = entrada (comportamento antigo)
+  return pid === 1 ? 'ENTRADA' : 'SAIDA';
 }
 
 // Converte timestamp Unix (UTC) da catraca para Date em UTC (guardamos UTC no banco; o frontend exibe em horário local)
@@ -133,6 +143,12 @@ async function sincronizarAcessos(dispositivo, options = {}) {
       logger.info(`[SYNC] ${dispositivo.nome}: 0 logs com timestampInicial=${timestampInicial}; tentando desde ${fallbackTs} (24h atrás)`);
       logs = await deviceService.obterLogsCatraca(session, link, fallbackTs, {});
     }
+    // TODO(F2b): a versão de `nao-funcional` fazia este fallback SEMPRE que logs.length === 0,
+    // sem exigir `lastLogId == null`. Ela cobre um modo de falha real e já observado: se
+    // `ultimo_log_id_sincronizado` ficar alto demais, o filtro exclui tudo e a sync trava em 0
+    // logs para sempre (ver docs/ANALISE_SYNC_CONTROL_ID.md: 48.057 logs → 0 inseridos).
+    // Mantida a versão da ponta aqui por ser consolidação (preserva comportamento) e por ela ter
+    // a proteção de `maxProcessarMonitor` que a outra não tinha. Decidir com teste na Fase 2b.
   }
 
   // Diagnóstico e ajuste: se o último acesso no banco está à frente do relógio da catraca, nenhum log passaria. Processar TODOS os logs já trazidos (ex.: fallback 24h) para não perder acesso de hoje (ex.: 13h).
@@ -169,7 +185,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   let ignoradosDuplicata = 0;
   const globalState = require('../state/globalState');
   const { emitToRoom } = require('../websocket/wsServer');
-  const { cacheMutation, CACHE_KEYS } = require('../cache/helpers');
+  const { cacheMutation, invalidateMultiple, CACHE_KEYS } = require('../cache/helpers');
   const { emitNotification } = require('./notificationService');
 
   // Processar lista em memória: só MySQL (SELECT/INSERT); nenhuma nova requisição à catraca.
@@ -234,6 +250,10 @@ async function sincronizarAcessos(dispositivo, options = {}) {
 
       await verificarEAtribuirPresenca(pessoa_id, data_hora);
       logger.debug(`[SYNC] Acesso registrado: ${pessoa.nome} (pessoa_id=${pessoa_id}) em ${dispositivo.nome}`);
+      // Invalidar cache logo após inserir para F5 na tela de monitoramento mostrar o novo acesso
+      try {
+        await invalidateMultiple([CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
+      } catch (e) { /* ignorar */ }
     }
   }
 
@@ -288,7 +308,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
 // Sincroniza todos os dispositivos com sincronizar = 1 (sync pesada: boot + cron 10min)
 async function sincronizarTodosAcessos() {
   const [dispositivos] = await db.query(
-    "SELECT * FROM Dispositivo WHERE COALESCE(sincronizar, 1) = 1"
+    "SELECT * FROM Dispositivo WHERE COALESCE(sync_enabled, 1) = 1"
   );
   const resultados = [];
 
@@ -314,6 +334,14 @@ async function sincronizarTodosAcessosMonitor() {
   if (!dispositivos || dispositivos.length === 0) return resultados;
 
   for (const dispositivo of dispositivos) {
+    // D-5: guardas complementares, ambas mantidas. A de nao-funcional (sync desativada) vem de
+    // `sync_ativo`, renomeada para `sync_enabled` pela decisão D-1.
+    if (!isSyncEnabled(dispositivo?.sync_enabled)) {
+      logger.debug(`[SYNC] Sync desativado para dispositivo ${dispositivo.nome}, pulando sincronização de acessos`);
+      resultados.push({ sucesso: false, message: `Sincronização desativada para ${dispositivo.nome}`, dispositivoId: dispositivo.id });
+      continue;
+    }
+
     const resultado = await sincronizarAcessos(dispositivo, { monitorOnly: true });
     resultados.push(resultado);
   }
@@ -374,7 +402,7 @@ async function processarNotificacaoMonitorDao(payload) {
   const logger = require('../config/logger');
   const { emitToRoom } = require('../websocket/wsServer');
   const globalState = require('../state/globalState');
-  const { cacheMutation, CACHE_KEYS } = require('../cache/helpers');
+  const { cacheMutation, invalidateMultiple, CACHE_KEYS } = require('../cache/helpers');
 
   const result = { processados: 0, ignorados: 0, erros: [] };
   const deviceIdControlId = payload.device_id != null ? Number(payload.device_id) : null;

@@ -26,7 +26,9 @@ routerExtra.post('/dispositivos/:id/backup-logs', autenticar, dispositivosContro
 routerExtra.post('/dispositivos/:id/backup-completo', autenticar, dispositivosController.backupCompleto);
 routerExtra.post('/dispositivos/:id/zerar-logs', autenticar, dispositivosController.zerarLogs);
 routerExtra.post('/dispositivos/:id/configurar-monitor', autenticar, dispositivosController.configurarMonitor);
+// D-4: conflito era apenas posicional — as duas rotas são complementares, ambas mantidas.
 routerExtra.delete('/dispositivos', autenticar, dispositivosController.limparUsuarios)
+routerExtra.post('/dispositivos/:id/toggle-sync', autenticar, dispositivosController.toggleSync);
 
 // Depois monta o restante das rotas (inclui /:id, etc.)
 routerExtra.use(router);

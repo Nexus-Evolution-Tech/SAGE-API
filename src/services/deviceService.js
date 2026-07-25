@@ -140,7 +140,9 @@ async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0, opti
       ? logs.filter(log => log.time > timestampInicial)
       : logs;
 
-    logger.debug(`${logsFiltrados.length} logs obtidos da catraca`);
+    if (logs.length !== logsFiltrados.length || logsFiltrados.length === 0) {
+      logger.info(`[load_objects] catraca retornou ${logs.length} logs, após filtro time>${timestampInicial} restaram ${logsFiltrados.length}`);
+    }
     return logsFiltrados;
   } catch (error) {
     logger.errorWithStack('Erro ao obter logs da catraca', error);

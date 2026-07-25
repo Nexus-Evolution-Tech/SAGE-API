@@ -21,6 +21,11 @@ const registrarSyncPendente = async (pessoaId, operation) => {
     }
 
     for (let dispositivo of dispositivos) {
+      // Pula dispositivos com sincronização desativada
+      if (dispositivo.sync_enabled === false || dispositivo.sync_enabled === 0) {
+        logger.debug(`Sync desativado para dispositivo ${dispositivo.id} (${dispositivo.nome}), ignorando operação ${operation}`);
+        continue;
+      }
       if (!pessoaId || !dispositivo?.id) {
         logger.error(`IDs inválidos: pessoaId=${pessoaId}, dispositivoId=${dispositivo?.id}`);
         continue;

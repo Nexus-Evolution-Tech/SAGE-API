@@ -122,6 +122,9 @@ const verificarSyncPendentesJob = () => {
           const dispositivo = dispositivoResult?.[0];
           if (!dispositivo) continue;
 
+          // D-3: mantida a versão de terceira-versao. A alternativa de nao-funcional marcava o
+          // dispositivo como "offline", o que faz o retry_count crescer indefinidamente para um
+          // equipamento intencionalmente desligado. `disabledDevices` é semanticamente correto.
           if (!isSyncEnabled(dispositivo?.sync_enabled)) {
             disabledDevices.add(dispositivoId);
             logger.info(`Sincronização pendente ignorada: ${dispositivo.nome} com sync desativada`);

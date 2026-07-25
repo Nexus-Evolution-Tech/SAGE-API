@@ -586,6 +586,47 @@ async function configurarMonitor(req, res) {
   }
 }
 
+/** Ativa ou desativa a sincronização automática para um dispositivo específico */
+async function toggleSync(req, res) {
+  try {
+    const id = parseDispositivoId(req.params.id);
+    if (id == null) {
+      return res.status(400).json({ message: 'ID do dispositivo inválido' });
+    }
+    
+    const { sync_enabled } = req.body;
+    if (sync_enabled === undefined || typeof sync_enabled !== 'boolean') {
+      return res.status(400).json({ message: 'Campo sync_enabled é obrigatório e deve ser booleano (true/false)' });
+    }
+    
+    const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
+    if (!dispositivo) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+    
+    await db.query(`UPDATE ${tabela} SET sync_enabled = ? WHERE id = ?`, [sync_enabled, id]);
+    await cacheMutation(async () => null, [`${tabela}:*`]);
+    
+    const statusMsg = sync_enabled ? 'ativada' : 'desativada';
+    logger.info(`Sincronização ${statusMsg} para dispositivo ${dispositivo.nome} (ID: ${id})`);
+    
+    emitNotification({
+      title: `Sincronização ${statusMsg}`,
+      message: `A sincronização automática foi ${statusMsg} para o dispositivo "${dispositivo.nome}"`,
+      type: 'success',
+    });
+    
+    return res.json({ 
+      message: `Sincronização ${statusMsg} com sucesso`,
+      dispositivo: dispositivo.nome,
+      sync_enabled 
+    });
+  } catch (error) {
+    logger.error(`Erro ao alterar sincronização: ${error.message}`);
+    return res.status(500).json({ message: 'Erro ao alterar sincronização', error: error.message });
+  }
+}
+
 const controllerGenerico = gerarController(tabela, campos, 'dispositivo');
 
 /** Criar dispositivo e já configurar o Monitor na catraca para monitoramento em tempo real */
@@ -646,6 +687,7 @@ module.exports = {
   zerarTudo,
   comecarDoZero,
   configurarMonitor,
+  toggleSync,
   diagnosticoAcessos,
   limparUsuarios,
   async discover(req, res) {
