@@ -12,6 +12,7 @@ const { isSyncEnabled } = require('../utils/syncFlags');
 const { limparUsuariosPorPrefixo11 } = require('../utils/controlId-utils');
 const globalState = require('../state/globalState');
 const catracaImportService = require('../services/catracaImportService');
+const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
 
 const tabela = 'Dispositivo';
 
@@ -223,6 +224,64 @@ async function zerarLogs(req, res) {
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    }
+
+    // 0) E5 / RNF-3 — trava contra perda de acesso.
+    //
+    // O backup abaixo salva os logs num ARQUIVO, o que é bom, mas não significa que os acessos
+    // entraram no banco do sistema. Se a sincronização estiver falhando, eles nunca aparecerão em
+    // nenhum relatório de frequência — e o arquivo não conserta isso.
+    //
+    // Não é hipotético: docs/ANALISE_SYNC_CONTROL_ID.md registra 48.057 logs na catraca com ZERO
+    // inseridos no banco. E catraca cheia fica lenta, que é exatamente quando alguém pensa em zerar.
+    const confirmadoPeloOperador = req.body?.confirmarPerdaDeLogs === true;
+
+    // `campos` não inclui ultimo_log_id_sincronizado (ele vem de migration; ver comentário no topo
+    // deste arquivo). Sem buscar explicitamente, a avaliação leria `undefined` e bloquearia SEMPRE,
+    // inclusive quando tudo já estivesse sincronizado — tornando a operação inutilizável.
+    const [[estadoSync]] = await db.query(
+      'SELECT ultimo_log_id_sincronizado FROM Dispositivo WHERE id = ?',
+      [id]
+    );
+    const ultimoLogIdSincronizado = estadoSync ? estadoSync.ultimo_log_id_sincronizado : null;
+
+    let maiorLogIdNaCatraca = null;
+    try {
+      const linkParaChecagem = deviceService.linkCatraca(dispositivo);
+      const sessaoParaChecagem = await deviceService.obterSessao(linkParaChecagem, dispositivo);
+      if (sessaoParaChecagem) {
+        maiorLogIdNaCatraca = await deviceService.obterMaiorLogIdCatraca(sessaoParaChecagem, linkParaChecagem);
+      }
+    } catch (erro) {
+      // Falha aqui vira "não sei" — e "não sei" bloqueia. Nunca tratar como "está tudo certo".
+      logger.error(`[ZERAR] ${dispositivo.nome}: não foi possível verificar logs não sincronizados — ${erro.message}`);
+      maiorLogIdNaCatraca = null;
+    }
+
+    const avaliacao = avaliarPerdaDeLogs({
+      maiorLogIdNaCatraca,
+      ultimoLogIdSincronizado,
+      confirmadoPeloOperador
+    });
+
+    if (!avaliacao.seguro) {
+      logger.warn(`[ZERAR] ${dispositivo.nome}: operação BLOQUEADA — ${avaliacao.motivo}`);
+      return res.status(409).json({
+        message: 'Operação bloqueada para não perder acessos.',
+        motivo: avaliacao.motivo,
+        naoSincronizados: avaliacao.naoSincronizados,
+        comoProsseguir:
+          'Sincronize os acessos deste dispositivo e tente de novo. Se ainda assim quiser zerar ' +
+          'aceitando a perda, reenvie com { "confirmarPerdaDeLogs": true }.'
+      });
+    }
+
+    if (confirmadoPeloOperador && avaliacao.naoSincronizados > 0) {
+      // Confirmação não apaga a razão: fica registrado que houve perda consciente.
+      // TODO(F3): quando existir identidade de usuário, isto vai para LogAuditoria com quem confirmou.
+      logger.warn(
+        `[ZERAR] ${dispositivo.nome}: operador CONFIRMOU perda de ~${avaliacao.naoSincronizados} acesso(s) não sincronizados. ${avaliacao.motivo}`
+      );
     }
 
     // 1) Backup antes de zerar

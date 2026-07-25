@@ -168,6 +168,30 @@ async function obterLogsCatraca(session, linkCatraca, timestampInicial = 0, opti
 }
 
 /**
+ * Maior `id` de access_log presente no equipamento.
+ *
+ * Usado pela trava de proteção contra perda de logs (services/protecaoLogs.js): comparado com
+ * `Dispositivo.ultimo_log_id_sincronizado`, diz quantos acessos existem na catraca que ainda NÃO
+ * entraram no banco do sistema.
+ *
+ * Consulta leve: pede 1 registro em ordem decrescente de id, não os 48k.
+ *
+ * LANÇA em caso de falha (RNF-4) — quem chama deve tratar "não sei" como "não destrua",
+ * nunca como "está tudo certo".
+ *
+ * @returns {Promise<number|null>} maior id, ou null se a catraca não tiver nenhum log.
+ */
+async function obterMaiorLogIdCatraca(session, linkCatracaStr) {
+  const logs = await obterLogsCatraca(session, linkCatracaStr, 0, {
+    limit: 1,
+    order: ['descending', 'id']
+  });
+  if (!Array.isArray(logs) || logs.length === 0) return null;
+  const id = Number(logs[0]?.id);
+  return Number.isFinite(id) ? id : null;
+}
+
+/**
  * Verifica se a catraca tem muitos logs (amostra leve para decidir "zerar ou continuar").
  * Chama load_objects com limit para não trazer os 49k.
  * @param {object} dispositivo - Dispositivo do banco
@@ -678,6 +702,7 @@ module.exports = {
   obterSessao,
   verificarSessao,
   obterLogsCatraca,
+  obterMaiorLogIdCatraca,
   ErroDispositivo,
   obterQuantidadeOuAmostraLogsCatraca,
   loadObjectsFromCatraca,
