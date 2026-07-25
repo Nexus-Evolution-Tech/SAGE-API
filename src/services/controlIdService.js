@@ -6,12 +6,32 @@ const { verificaSeFotoUserExiste, deletarFotoUserPorId } = require('../utils/pho
 const gerarCardValue = require('../utils/gerarCardValue');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 const logger = require('../config/logger');
+const { isSyncEnabled } = require('../utils/syncFlags');
 
-const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '111000000');
+const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '110000000');
 const PARALLEL_LIMIT = parseInt(process.env.SYNC_PARALLEL_LIMIT || '3');
 
 // Limitar concorrência para não sobrecarregar as catracas
 const limit = pLimit(PARALLEL_LIMIT);
+
+function filtrarDispositivosHabilitados(dispositivos = []) {
+  return dispositivos.filter((dispositivo) => isSyncEnabled(dispositivo?.sync_enabled));
+}
+
+function resolverDispositivos(todosDispositivos, dispositivoIdParam = null) {
+  const habilitados = filtrarDispositivosHabilitados(todosDispositivos);
+
+  if (dispositivoIdParam == null) {
+    return habilitados;
+  }
+
+  const targetId = Number(dispositivoIdParam?.dispositivoId ?? dispositivoIdParam);
+  if (Number.isNaN(targetId)) {
+    return habilitados;
+  }
+
+  return habilitados.filter((dispositivo) => Number(dispositivo.id) === targetId);
+}
 
 // ==================== HELPERS ====================
 
@@ -70,16 +90,12 @@ const processarCriacaoDispositivo = async (dispositivo, novaPessoa, catracaUserI
 const criarNovaPessoaNasCatracas = async (novaPessoa, dispositivoId = null) => {
   const catracaUserId = USER_ID_OFFSET + Number(novaPessoa.id);
   const todosDispositivos = await listarTodos();
+  const dispositivos = resolverDispositivos(todosDispositivos, dispositivoId);
 
   logger.info(`Catraca User Id: ${catracaUserId}`);
   
-  // Filtrar dispositivos (todos ou específico)
-  const dispositivos = dispositivoId !== null
-    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)].filter(Boolean)
-    : todosDispositivos;
-
   if (dispositivos.length === 0) {
-    throw new Error('Nenhum dispositivo encontrado');
+    throw new Error('Nenhum dispositivo com sincronização habilitada para processamento');
   }
 
   logger.info(`Iniciando criação paralela de ${novaPessoa.nome} em ${dispositivos.length} catraca(s)\nQRCODE: ${novaPessoa.qr_code}`);
@@ -175,13 +191,10 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
 const editarPessoaNasCatracas = async (id, nome, cartao_rfid, qr_code, dispositivoId = null) => {
   const catracaUserId = USER_ID_OFFSET + Number(id);
   const todosDispositivos = await listarTodos();
-  
-  const dispositivos = dispositivoId !== null
-    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)].filter(Boolean)
-    : todosDispositivos;
+  const dispositivos = resolverDispositivos(todosDispositivos, dispositivoId);
 
   if (dispositivos.length === 0) {
-    throw new Error('Nenhum dispositivo encontrado');
+    throw new Error('Nenhum dispositivo com sincronização habilitada para processamento');
   }
 
   logger.info(`Iniciando edição paralela de pessoa ${id} em ${dispositivos.length} catraca(s)`);
@@ -243,13 +256,10 @@ const processarDelecaoDispositivo = async (dispositivo, id, catracaUserId) => {
 const deletarPessoaDasCatracas = async (id, dispositivoId = null) => {
   const catracaUserId = USER_ID_OFFSET + Number(id);
   const todosDispositivos = await listarTodos();
-  
-  const dispositivos = dispositivoId !== null
-    ? [todosDispositivos.find(d => d.id == dispositivoId.dispositivoId)].filter(Boolean)
-    : todosDispositivos;
+  const dispositivos = resolverDispositivos(todosDispositivos, dispositivoId);
 
   if (dispositivos.length === 0) {
-    throw new Error('Nenhum dispositivo encontrado');
+    throw new Error('Nenhum dispositivo com sincronização habilitada para processamento');
   }
 
   logger.info(`Iniciando deleção paralela de pessoa ${id} em ${dispositivos.length} catraca(s)`);

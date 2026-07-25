@@ -1,6 +1,8 @@
 const deviceService = require('./deviceService');
 const verificarEAtribuirPresenca = require('./presenceService');
-const db = require('../config/database')
+const db = require('../config/database');
+const { isSyncEnabled } = require('../utils/syncFlags');
+const globalState = require('../state/globalState');
 
 // Deve ser o MESMO valor do controlIdService (catracaUserId = offset + pessoa.id)
 const USER_ID_OFFSET = parseInt(process.env.CATRACA_USER_ID_OFFSET || '111000000');
@@ -66,6 +68,18 @@ async function sincronizarAcessos(dispositivo, options = {}) {
 
   if (MIN_ID > 0 && !monitorOnly) {
     logger.debug(`[SYNC] ${dispositivo.nome}: ignorando logs da catraca com id <= ${MIN_ID} (CATRACA_MIN_LOG_ID)`);
+  }
+
+  if (!isSyncEnabled(dispositivo?.sync_enabled)) {
+    logger.info(`[SYNC] ${dispositivo.nome}: sincronização desativada (flag no dispositivo)`);
+    return {
+      sucesso: false,
+      message: `Sincronização desativada para ${dispositivo.nome}`,
+      dispositivo_id: dispositivo.id,
+      nome: dispositivo.nome,
+      acessosSincronizados: 0,
+      sincronizacaoDesativada: true
+    };
   }
 
   const link = deviceService.linkCatraca(dispositivo);
@@ -281,6 +295,10 @@ async function sincronizarTodosAcessos() {
   if (!dispositivos || dispositivos.length === 0) return resultados;
 
   for (const dispositivo of dispositivos) {
+    if (globalState.isDeviceZerando(dispositivo.id)) {
+      resultados.push({ dispositivo: dispositivo.nome, acessosSincronizados: 0, ignorado: true, motivo: 'zerando logs' });
+      continue;
+    }
     const resultado = await sincronizarAcessos(dispositivo);
     resultados.push(resultado);
   }

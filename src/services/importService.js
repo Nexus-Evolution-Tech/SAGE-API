@@ -215,7 +215,7 @@ async function upsertCatracas(sheet, summary) {
     }
 
     await db.query(
-      'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, area_id, numero_serial, sincronizar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, area_id, numero_serial, sync_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         nome,
         cleanValue(row.Modelo),

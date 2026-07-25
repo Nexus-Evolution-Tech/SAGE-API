@@ -23,6 +23,9 @@ class GlobalState {
       // Usuários conectados ao WebSocket
       connectedUsers: new Map(),
 
+      // Dispositivos em processo de zerar logs (evita sync/polling bater na mesma catraca)
+      zerandoDispositivos: new Set(),
+
       // Estatísticas em tempo real
       stats: {
         acessos_hoje: 0,
@@ -315,6 +318,25 @@ class GlobalState {
   /**
    * Obter snapshot completo do estado
    */
+  /**
+   * Marcar dispositivo como "zerando logs" para o sync/polling não consultá-lo nesse período.
+   * @param {number} dispositivoId
+   * @param {boolean} zerando
+   */
+  setZerandoDispositivo(dispositivoId, zerando) {
+    if (zerando) {
+      this.state.zerandoDispositivos.add(Number(dispositivoId));
+      logger.debug(`[STATE] Dispositivo ${dispositivoId} em zeragem de logs (sync/polling vai pular)`);
+    } else {
+      this.state.zerandoDispositivos.delete(Number(dispositivoId));
+      logger.debug(`[STATE] Dispositivo ${dispositivoId} zeragem concluída`);
+    }
+  }
+
+  isDeviceZerando(dispositivoId) {
+    return this.state.zerandoDispositivos.has(Number(dispositivoId));
+  }
+
   getSnapshot() {
     return {
       syncInProgress: this.getSyncInProgress(),

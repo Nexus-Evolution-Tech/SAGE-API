@@ -8,7 +8,7 @@ security:
   - bearerAuth: []   # aplica globalmente a todas as rotas
 
 servers:
-  - url: http://localhost:3000
+  - url: "http://localhost:3000"
 
 tags:
   - name: Dados
@@ -801,6 +801,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Dispositivo'
+    delete:
+      tags: [Dispositivos]
+      summary: Remove todos os usuários por prefixo de id "11"
+      responses:
+        '204':
+          description: Usuários deletados
+        '404':
+          description: Usuários não encontrados
+
 
   /dispositivos/status:
     get:
@@ -2406,6 +2415,12 @@ components:
           type: string
         senha:
           type: string
+        status:
+          type: string
+          enum: [ONLINE, OFFLINE, DESCONHECIDO]
+        sync_enabled:
+          type: boolean
+          description: Indica se o dispositivo participa das sincronizações automáticas
     
     Empresa:
       type: object
