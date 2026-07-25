@@ -50,7 +50,7 @@ const acessoSchema = Joi.object({
   pessoa_id: Joi.number().integer().positive().required(),
   dispositivo_id: Joi.number().integer().positive().required(),
   status: Joi.string().valid('ENTRADA', 'SAIDA').required(),
-  metodo_auth: Joi.string().valid('CARTAO_RFID', 'QRCODE', 'BIOMETRIA').required()
+  metodo_auth: Joi.string().valid('QR_CODE', 'CARTAO_RFID', 'SENHA', 'BIOMETRIA').required()
 });
 
 const loginSchema = Joi.object({

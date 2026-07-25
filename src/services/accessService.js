@@ -27,8 +27,13 @@ function userIdCatracaParaPessoaId(user_id) {
 }
 
 // Determina o tipo de autenticação pelo valor lido
+// ATENÇÃO: os valores devolvidos aqui vão direto para Acesso.metodo_auth, que é
+// ENUM('QR_CODE', 'CARTAO_RFID', 'SENHA', 'BIOMETRIA'). Antes esta função devolvia 'QRCODE',
+// sem underscore — e com o MySQL em STRICT_TRANS_TABLES o INSERT FALHAVA, abortando a
+// sincronização inteira. Como o ponteiro só avança no fim do laço, a sync rebuscava o mesmo lote
+// e travava de novo no mesmo log: paralisia permanente. Ver test/regressao-metodo-auth.test.js.
 function mapearMetodo(value) {
-  return value.length === 8 ? 'QRCODE' : 'CARTAO_RFID';
+  return String(value).length === 8 ? 'QR_CODE' : 'CARTAO_RFID';
 }
 
 // Determina se é entrada ou saída pelo portal_id (sentido do giro na catraca: esquerda/direita).
@@ -201,10 +206,29 @@ async function sincronizarAcessos(dispositivo, options = {}) {
     }
   }
 
-  // Ordenar do mais recente ao mais antigo: usuário vê os últimos acessos em segundos enquanto a sync continua em background
-  logs.sort((a, b) => (Number(b?.time) || 0) - (Number(a?.time) || 0));
+  // Ordem de processamento — a escolha aqui tem consequência de PERDA DE DADOS, não só de UX.
+  //
+  // Monitor (monitorOnly): do mais recente ao mais antigo. É o que a pessoa vê na tela ao ligar o
+  // computador, e é onde a percepção de rapidez importa. Este caminho não move o ponteiro.
+  //
+  // Full sync: do MAIS ANTIGO ao mais recente, por id. Antes era decrescente aqui também, e isso
+  // criava um buraco permanente: uma queda no meio gravava os acessos NOVOS e deixava os VELHOS,
+  // e o resume seguinte partia do último acesso gravado menos 1h — excluindo os antigos para
+  // sempre. Com os logs cobrindo mais de 1h, havia perda silenciosa garantida.
+  // Provado em test/recuperacao-apos-queda.test.js (120 logs em 148 min → 3 perdidos).
+  //
+  // Em ordem crescente, o ponteiro avança junto com o progresso real e a retomada é exata.
+  if (monitorOnly) {
+    logs.sort((a, b) => (Number(b?.time) || 0) - (Number(a?.time) || 0));
+  } else {
+    logs.sort((a, b) => (Number(a?.id) || 0) - (Number(b?.id) || 0));
+  }
 
   let acessosSincronizados = 0;
+  // Maior id de log EFETIVAMENTE gravado — diferente do maior id buscado. O ponteiro tem de
+  // refletir o que entrou no banco, não o que veio da catraca.
+  let maiorLogIdGravado = 0;
+  const PASSO_PONTEIRO = parseInt(process.env.SYNC_PASSO_PONTEIRO || '25', 10);
   let ignoradosPessoa = 0;
   let ignoradosDuplicata = 0;
   const globalState = require('../state/globalState');
@@ -256,6 +280,24 @@ async function sincronizarAcessos(dispositivo, options = {}) {
         [pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora_utc, new Date()]
       );
       acessosSincronizados++;
+
+      // Avanço PROGRESSIVO do ponteiro (só no full sync, e só em ordem crescente de id).
+      // Se o processo morrer agora, a retomada começa exatamente daqui — em vez de depender do
+      // filtro por timestamp, que já provocou perda permanente de acessos antigos.
+      // A cada N para não transformar isto em uma escrita por linha (HD mecânico).
+      if (!monitorOnly && Number.isFinite(Number(log.id))) {
+        maiorLogIdGravado = Math.max(maiorLogIdGravado, Number(log.id));
+        if (acessosSincronizados % PASSO_PONTEIRO === 0) {
+          try {
+            await db.query(
+              'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
+              [maiorLogIdGravado, dispositivo.id]
+            );
+          } catch (e) {
+            logger.error(`[SYNC] ${dispositivo.nome}: falha ao avançar ponteiro: ${e.message}`);
+          }
+        }
+      }
 
       try {
         globalState.incrementAcessoTodiaSuccesso();
