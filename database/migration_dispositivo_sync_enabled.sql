@@ -41,7 +41,26 @@ SET @sql = IF(@tem_nova = 0,
   'SELECT ''sync_enabled ja existe''');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- 4) Índice (idempotente)
+-- 4) Convergência: se `sync_enabled` já existe e sobrou coluna antiga (caso de banco onde as duas
+--    migrations antigas rodaram), remove a órfã. Sem isso a tabela fica com coluna morta que
+--    confunde diagnóstico remoto. Verificado no cenário de borda em MySQL 9.5.
+SET @tem_nova = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Dispositivo' AND COLUMN_NAME = 'sync_enabled');
+SET @tem_orfa = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Dispositivo' AND COLUMN_NAME = 'sincronizar');
+SET @sql = IF(@tem_nova = 1 AND @tem_orfa = 1,
+  'ALTER TABLE Dispositivo DROP COLUMN sincronizar',
+  'SELECT ''sem coluna orfa (sincronizar)''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @tem_orfa = (SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Dispositivo' AND COLUMN_NAME = 'sync_ativo');
+SET @sql = IF(@tem_nova = 1 AND @tem_orfa = 1,
+  'ALTER TABLE Dispositivo DROP COLUMN sync_ativo',
+  'SELECT ''sem coluna orfa (sync_ativo)''');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 5) Índice (idempotente)
 SET @tem_idx = (SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Dispositivo' AND INDEX_NAME = 'idx_dispositivo_sync_enabled');
 SET @sql = IF(@tem_idx = 0,

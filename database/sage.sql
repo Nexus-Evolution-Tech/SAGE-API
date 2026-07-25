@@ -1,6 +1,12 @@
--- BANCO: PADRÃO, O SCRIPT RODARÁ O sage.sql PRA TER O BANCO
-CREATE SCHEMA IF NOT EXISTS sage;
-USE sage;
+-- Schema do SAGE.
+--
+-- ATENÇÃO (achado A-1, docs/ACHADOS-INSTALADOR.md): este arquivo NÃO deve criar nem selecionar o
+-- banco. Antes ele fazia `CREATE SCHEMA IF NOT EXISTS sage; USE sage;`, o que ignorava a variável
+-- DB_NAME: o schema ia sempre para `sage` e as migrations seguintes rodavam num banco vazio,
+-- falhando todas — com o instalador reportando sucesso (exit 0).
+--
+-- Quem cria e seleciona o banco é `scripts/setup-database.js`, que já respeita DB_NAME.
+-- Para rodar este arquivo à mão, informe o banco: `mysql -u root -p -D nome_do_banco < sage.sql`
 
 SET time_zone = '-03:00';
 
