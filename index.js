@@ -58,7 +58,9 @@ async function iniciarServidor() {
         logger.warn('  Execute: npm run setup:db');
       }
     } catch (error) {
-      logger.debug(`Health check error (ignorado): ${error.message}`);
+      // RNF-4: era debug com "(ignorado)". O health check do banco é justamente o mecanismo que
+      // deveria avisar que algo está errado — falhar em silêncio o torna decorativo.
+      logger.error(`Falha ao verificar saúde do banco: ${error.message}`);
     }
   }, 2000);
 
@@ -80,7 +82,11 @@ async function iniciarServidor() {
               logger.info(`[PROMOÇÃO] Executado na subida: ${resultado.promovidos} promovidos, ${resultado.finalizados} finalizados`);
             }
           })
-          .catch((err) => logger.debug(`[PROMOÇÃO] Verificação na subida: ${err.message}`));
+          // RNF-4: era logger.debug — em produção (nível info) uma falha aqui sumia sem rastro.
+          // Este é o job MAIS consequente do sistema: ele muda a turma de todo aluno, uma vez por
+          // ano. Falhar em silêncio significa alunos não promovidos, descoberto só em fevereiro,
+          // quando não passarem na catraca.
+          .catch((err) => logger.errorWithStack('[PROMOÇÃO] Falha na verificação de subida', err));
       } else {
         logger.info('[PROMOÇÃO] Promoção na subida desabilitada (PROMOCAO_NA_SUBIDA=false)');
       }
@@ -95,7 +101,10 @@ async function iniciarServidor() {
             const total = resultados.reduce((acc, r) => acc + (r.acessosSincronizados || 0), 0);
             if (total > 0) logger.info(`[BOOT] Sync inicial: ${total} acessos sincronizados`);
           })
-          .catch((err) => logger.debug(`[BOOT] Sync inicial: ${err.message}`));
+          // RNF-4: era logger.debug. A sync de boot é o que recupera tudo que a catraca acumulou
+          // enquanto o PC esteve desligado — se ela falhar calada, o operador acha que está tudo
+          // sincronizado quando não está.
+          .catch((err) => logger.errorWithStack('[BOOT] Falha na sync inicial', err));
         });
       }
     } else {
