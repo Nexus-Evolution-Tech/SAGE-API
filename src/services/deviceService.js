@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../config/logger');
 const ErroDispositivo = require('../errors/ErroDispositivo');
+const saudeDispositivos = require('./saudeDispositivos');
 const { ORDEM_ZERAR_CATRACA } = require('../config/syncOrder');
 
 const CHUNK_SIZE = parseInt(process.env.CATRACA_BACKUP_CHUNK_SIZE || '2000', 10);
@@ -91,8 +92,24 @@ async function obterSessao(linkCatraca, dispositivo, forceNew = false) {
       logger.info(` Sessão criada para ${dispositivo.nome}: ${s}`);
       return s;
     }, `${dispositivo.nome} login`);
+    saudeDispositivos.registrarSucesso(dispositivo.id, {
+      nome: dispositivo.nome,
+      operacao: 'obterSessao'
+    });
     return session;
   } catch (error) {
+    // RNF-4, E6 — aqui o contrato de devolver `null` é legítimo: todos os chamadores já fazem
+    // `if (!session)`. O que se perdia era a RAZÃO: "a catraca está fora do ar" e "a catraca
+    // recusou a senha" viravam exatamente o mesmo `null`, e a tela só sabia dizer "OFFLINE".
+    //
+    // Agora a razão fica registrada, para a página de status poder explicar o que houve — e,
+    // principalmente, dizer se a pessoa precisa fazer alguma coisa.
+    saudeDispositivos.registrarFalha(dispositivo.id, {
+      nome: dispositivo.nome,
+      operacao: 'obterSessao',
+      motivo: error.message,
+      alcancavel: Boolean(error.response)
+    });
     logger.error(` Erro ao obter sessão ${dispositivo.nome}: ${error.message}`);
     return null;
   }
