@@ -7,6 +7,8 @@ describe('contrato do builder nativo Windows', () => {
   it('constrói de commits descartáveis e prova dependências nativas antes do layout', () => {
     const script = fs.readFileSync(SCRIPT, 'utf8');
     expect(script).toContain("[Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64'");
+    expect(script).toContain('major:parseInt(process.versions.node,10)');
+    expect(script).not.toMatch(/runtimeExpression\s*=.*split\(["']/);
     expect(script.match(/git\.exe' @\('archive'/g)).toHaveLength(2);
     expect(script).toContain('git.exe rev-parse HEAD');
     expect(script).toContain('"--output=$apiZip", $apiCommit');

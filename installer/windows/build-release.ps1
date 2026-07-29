@@ -52,7 +52,7 @@ New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($output)) -Force
 
 $nodeCommand = (Get-Command node.exe -ErrorAction Stop).Source
 $npmCommand = (Get-Command npm.cmd -ErrorAction Stop).Source
-$runtimeExpression = 'JSON.stringify({platform:process.platform,arch:process.arch,major:Number(process.versions.node.split(".")[0])})'
+$runtimeExpression = 'JSON.stringify({platform:process.platform,arch:process.arch,major:parseInt(process.versions.node,10)})'
 $runtime = & $nodeCommand -p $runtimeExpression | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or $runtime.platform -ne 'win32' -or $runtime.arch -ne 'x64' -or $runtime.major -ne 24) {
   throw 'Builder exige Node 24 x64 para Windows'
