@@ -28,6 +28,8 @@ function configConexao() {
     port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
+    // Constante do contrato de produção; o teste de fuso não pode herdar o timezone da máquina.
+    timezone: '-03:00',
     multipleStatements: true
   };
 }
