@@ -9,6 +9,7 @@ global.db = globalDB;
 const path = require("path");
 const fs = require("fs");
 const { paths, ensureDataDirs } = require("./config/paths");
+const { webDir, indexFile, webBuildAvailable, isSpaNavigation } = require("./config/web");
 
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
@@ -18,6 +19,12 @@ const swaggerDocument = YAML.parse(
 );
 
 const app = express();
+const webBuildIsAvailable = webBuildAvailable();
+
+function serveSpaNavigation(req, res, next) {
+  if (!isSpaNavigation(req)) return next();
+  return res.sendFile(indexFile);
+}
 
 // Rate limiting removido em dev para evitar 429; se precisar em prod, reativar aqui.
 
@@ -110,6 +117,10 @@ logger.info("Documentação Swagger disponível em: /docs");
 app.use("/uploads", express.static(paths.uploads));
 logger.info("Arquivos estáticos disponíveis em: /uploads");
 
+// Algumas rotas do BrowserRouter também existem na API. Navegação HTML precisa vencer essas
+// rotas; fetches sem Accept: text/html continuam seguindo para a API logo abaixo.
+if (webBuildIsAvailable) app.use(serveSpaNavigation);
+
 // Rotas da aplicação (com tratamento de erro)
 try {
   loadRoutes(app);
@@ -156,6 +167,16 @@ app.get('/health', (req, res) => {
     }
   });
 });
+
+// Assets são resolvidos depois da infraestrutura. O fallback repete a lista explícita de rotas
+// do painel, para não transformar endpoints desconhecidos da API em index.html.
+if (webBuildIsAvailable) {
+  app.use(express.static(webDir, { index: false }));
+  app.use(serveSpaNavigation);
+  logger.info(`Painel web disponível em: ${webDir}`);
+} else {
+  logger.warn(`Build web indisponível em: ${webDir}`);
+}
 
 // 404 handler (após todas as rotas)
 app.use((req, res) => {
