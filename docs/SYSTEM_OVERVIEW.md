@@ -8,10 +8,10 @@
 
 ## Fluxo de inicialização
 - `npm start` → `scripts/start-with-setup.js`
-  - Verifica conexão MySQL
-  - Cria DB se faltar
-  - Executa migrations/seeds (scripts/setup-database.js)
+  - Verifica schema, ledger e checksums usando somente leitura
+  - Recusa iniciar quando há migration pendente, falha ou incompatível
   - Sobe `index.js` (Express) com nodemon em dev
+- `npm run setup:db` usa a credencial migradora para criar DB e aplicar migrations antes do start
 - `src/app.js`
   - carrega middlewares (CORS, compress, JSON, logger de request)
   - registra rotas via `config/loadRoutes.js`
@@ -58,9 +58,9 @@
 - Rotas em `src/routes/*` agrupadas por recurso (pessoa, aula, acesso, etc.)
 
 ## Comandos úteis
-- `npm start` – verifica/cria DB, aplica migrations/seeds e inicia servidor
+- `npm run setup:db` – cria/atualiza o banco com credencial migradora
+- `npm start` – valida o schema sem DDL e inicia o servidor
 - `npm run dev` – nodemon sem verificação de setup (usa DB já existente)
-- `npm run setup` – roda apenas o setup do banco
 
 ## Variáveis de ambiente (principais)
 - DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
@@ -72,4 +72,4 @@
 - Todas as operações persistem primeiro no MySQL (ACID)
 - Sincronizações externas são assíncronas + fila `sync_pendente`
 - Startup reprocessa pendências automaticamente
-- Seeds e migrations são idempotentes
+- O instalador aplica migrations antes de ativar o release; o runtime apenas valida o ledger

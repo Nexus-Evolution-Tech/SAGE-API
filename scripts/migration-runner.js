@@ -213,7 +213,44 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
   }
 }
 
+async function verifyMigrationState({ connection, migrationsDir }) {
+  if (!connection || typeof connection.query !== 'function') {
+    throw new TypeError('connection deve ser uma conexão mysql2 aberta');
+  }
+  const migrations = await loadMigrations(migrationsDir);
+  const ledgerRows = rowsOf(await connection.query(
+    'SELECT version, checksum, status FROM schema_migrations ORDER BY version'
+  )) || [];
+  const localByVersion = new Map(migrations.map((migration) => [migration.version, migration]));
+  const applied = new Map();
+
+  for (const row of ledgerRows) {
+    if (row.status !== 'applied') {
+      throw new MigrationError(
+        `Migration ${row.version} está em estado ${row.status}; intervenção manual obrigatória`,
+        'MIGRATION_REQUIRES_INTERVENTION'
+      );
+    }
+    const local = localByVersion.get(row.version);
+    if (!local) {
+      throw new MigrationError(`Ledger contém versão sem arquivo local: ${row.version}`, 'MISSING_LOCAL_FILE');
+    }
+    if (local.checksum !== row.checksum) {
+      throw new MigrationError(`Checksum divergente na migration ${row.version}`, 'CHECKSUM_DRIFT');
+    }
+    applied.set(row.version, row);
+  }
+  const pending = migrations.filter(({ version }) => !applied.has(version));
+  if (pending.length > 0) {
+    throw new MigrationError(
+      `Há migrations pendentes: ${pending.map(({ version }) => version).join(', ')}`,
+      'PENDING_MIGRATIONS'
+    );
+  }
+  return { versions: migrations.map(({ version }) => version) };
+}
+
 module.exports = {
   LOCK_PREFIX, LOCK_TIMEOUT_SECONDS, SERVER_STATUS_IN_TRANS,
-  MigrationError, loadMigrations, lockNameForSchema, runMigrations
+  MigrationError, loadMigrations, lockNameForSchema, runMigrations, verifyMigrationState
 };

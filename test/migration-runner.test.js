@@ -7,7 +7,8 @@ const { configConexao, criarBancoDeTeste, temBancoDisponivel } = require('./help
 const {
   MigrationError,
   lockNameForSchema,
-  runMigrations
+  runMigrations,
+  verifyMigrationState
 } = require('../scripts/migration-runner');
 
 const dirs = [];
@@ -73,6 +74,22 @@ function db({
 afterEach(async () => Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true }))));
 
 describe('runner de migrations versionadas', () => {
+  it('verifica o ledger em modo somente leitura e bloqueia pendência ou falha', async () => {
+    const sql = 'SELECT 1;';
+    const dir = await migrations({ '0001_alpha.sql': sql });
+    const valid = db({ ledger: [{ version: '0001', checksum: checksum(sql), status: 'applied' }] });
+
+    await expect(verifyMigrationState({ connection: valid, migrationsDir: dir }))
+      .resolves.toEqual({ versions: ['0001'] });
+    expect(valid.calls.every(([query]) => query.startsWith('SELECT'))).toBe(true);
+    await expect(verifyMigrationState({ connection: db(), migrationsDir: dir }))
+      .rejects.toMatchObject({ code: 'PENDING_MIGRATIONS' });
+    await expect(verifyMigrationState({
+      connection: db({ ledger: [{ version: '0001', checksum: checksum(sql), status: 'failed' }] }),
+      migrationsDir: dir
+    })).rejects.toMatchObject({ code: 'MIGRATION_REQUIRES_INTERVENTION' });
+  });
+
   it('marca in_progress antes do SQL e applied após cada migration pendente', async () => {
     const one = 'CREATE TABLE IF NOT EXISTS one_table (id INT);';
     const two = 'CREATE TABLE IF NOT EXISTS two_table (id INT);';

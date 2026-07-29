@@ -4,28 +4,26 @@
 
 API para gestão escolar integrada com sistemas de controle de acesso.
 
-**🟢 VALIDADO E PRONTO PARA PRODUÇÃO**
+**🟠 ALFA EM HOMOLOGAÇÃO — AINDA NÃO DISTRIBUIR**
 
-[![Testes](https://img.shields.io/badge/testes-62%2F62%20aprovados-brightgreen)](./scripts/test-validacao.sh)
-[![Windows](https://img.shields.io/badge/Windows-Compatible-blue)](./INSTALACAO_WINDOWS.md)
-[![Node](https://img.shields.io/badge/Node.js-16%2B-green)](https://nodejs.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-orange)](https://www.mysql.com/)
+[![Node](https://img.shields.io/badge/Node.js-24_LTS-green)](https://nodejs.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.4_LTS-orange)](https://www.mysql.com/)
 
 </div>
 
 ---
 
-## 🎯 Validação Completa
+## 🎯 Estado da homologação
 
-✅ **62/62 testes automatizados passaram (100%)**
+O backend possui suíte automatizada em MySQL 8.4, mas o instalador Windows e o hardware IDBlock
+real ainda são gates abertos. Consulte `docs/planejamento/specs/F8-instalador-alpha-campo.md`.
 
-- ✅ Startup automático do zero
+- ✅ Setup explícito com ledger e falha fechada
 - ✅ Sincronização com catracas ControlID
 - ✅ Geração de QR Code e RFID
 - ✅ Importação de dados em massa (Excel)
-- ✅ Compatibilidade Windows completa
-- ✅ Setup de banco automático
-- ✅ Documentação completa
+- ⚠️ Compatibilidade Windows ainda precisa de prova em VM limpa
+- ⚠️ Release público depende de assinatura e auditoria de dependências
 
 **Ver detalhes**: [VALIDACAO_COMPLETA.md](./VALIDACAO_COMPLETA.md)
 
@@ -41,10 +39,13 @@ npm install
 # DB_PASSWORD=sua_senha_mysql
 # JWT_SECRET=sua_chave_32_caracteres_ou_mais
 
-# 3. Iniciar (cria banco + servidor)
+# 3. Provisionar com a credencial migradora
+npm run setup:db
+
+# 4. Iniciar com a credencial de runtime
 npm start
 
-# 4. Acessar
+# 5. Acessar
 # Swagger: http://localhost:3000/docs
 # Health: http://localhost:3000/health
 ```
@@ -88,9 +89,9 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 ## Stack Tecnológica
 
 ### Backend
-- **Runtime**: Node.js
+- **Runtime**: Node.js 24
 - **Framework**: Express.js
-- **Database**: MySQL 8.0+
+- **Database**: MySQL 8.4
 - **Query Builder**: Knex.js
 - **Autenticação**: bcrypt
 
@@ -114,7 +115,7 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 │   ├── 📄 checklyapi.yml           # OpenAPI/Swagger spec
 │   └── 📄 *.postman_collection.json # Collections organizadas por entidade
 ├── 📁 database/                     # Scripts e Modelagem
-│   ├── 📄 checklydb.sql            # Schema completo do banco
+│   ├── 📄 sage.sql                 # Schema-base do banco
 │   ├── 📄 checkly.dbml             # Modelagem DBML
 │   ├── �️ ChecklyDER.png           # Diagrama ER visual
 │   └── 📄 dados_etec_taboao.sql    # Dados de exemplo
@@ -147,8 +148,8 @@ Sistema completo de gestão escolar desenvolvido para o **Centro de Paula Souza*
 ## Instalação e Configuração
 
 ### Pré-requisitos
-- Node.js 16+ 
-- MySQL 8.0+
+- Node.js 24
+- MySQL 8.4
 - Git
 
 ### 1. Clone o repositório
@@ -162,28 +163,21 @@ cd SGC-API
 npm install
 ```
 
-### 3. Configure o banco de dados
+### 3. Configure o ambiente
 ```bash
-# Execute o script SQL para criar o schema
-mysql -u root -p < database/checklydb.sql
-
-# (Opcional) Carregue dados de exemplo
-mysql -u root -p checkly < database/dados_etec_taboao.sql
+cp .env.example .env
 ```
 
-### 4. Configure as variáveis de ambiente
-Edite `src/config/database.js` com suas credenciais:
-```javascript
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'seu_usuario',
-  password: 'sua_senha',
-  database: 'checkly',
-  // ...
-});
+Preencha no `.env` as credenciais migradoras e execute o setup explícito:
+
+```bash
+npm run setup:db
 ```
 
-### 5. Inicie o servidor
+O serviço em produção deve usar uma conta MySQL separada e restrita. O instalador será
+responsável por materializar essa separação.
+
+### 4. Inicie o servidor
 ```bash
 npm start
 ```
@@ -287,7 +281,8 @@ O projeto implementa um sistema robusto de validações em múltiplas camadas:
 ### Scripts Disponíveis
 ```bash
 npm start          # Inicia servidor com nodemon
-npm run dev        # Alias para start  
+npm run setup:db   # Provisiona ou atualiza o schema antes do start
+npm run dev        # Nodemon sem gate de schema
 npm test          # Executa testes (em desenvolvimento)
 ```
 

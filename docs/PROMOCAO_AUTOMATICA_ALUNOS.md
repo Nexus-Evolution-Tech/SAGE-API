@@ -118,9 +118,10 @@ Substitua `SEU_TOKEN` pelo token obtido no login e `http://localhost:3000` pela 
 
 Depois da reversão, reatribua as turmas aos alunos (reimportar planilha com a coluna Turma correta ou editar manualmente).
 
-## Setup (npm start em máquina zerada)
+## Setup (antes do primeiro start)
 
-A tabela `ConfigSistema` já está em `sage.sql` e `melhorias_sistema.sql`, que rodam automaticamente no `npm start`. Nada a fazer manualmente.
+A tabela `ConfigSistema` já está em `sage.sql` e `melhorias_sistema.sql`. O instalador, ou o
+desenvolvedor com credencial migradora, executa `npm run setup:db` antes de `npm start`.
 
 ## Migrations Adicionais (opcional)
 
