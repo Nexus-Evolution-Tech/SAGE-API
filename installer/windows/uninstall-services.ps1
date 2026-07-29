@@ -1,0 +1,168 @@
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+  throw 'A remoção dos serviços SAGE só pode rodar no Windows'
+}
+$principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  throw 'A remoção dos serviços SAGE exige elevação administrativa'
+}
+
+$programRoot = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
+$configRoot = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE\config'
+$mysqld = Join-Path $programRoot 'runtime\mysql\bin\mysqld.exe'
+$mysqlIni = Join-Path $configRoot 'mysql.ini'
+$winsw = Join-Path $programRoot 'service\SAGE-API.exe'
+$node = Join-Path $programRoot 'runtime\node\node.exe'
+$sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
+$firewallName = 'SAGE-API-LAN'
+
+if (-not (Test-Path -LiteralPath $sc -PathType Leaf)) {
+  throw "Service Controller do Windows ausente: $sc"
+}
+
+function Invoke-NativeChecked {
+  param([string]$File, [string[]]$Arguments)
+  & $File @Arguments | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "$File falhou com exit $LASTEXITCODE" }
+}
+
+function Get-ServiceRecord {
+  param([string]$Name)
+  return Get-CimInstance Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
+}
+
+function Assert-ServiceRecord {
+  param([string]$Name, [string[]]$AllowedPathNames)
+  $record = Get-ServiceRecord $Name
+  if ($null -ne $record -and ($AllowedPathNames -notcontains $record.PathName.Trim() -or
+      $record.StartName -ne 'NT AUTHORITY\LocalService')) {
+    throw "Serviço preexistente divergente; remoção recusada: $Name"
+  }
+}
+
+function Test-ServiceMarkedForDeletion {
+  param($ErrorRecord)
+  $exception = $ErrorRecord.Exception
+  while ($null -ne $exception) {
+    $nativeCode = $exception.PSObject.Properties['NativeErrorCode']
+    if ($null -ne $nativeCode -and $exception.NativeErrorCode -eq 1072) { return $true }
+    $exception = $exception.InnerException
+  }
+  return $false
+}
+
+function Disable-And-StopService {
+  param([string]$Name)
+  $service = Get-Service $Name -ErrorAction SilentlyContinue
+  if ($null -eq $service) { return }
+  try {
+    Set-Service $Name -StartupType Disabled
+    if ($service.Status -ne 'Stopped') {
+      Stop-Service $Name -Force
+      $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+    }
+  } catch {
+    if (-not (Test-ServiceMarkedForDeletion $_)) { throw }
+  }
+}
+
+function Assert-FirewallRuleOwned {
+  param($Rule)
+  $port = @(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $Rule)
+  $address = @(Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $Rule)
+  $application = @(Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $Rule)
+  $security = @(Get-NetFirewallSecurityFilter -AssociatedNetFirewallRule $Rule)
+  if ($Rule.DisplayName -cne 'SAGE API (LAN privada)' -or $Rule.Group -cne 'SAGE' -or
+      $Rule.Enabled.ToString() -cne 'True' -or
+      $Rule.Direction.ToString() -cne 'Inbound' -or $Rule.Action.ToString() -cne 'Allow' -or
+      $Rule.EdgeTraversalPolicy.ToString() -cne 'Block' -or
+      [int]$Rule.Profile -ne 3 -or $port.Count -ne 1 -or
+      $port.Protocol.ToString() -cne 'TCP' -or $port.LocalPort.ToString() -cne '3000' -or
+      $port.RemotePort.ToString() -cne 'Any' -or
+      $address.Count -ne 1 -or @($address.RemoteAddress).Count -ne 1 -or
+      $address.RemoteAddress -cne 'LocalSubnet' -or $application.Count -ne 1 -or
+      $application.Program -cne $node -or $security.Count -ne 1 -or
+      $security.OverrideBlockRules.ToString() -cne 'False') {
+    throw "Regra de firewall divergente; remoção recusada: $firewallName"
+  }
+}
+
+function Remove-ServiceRecord {
+  param([string]$Name)
+  if ($null -eq (Get-ServiceRecord $Name)) { return }
+  & $sc delete $Name | Out-Null
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -notin @(0, 1060, 1072) -and $null -ne (Get-ServiceRecord $Name)) {
+    throw "$sc delete $Name falhou com exit $exitCode"
+  }
+}
+
+$lifecycleMutex = [Threading.Mutex]::new($false, 'Global\SAGE-Service-Lifecycle')
+$lifecycleLockTaken = $false
+try {
+  try { $lifecycleLockTaken = $lifecycleMutex.WaitOne([TimeSpan]::FromSeconds(60)) }
+  catch [Threading.AbandonedMutexException] { $lifecycleLockTaken = $true }
+  if (-not $lifecycleLockTaken) { throw 'Outra operação de serviço SAGE continua em execução' }
+
+$mysqlPaths = @(
+  "`"$mysqld`" --defaults-file=`"$mysqlIni`" SAGEMySQL",
+  "`"$mysqld`" --defaults-file=$mysqlIni SAGEMySQL"
+)
+Assert-ServiceRecord 'SAGEMySQL' $mysqlPaths
+Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw)
+$firewallRules = @(Get-NetFirewallRule -PolicyStore PersistentStore -Name $firewallName `
+  -ErrorAction SilentlyContinue)
+if ($firewallRules.Count -gt 1) { throw "Mais de uma regra local usa o nome: $firewallName" }
+if ($firewallRules.Count -eq 1) { Assert-FirewallRuleOwned $firewallRules[0] }
+
+if ($firewallRules.Count -eq 1) {
+  $firewallRules[0] | Remove-NetFirewallRule
+  if (Get-NetFirewallRule -PolicyStore PersistentStore -Name $firewallName `
+      -ErrorAction SilentlyContinue) {
+    throw "Regra de firewall não foi removida: $firewallName"
+  }
+}
+
+Disable-And-StopService 'SAGEAPI'
+Remove-ServiceRecord 'SAGEAPI'
+
+if (Get-ServiceRecord 'SAGEMySQL') {
+  Invoke-NativeChecked $sc @('failure', 'SAGEMySQL', 'reset=', '0', 'actions=', '')
+  Invoke-NativeChecked $sc @('failureflag', 'SAGEMySQL', '0')
+}
+Disable-And-StopService 'SAGEMySQL'
+Remove-ServiceRecord 'SAGEMySQL'
+
+$programPrefix = $programRoot.TrimEnd('\') + '\'
+$remaining = @(Get-CimInstance Win32_Process | Where-Object {
+  $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
+    $programPrefix, [StringComparison]::OrdinalIgnoreCase
+  )
+})
+foreach ($process in $remaining) { Stop-Process -Id $process.ProcessId -Force }
+
+for ($attempt = 0; $attempt -lt 240; $attempt++) {
+  $remaining = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
+      $programPrefix, [StringComparison]::OrdinalIgnoreCase
+    )
+  })
+  if ($remaining.Count -eq 0 -and -not (Get-ServiceRecord 'SAGEAPI') -and
+      -not (Get-ServiceRecord 'SAGEMySQL')) { break }
+  Start-Sleep -Milliseconds 250
+}
+if ($remaining.Count -ne 0 -or (Get-ServiceRecord 'SAGEAPI') -or
+    (Get-ServiceRecord 'SAGEMySQL')) {
+  throw 'Processo ou serviço SAGE permaneceu após a remoção'
+}
+
+Write-Host 'Serviços e firewall do SAGE removidos; dados escolares preservados.'
+} finally {
+  if ($lifecycleLockTaken) { $lifecycleMutex.ReleaseMutex() }
+  $lifecycleMutex.Dispose()
+}

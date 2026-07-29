@@ -23,6 +23,7 @@ $maintenanceClient = Join-Path $configRoot 'maintenance-client.cnf'
 $winsw = Join-Path $PSScriptRoot 'SAGE-API.exe'
 $winswXml = Join-Path $PSScriptRoot 'SAGE-API.xml'
 $releaseFile = Join-Path $programRoot 'release.json'
+$sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
 
 function Assert-RegularPath {
   param([string]$Path, [bool]$Leaf)
@@ -102,12 +103,20 @@ function Assert-ServiceAbsent {
   if ($found) { throw "Serviço possui acesso indevido: $Path" }
 }
 
+$lifecycleMutex = [Threading.Mutex]::new($false, 'Global\SAGE-Service-Lifecycle')
+$lifecycleLockTaken = $false
+try {
+  try { $lifecycleLockTaken = $lifecycleMutex.WaitOne([TimeSpan]::FromSeconds(60)) }
+  catch [Threading.AbandonedMutexException] { $lifecycleLockTaken = $true }
+  if (-not $lifecycleLockTaken) { throw 'Outra operação de serviço SAGE continua em execução' }
+
 foreach ($directory in @($programRoot, $mysqlRoot, $PSScriptRoot)) {
   Assert-RegularPath $directory $false
 }
 foreach ($file in @($mysqld, $mysqladmin, $winsw, $winswXml, $releaseFile)) {
   Assert-RegularPath $file $true
 }
+Assert-RegularPath $sc $true
 $xml = [xml][IO.File]::ReadAllText($winswXml)
 $release = [IO.File]::ReadAllText($releaseFile) | ConvertFrom-Json
 $expectedArguments = '"%BASE%\..\releases\' + $release.version + '\api\scripts\start-with-setup.js"'
@@ -147,13 +156,13 @@ Assert-ServiceRecord 'SAGEMySQL' $mysqlPathNames
 Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw)
 
 foreach ($name in @('SAGEMySQL', 'SAGEAPI')) {
-  Invoke-NativeChecked 'sc.exe' @('sidtype', $name, 'unrestricted')
+  Invoke-NativeChecked $sc @('sidtype', $name, 'unrestricted')
 }
-Invoke-NativeChecked 'sc.exe' @(
+Invoke-NativeChecked $sc @(
   'failure', 'SAGEMySQL', 'reset=', '3600',
   'actions=', 'restart/5000/restart/30000/restart/120000'
 )
-Invoke-NativeChecked 'sc.exe' @('failureflag', 'SAGEMySQL', '1')
+Invoke-NativeChecked $sc @('failureflag', 'SAGEMySQL', '1')
 if ((Get-Service SAGEAPI).RequiredServices.Name -notcontains 'SAGEMySQL') {
   throw 'SAGEAPI não depende de SAGEMySQL'
 }
@@ -209,8 +218,8 @@ Assert-ServiceAbsent $dataDirectory $apiSid
 Assert-ServiceAccess (Join-Path $configRoot 'sage.env') $apiSid `
   ([Security.AccessControl.FileSystemRights]::Read)
 Assert-ServiceAbsent (Join-Path $configRoot 'sage.env') $mysqlSid
-Invoke-NativeChecked 'sc.exe' @('config', 'SAGEMySQL', 'start=', 'auto')
-Invoke-NativeChecked 'sc.exe' @('config', 'SAGEAPI', 'start=', 'delayed-auto')
+Invoke-NativeChecked $sc @('config', 'SAGEMySQL', 'start=', 'auto')
+Invoke-NativeChecked $sc @('config', 'SAGEAPI', 'start=', 'delayed-auto')
 
 $mysqlService = Get-Service SAGEMySQL
 if ($mysqlService.Status -ne 'Running') { Start-Service SAGEMySQL }
@@ -240,3 +249,7 @@ if ($StartApi) {
 }
 
 Write-Host 'Serviços privados do SAGE provisionados sem exibir segredos.'
+} finally {
+  if ($lifecycleLockTaken) { $lifecycleMutex.ReleaseMutex() }
+  $lifecycleMutex.Dispose()
+}

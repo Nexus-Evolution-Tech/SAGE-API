@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall, agent/f8-uninstall]
 
 permissions:
   contents: read
@@ -73,7 +73,7 @@ jobs:
             test/assemble-windows-layout.test.js test/windows-native-builder-contract.test.js `
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
             test/windows-services-contract.test.js test/windows-firewall-contract.test.js `
-            test/start-with-setup.test.js `
+            test/windows-uninstall-contract.test.js test/start-with-setup.test.js `
             test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
             test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
@@ -350,6 +350,56 @@ jobs:
           foreach ($secret in $secretValues) {
             if (($observed -join "`n").Contains($secret)) { throw 'Segredo apareceu em processo, XML ou log' }
           }
+
+          $sentinels = @(
+            (Join-Path $state 'backups\uninstall-proof.txt'),
+            (Join-Path $state 'uploads\uninstall-proof.txt'),
+            (Join-Path $state 'exports\uninstall-proof.txt')
+          )
+          foreach ($sentinel in $sentinels) {
+            [IO.File]::WriteAllText($sentinel, "preservar-$([guid]::NewGuid().ToString('N'))")
+          }
+          $sentinelHashes = @{}
+          foreach ($sentinel in $sentinels) {
+            $sentinelHashes[$sentinel] = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
+          }
+          & (Join-Path ([Environment]::SystemDirectory) 'sc.exe') delete SAGEAPI | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível simular serviço marcado para exclusão' }
+          & (Join-Path $program 'service\uninstall-services.ps1')
+          if (-not $?) { throw 'Desinstalação dos serviços falhou' }
+          if ((Get-Service SAGEAPI -ErrorAction SilentlyContinue) -or
+              (Get-Service SAGEMySQL -ErrorAction SilentlyContinue)) {
+            throw 'Desinstalação preservou serviço SAGE'
+          }
+          if (Get-NetFirewallRule -PolicyStore PersistentStore -Name SAGE-API-LAN `
+              -ErrorAction SilentlyContinue) { throw 'Desinstalação preservou firewall SAGE' }
+          foreach ($sentinel in $sentinels) {
+            if (-not (Test-Path -LiteralPath $sentinel) -or
+                (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sentinelHashes[$sentinel]) {
+              throw 'Desinstalação alterou dados persistentes'
+            }
+          }
+          foreach ($required in @('config\sage.env', 'mysql\data', 'logs', 'backups', 'uploads', 'exports')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $state $required))) {
+              throw "Desinstalação removeu estado obrigatório: $required"
+            }
+          }
+          Rename-Item -LiteralPath (Join-Path $program 'service\SAGE-API.exe') `
+            -NewName 'SAGE-API.exe.removed'
+          Rename-Item -LiteralPath (Join-Path $program 'runtime\mysql\bin\mysqld.exe') `
+            -NewName 'mysqld.exe.removed'
+          & (Join-Path $program 'service\uninstall-services.ps1')
+          if (-not $?) { throw 'Segunda desinstalação sem binários não foi idempotente' }
+          New-NetFirewallRule -PolicyStore PersistentStore -Name SAGE-API-LAN `
+            -DisplayName 'Regra alheia' -Direction Outbound -Action Block | Out-Null
+          $refusedForeignRule = $false
+          try { & (Join-Path $program 'service\uninstall-services.ps1') }
+          catch { $refusedForeignRule = $true }
+          if (-not $refusedForeignRule -or -not (Get-NetFirewallRule -PolicyStore PersistentStore `
+              -Name SAGE-API-LAN -ErrorAction SilentlyContinue)) {
+            throw 'Desinstalação não preservou regra de firewall divergente'
+          }
+          Get-NetFirewallRule -PolicyStore PersistentStore -Name SAGE-API-LAN | Remove-NetFirewallRule
 
       - name: Descartar serviços do smoke
         if: always()

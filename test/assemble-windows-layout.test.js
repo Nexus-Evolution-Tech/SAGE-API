@@ -28,6 +28,7 @@ async function fixture() {
   await write(api, 'installer/windows/initialize-mysql.ps1');
   await write(api, 'installer/windows/configure-firewall.ps1');
   await write(api, 'installer/windows/provision-services.ps1');
+  await write(api, 'installer/windows/uninstall-services.ps1');
   await write(api, 'installer/windows/SAGE-API.xml.template', [
     '<service>', '<id>SAGEAPI</id>', '<depend>SAGEMySQL</depend>',
     '<arguments>__SAGE_VERSION__</arguments>', '</service>'
@@ -111,6 +112,7 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('service/initialize-mysql.ps1');
     expect(files).toContain('service/configure-firewall.ps1');
     expect(files).toContain('service/provision-services.ps1');
+    expect(files).toContain('service/uninstall-services.ps1');
     expect(files).toContain('releases/1.2.3/api/node_modules/bcrypt/index.js');
     expect(files).toContain('releases/1.2.3/web/index.html');
     const serviceXml = await fs.readFile(path.join(input.destination, 'service', 'SAGE-API.xml'), 'utf8');

@@ -56,6 +56,14 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain("Stop-Process -Id $nodeBefore.ProcessId -Force");
     expect(source).toContain("Stop-Process -Id $mysqlProcess.ProcessId -Force");
     expect(source).toContain('Segredo apareceu em processo, XML ou log');
+    expect(source).toContain("service\\uninstall-services.ps1");
+    expect(source).toContain('Desinstalação alterou dados persistentes');
+    expect(source).toContain('Desinstalação preservou firewall SAGE');
+    expect(source).toContain('Não foi possível simular serviço marcado para exclusão');
+    expect(source).toContain('Segunda desinstalação sem binários não foi idempotente');
+    expect(source).toContain("-NewName 'SAGE-API.exe.removed'");
+    expect(source).toContain("-NewName 'mysqld.exe.removed'");
+    expect(source).toContain('Desinstalação não preservou regra de firewall divergente');
     expect(source).toContain('Descartar serviços do smoke');
     expect(source.match(/for \(\$attempt = 0; \$attempt -lt 20/g)).toHaveLength(3);
     expect(source).toContain('Processo residual do SAGE não encerrou');

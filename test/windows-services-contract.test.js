@@ -55,4 +55,10 @@ describe('serviços Windows privados do SAGE', () => {
     expect(script).toContain('Assert-ServiceAbsent $dataDirectory $apiSid');
     expect(script).toContain("Assert-ServiceAbsent (Join-Path $configRoot 'sage.env') $mysqlSid");
   });
+  it('serializa mudanças no SCM e usa o controlador absoluto do Windows', () => {
+    expect(script).toContain("'Global\\SAGE-Service-Lifecycle'");
+    expect(script).toContain('WaitOne([TimeSpan]::FromSeconds(60))');
+    expect(script).toContain("[Environment]::SystemDirectory) 'sc.exe'");
+    expect(script).not.toContain("Invoke-NativeChecked 'sc.exe'");
+  });
 });
