@@ -96,16 +96,23 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
     await connection.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       version VARCHAR(4) NOT NULL PRIMARY KEY,
       checksum CHAR(64) NOT NULL,
-      applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+      status ENUM('in_progress', 'applied', 'failed') NOT NULL,
+      applied_at DATETIME(6) NULL DEFAULT NULL,
       app_version VARCHAR(255) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
     const ledgerRows = rowsOf(await connection.query(
-      'SELECT version, checksum FROM schema_migrations ORDER BY version'
+      'SELECT version, checksum, status FROM schema_migrations ORDER BY version'
     ));
     const localByVersion = new Map(migrations.map((migration) => [migration.version, migration]));
     const applied = new Map((ledgerRows || []).map((row) => [row.version, row]));
 
     for (const row of applied.values()) {
+      if (row.status !== 'applied') {
+        throw new MigrationError(
+          `Migration ${row.version} está em estado ${row.status}; intervenção manual obrigatória`,
+          'MIGRATION_REQUIRES_INTERVENTION'
+        );
+      }
       const local = localByVersion.get(row.version);
       if (!local) {
         throw new MigrationError(`Ledger contém versão sem arquivo local: ${row.version}`, 'MISSING_LOCAL_FILE');
@@ -129,12 +136,35 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
     const executed = [];
     for (const migration of migrations) {
       if (applied.has(migration.version)) continue;
-      // DDL e marcador não formam uma transação: SQL deve ser idempotente para permitir retry.
-      await connection.query(migration.sql);
-      await connection.query(
-        'INSERT INTO schema_migrations (version, checksum, app_version) VALUES (?, ?, ?)',
-        [migration.version, migration.checksum, appVersion]
-      );
+      let inProgress = false;
+      try {
+        await connection.query(
+          'INSERT INTO schema_migrations (version, checksum, app_version, status) VALUES (?, ?, ?, ?)',
+          [migration.version, migration.checksum, appVersion, 'in_progress']
+        );
+        inProgress = true;
+        await connection.query(migration.sql);
+        const statusResult = rowsOf(await connection.query(
+          `UPDATE schema_migrations SET status = 'applied', applied_at = CURRENT_TIMESTAMP(6)
+            WHERE version = ? AND status = 'in_progress'`,
+          [migration.version]
+        ));
+        if (Number(statusResult?.affectedRows) !== 1) {
+          throw new MigrationError(
+            `Não foi possível concluir o estado da migration ${migration.version}`,
+            'MIGRATION_STATUS_UPDATE_FAILED'
+          );
+        }
+      } catch (error) {
+        if (inProgress) {
+          await connection.query(
+            `UPDATE schema_migrations SET status = 'failed'
+              WHERE version = ? AND status = 'in_progress'`,
+            [migration.version]
+          ).catch(() => {});
+        }
+        throw error;
+      }
       executed.push(migration.version);
     }
     return { applied: executed, discovered: migrations.map(({ version }) => version) };

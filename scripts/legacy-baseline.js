@@ -113,11 +113,12 @@ async function ensureLegacyBaseline({
     await connection.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       version VARCHAR(4) NOT NULL PRIMARY KEY,
       checksum CHAR(64) NOT NULL,
-      applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+      status ENUM('in_progress', 'applied', 'failed') NOT NULL,
+      applied_at DATETIME(6) NULL,
       app_version VARCHAR(255) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
     const ledger = rowsOf(await connection.query(
-      'SELECT version, checksum FROM schema_migrations ORDER BY version'
+      'SELECT version, checksum, status FROM schema_migrations ORDER BY version'
     )) || [];
     const checkpoint = ledger.find(({ version }) => version === BASELINE_VERSION);
 
@@ -131,6 +132,12 @@ async function ensureLegacyBaseline({
       if (checkpoint.checksum !== baseline.checksum) {
         throw new MigrationError('Checksum divergente no baseline 0000', 'CHECKSUM_DRIFT');
       }
+      if (checkpoint.status !== 'applied') {
+        throw new MigrationError(
+          `Baseline 0000 requer intervenção: ${checkpoint.status}`,
+          'MIGRATION_REQUIRES_INTERVENTION'
+        );
+      }
       await verifyBaselineReadiness(connection, checkSchema);
       return { adopted: false };
     }
@@ -139,7 +146,9 @@ async function ensureLegacyBaseline({
     await normalizeLegacy(connection);
     await verifyBaselineReadiness(connection, checkSchema);
     await connection.query(
-      'INSERT INTO schema_migrations (version, checksum, app_version) VALUES (?, ?, ?)',
+      `INSERT INTO schema_migrations
+        (version, checksum, status, applied_at, app_version)
+       VALUES (?, ?, 'applied', CURRENT_TIMESTAMP(6), ?)`,
       [BASELINE_VERSION, baseline.checksum, appVersion]
     );
     return { adopted: true };

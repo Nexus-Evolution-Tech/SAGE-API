@@ -33,7 +33,7 @@ function connection({ ledger = [], duplicates = [], schemaOk = true, tablesOk = 
         return [tablesOk ? BASELINE_REQUIRED_TABLES.map((TABLE_NAME) => ({ TABLE_NAME })) : []];
       }
       if (sql.startsWith('INSERT INTO schema_migrations')) {
-        ledger.push({ version: params[0], checksum: params[1] });
+        ledger.push({ version: params[0], checksum: params[1], status: 'applied' });
       }
       return [[]];
     }
@@ -61,7 +61,9 @@ describe('baseline legado 0000', () => {
 
   it('nunca normaliza novamente quando 0000 já está marcado', async () => {
     const checkpoint = await readBaseline();
-    const db = connection({ ledger: [{ version: BASELINE_VERSION, checksum: checkpoint.checksum }] });
+    const db = connection({
+      ledger: [{ version: BASELINE_VERSION, checksum: checkpoint.checksum, status: 'applied' }]
+    });
     const normalizeLegacy = vi.fn();
 
     await expect(ensureLegacyBaseline({ connection: db, appVersion: '8.0.0', normalizeLegacy }))
@@ -70,11 +72,20 @@ describe('baseline legado 0000', () => {
   });
 
   it('rejeita migrations sem baseline e não normaliza um estado parcialmente versionado', async () => {
-    const db = connection({ ledger: [{ version: '0001', checksum: 'a'.repeat(64) }] });
+    const db = connection({
+      ledger: [{ version: '0001', checksum: 'a'.repeat(64), status: 'applied' }]
+    });
+    const checkpoint = await readBaseline();
+    const interrupted = connection({
+      ledger: [{ version: BASELINE_VERSION, checksum: checkpoint.checksum, status: 'in_progress' }]
+    });
     const normalizeLegacy = vi.fn();
 
     await expect(ensureLegacyBaseline({ connection: db, appVersion: '8.0.0', normalizeLegacy }))
       .rejects.toMatchObject({ code: 'BASELINE_MISSING_WITH_APPLIED_MIGRATIONS' });
+    await expect(ensureLegacyBaseline({
+      connection: interrupted, appVersion: '8.0.0', normalizeLegacy
+    })).rejects.toMatchObject({ code: 'MIGRATION_REQUIRES_INTERVENTION' });
     expect(normalizeLegacy).not.toHaveBeenCalled();
   });
 

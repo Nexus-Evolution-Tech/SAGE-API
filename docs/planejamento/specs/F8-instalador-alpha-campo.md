@@ -107,11 +107,17 @@ revisão de segurança documentar o risco residual.
 ### 3.7 Banco e update
 
 - O processo normal não usa `root`.
-- Migrations possuem versão, ordem e checksum em `schema_migrations`.
+- Migrations possuem versão, ordem, checksum e estado (`in_progress`, `applied`, `failed`) em
+  `schema_migrations`.
+- O runner grava `in_progress` antes do SQL, `applied` somente depois da conclusão e `failed` quando
+  captura erro. Encontrar `in_progress` ou `failed` na partida interrompe o update e exige
+  intervenção; DDL parcialmente aplicado não é reexecutado às cegas.
 - Migration roda antes de ativar o release.
 - Falha de migration impede a troca de versão.
 - Migration de produção é para frente; rollback volta o código, não desfaz dados destrutivamente.
 - A credencial privilegiada de instalação/backup não é a mesma credencial do runtime.
+- Backup verificado e sua associação ao update pertencem ao fluxo F8.6; instalação limpa não exige
+  backup de um banco ainda inexistente.
 
 ### 3.8 Readiness e diagnóstico
 

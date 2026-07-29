@@ -19,7 +19,7 @@ const checksum = (sql) => crypto.createHash('sha256').update(sql).digest('hex');
 
 function db({
   ledger = [], insertError, shared, onMigrationSql, schema = 'sage_test',
-  releaseResult = 1, releaseError
+  releaseResult = 1, releaseError, migrationError, statusUpdateResult = 1
 } = {}) {
   const calls = [];
   return {
@@ -38,7 +38,21 @@ function db({
       }
       if (sql.startsWith('SELECT version')) return [ledger];
       if (sql.startsWith('CREATE TABLE IF NOT EXISTS retry_table')) await onMigrationSql?.();
-      if (sql.startsWith('INSERT')) { if (insertError) throw insertError; ledger.push({ version: params[0], checksum: params[1] }); }
+      if (sql.startsWith('INSERT')) {
+        if (insertError) throw insertError;
+        ledger.push({ version: params[0], checksum: params[1], status: params[3] });
+      }
+      if (sql.startsWith('UPDATE schema_migrations SET status = \'applied\'')) {
+        if (statusUpdateResult === 1) {
+          ledger.find(({ version }) => version === params[0]).status = 'applied';
+        }
+        return [{ affectedRows: statusUpdateResult }];
+      }
+      if (sql.startsWith('UPDATE schema_migrations SET status = \'failed\'')) {
+        ledger.find(({ version }) => version === params[0]).status = 'failed';
+        return [{ affectedRows: 1 }];
+      }
+      if (migrationError && sql === migrationError.sql) throw migrationError.error;
       return [[]];
     }
   };
@@ -47,25 +61,27 @@ function db({
 afterEach(async () => Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true }))));
 
 describe('runner de migrations versionadas', () => {
-  it('executa pendentes em ordem e grava o ledger após cada SQL', async () => {
+  it('marca in_progress antes do SQL e applied após cada migration pendente', async () => {
     const one = 'CREATE TABLE IF NOT EXISTS one_table (id INT);';
     const two = 'CREATE TABLE IF NOT EXISTS two_table (id INT);';
     const connection = db();
     const result = await runMigrations({ connection, appVersion: '8.1.0', migrationsDir: await migrations({ '0002_two.sql': two, '0001_one.sql': one, 'nota.txt': 'ignorada' }) });
     expect(result.applied).toEqual(['0001', '0002']);
     expect(connection.calls.filter(([sql]) => sql.startsWith('INSERT')).map(([, params]) => params)).toEqual([
-      ['0001', checksum(one), '8.1.0'], ['0002', checksum(two), '8.1.0']
+      ['0001', checksum(one), '8.1.0', 'in_progress'], ['0002', checksum(two), '8.1.0', 'in_progress']
     ]);
     const sqlCalls = connection.calls.map(([sql]) => sql);
-    expect(sqlCalls.indexOf(one)).toBeLessThan(sqlCalls.findIndex((sql) => sql.startsWith('INSERT')));
+    expect(sqlCalls.findIndex((sql) => sql.startsWith('INSERT'))).toBeLessThan(sqlCalls.indexOf(one));
+    expect(connection.calls.filter(([sql]) => sql.startsWith('UPDATE schema_migrations SET status = \'applied\''))).toHaveLength(2);
+    expect(connection.calls.filter(([sql]) => sql.startsWith('ALTER TABLE schema_migrations'))).toHaveLength(0);
   });
 
   it('rejeita drift, ledger futuro e identificadores locais duplicados', async () => {
     const dir = await migrations({ '0001_alpha.sql': 'SELECT 1;', '0001_beta.sql': 'SELECT 2;' });
     await expect(runMigrations({ connection: db(), appVersion: 'x', migrationsDir: dir })).rejects.toMatchObject({ code: 'DUPLICATE_VERSION' });
     const valid = await migrations({ '0001_alpha.sql': 'SELECT 1;' });
-    await expect(runMigrations({ connection: db({ ledger: [{ version: '0001', checksum: '0'.repeat(64) }] }), appVersion: 'x', migrationsDir: valid })).rejects.toMatchObject({ code: 'CHECKSUM_DRIFT' });
-    await expect(runMigrations({ connection: db({ ledger: [{ version: '9999', checksum: '0'.repeat(64) }] }), appVersion: 'x', migrationsDir: valid })).rejects.toMatchObject({ code: 'MISSING_LOCAL_FILE' });
+    await expect(runMigrations({ connection: db({ ledger: [{ version: '0001', checksum: '0'.repeat(64), status: 'applied' }] }), appVersion: 'x', migrationsDir: valid })).rejects.toMatchObject({ code: 'CHECKSUM_DRIFT' });
+    await expect(runMigrations({ connection: db({ ledger: [{ version: '9999', checksum: '0'.repeat(64), status: 'applied' }] }), appVersion: 'x', migrationsDir: valid })).rejects.toMatchObject({ code: 'MISSING_LOCAL_FILE' });
     const duplicateName = await migrations({ '0001_alpha.sql': 'SELECT 1;', '0002_alpha.sql': 'SELECT 2;' });
     await expect(runMigrations({ connection: db(), appVersion: 'x', migrationsDir: duplicateName })).rejects.toMatchObject({ code: 'DUPLICATE_NAME' });
     const invalidName = await migrations({ 'sem-versao.sql': 'SELECT 1;' });
@@ -86,7 +102,7 @@ describe('runner de migrations versionadas', () => {
     await expect(runMigrations({
       connection: { query() {}, getConnection() {} }, appVersion: 'x', migrationsDir: dir
     })).rejects.toThrow('connection deve ser dedicada');
-    const connection = db({ ledger: [{ version: '0001', checksum: 'bad' }] });
+    const connection = db({ ledger: [{ version: '0001', checksum: 'bad', status: 'applied' }] });
     await expect(runMigrations({ connection, appVersion: 'x', migrationsDir: dir })).rejects.toBeInstanceOf(MigrationError);
     expect(connection.calls.some(([sql, params]) => (
       sql.includes('RELEASE_LOCK') && params[0] === lockNameForSchema('sage_test')
@@ -95,7 +111,7 @@ describe('runner de migrations versionadas', () => {
       connection: db({ releaseResult: 0 }), appVersion: 'x', migrationsDir: dir
     })).rejects.toMatchObject({ code: 'LOCK_RELEASE_FAILED' });
     await expect(runMigrations({
-      connection: db({ ledger: [{ version: '0001', checksum: 'bad' }], releaseError: new Error('release') }),
+      connection: db({ ledger: [{ version: '0001', checksum: 'bad', status: 'applied' }], releaseError: new Error('release') }),
       appVersion: 'x', migrationsDir: dir
     })).rejects.toMatchObject({ code: 'CHECKSUM_DRIFT' });
   });
@@ -112,24 +128,42 @@ describe('runner de migrations versionadas', () => {
     await first;
   });
 
-  it('repete SQL idempotente se cair entre DDL e marcador', async () => {
+  it('marca erro como failed e nunca reexecuta migration interrompida', async () => {
     const sql = 'CREATE TABLE IF NOT EXISTS retry_table (id INT);';
     const dir = await migrations({ '0001_retry.sql': sql });
     const ledger = [];
-    const first = db({ ledger, insertError: new Error('marker indisponível') });
-    await expect(runMigrations({ connection: first, appVersion: 'x', migrationsDir: dir })).rejects.toThrow('marker indisponível');
+    const first = db({ ledger, migrationError: { sql, error: new Error('ddl interrompido') } });
+    await expect(runMigrations({ connection: first, appVersion: 'x', migrationsDir: dir })).rejects.toThrow('ddl interrompido');
+    expect(ledger).toEqual([{ version: '0001', checksum: checksum(sql), status: 'failed' }]);
     const retry = db({ ledger });
-    await runMigrations({ connection: retry, appVersion: 'x', migrationsDir: dir });
+    await expect(runMigrations({ connection: retry, appVersion: 'x', migrationsDir: dir }))
+      .rejects.toMatchObject({ code: 'MIGRATION_REQUIRES_INTERVENTION' });
     expect(first.calls.filter(([query]) => query === sql)).toHaveLength(1);
-    expect(retry.calls.filter(([query]) => query === sql)).toHaveLength(1);
+    expect(retry.calls.filter(([query]) => query === sql)).toHaveLength(0);
     expect(ledger).toHaveLength(1);
+  });
+
+  it('bloqueia estado in_progress deixado por queda antes de executar SQL', async () => {
+    const sql = 'SELECT 1;';
+    const connection = db({ ledger: [{ version: '0001', checksum: checksum(sql), status: 'in_progress' }] });
+    await expect(runMigrations({ connection, appVersion: 'x', migrationsDir: await migrations({ '0001_alpha.sql': sql }) }))
+      .rejects.toMatchObject({ code: 'MIGRATION_REQUIRES_INTERVENTION' });
+    expect(connection.calls.some(([query]) => query === sql)).toBe(false);
+  });
+
+  it('falha fechado se não conseguir concluir o estado applied', async () => {
+    const sql = 'SELECT 1;';
+    const connection = db({ statusUpdateResult: 0 });
+    await expect(runMigrations({
+      connection, appVersion: 'x', migrationsDir: await migrations({ '0001_alpha.sql': sql })
+    })).rejects.toMatchObject({ code: 'MIGRATION_STATUS_UPDATE_FAILED' });
   });
 
   it('falha se uma versão posterior estiver aplicada antes de uma pendente', async () => {
     const one = 'SELECT 1;';
     const two = 'SELECT 2;';
     const dir = await migrations({ '0001_one.sql': one, '0002_two.sql': two });
-    const connection = db({ ledger: [{ version: '0002', checksum: checksum(two) }] });
+    const connection = db({ ledger: [{ version: '0002', checksum: checksum(two), status: 'applied' }] });
 
     await expect(runMigrations({
       connection,
