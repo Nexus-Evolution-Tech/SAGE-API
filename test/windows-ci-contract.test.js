@@ -17,7 +17,7 @@ describe('CI do layout Windows nativo', () => {
   });
 
   it('pina actions, restringe permissão e revalida cache antes do uso', () => {
-    expect(source).toContain('permissions:\n  contents: read');
+    expect(source).toMatch(/permissions:\r?\n  contents: read/);
     const actions = [...source.matchAll(/uses: actions\/[a-z-]+@([^\s]+)/g)].map((match) => match[1]);
     expect(actions.length).toBeGreaterThanOrEqual(4);
     expect(actions.every((ref) => /^[a-f0-9]{40}$/.test(ref))).toBe(true);
