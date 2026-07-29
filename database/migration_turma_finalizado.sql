@@ -1,8 +1,7 @@
 -- Migration: Turma "Finalizado" por unidade
 -- Alunos que concluem o curso (não há próxima série) são movidos para esta turma.
 -- Execute: mysql -u user -p sage < migration_turma_finalizado.sql
-
-USE sage;
+-- Não selecione um schema fixo: o instalador já conecta no DB_NAME escolhido.
 
 -- Cria turma "Finalizado" para cada unidade que ainda não possui
 INSERT INTO Turma (nome, turno, curso_id, unidade_id)

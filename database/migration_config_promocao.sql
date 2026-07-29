@@ -1,7 +1,6 @@
 -- Migration: Tabela de configuração para promoção (OPCIONAL)
 -- Já incluída em sage.sql e melhorias_sistema.sql - rode apenas se precisar reparar manualmente.
-
-USE sage;
+-- Não selecione um schema fixo: o instalador já conecta no DB_NAME escolhido.
 
 CREATE TABLE IF NOT EXISTS ConfigSistema (
   chave VARCHAR(100) PRIMARY KEY,
