@@ -34,4 +34,14 @@ describe('CI do layout Windows nativo', () => {
     expect(source).not.toMatch(/upload-artifact|gh release|softprops\/action-gh-release/i);
     expect(source).toContain('Descartar protótipo');
   });
+
+  it('prova bootstrap e segundo boot MySQL sem persistir root no runner', () => {
+    expect(source).toContain('Provar bootstrap privado do MySQL');
+    expect(source).toContain("service\\initialize-mysql.ps1");
+    expect(source).toContain('--install-manual SAGE-MySQL-Smoke');
+    expect(source).toContain('Segundo bootstrap MySQL não foi idempotente');
+    expect(source).toContain('Descartar estado do smoke MySQL');
+    expect(source).toContain("'mysql-bootstrap-client.cnf'");
+    expect(source).toContain('credencial root após sucesso');
+  });
 });

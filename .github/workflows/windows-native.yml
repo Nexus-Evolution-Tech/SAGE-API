@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap]
 
 permissions:
   contents: read
@@ -71,7 +71,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'npm ci da API falhou' }
           npx vitest run test/windows-artifacts.test.js test/fetch-windows-artifacts.test.js `
             test/assemble-windows-layout.test.js test/windows-native-builder-contract.test.js `
-            test/windows-initialize-state-contract.test.js test/backup-maintenance-credential.test.js
+            test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
+            test/backup-maintenance-credential.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
           npm audit --omit=dev --audit-level=high
           if ($LASTEXITCODE -ne 0) { throw 'Audit de produção da API falhou' }
@@ -118,6 +119,61 @@ jobs:
               "require('bcrypt').hash('windows-smoke',4).then(()=>process.exit(0)).catch(()=>process.exit(1))"
             if ($LASTEXITCODE -ne 0) { throw 'bcrypt Windows do layout não carregou' }
           } finally { Pop-Location }
+
+      - name: Provar bootstrap privado do MySQL
+        shell: powershell
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
+          $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
+          if (Test-Path -LiteralPath $state) { throw 'Runner não está limpo para o smoke MySQL' }
+          & (Join-Path $output 'service\initialize-mysql.ps1')
+          if ($LASTEXITCODE -ne 0) { throw 'Bootstrap MySQL falhou' }
+          $config = Join-Path $state 'config'
+          if (-not (Test-Path -LiteralPath (Join-Path $config 'mysql-accounts.ready'))) {
+            throw 'Bootstrap MySQL não promoveu o marcador'
+          }
+          if (Test-Path -LiteralPath (Join-Path $config 'mysql-bootstrap-client.cnf')) {
+            throw 'Bootstrap MySQL preservou credencial root após sucesso'
+          }
+
+          $myIni = Join-Path $config 'mysql-smoke.ini'
+          $mysqlRoot = Join-Path $output 'runtime\mysql'
+          $data = (Join-Path $state 'mysql\data').Replace('\', '/')
+          $base = $mysqlRoot.Replace('\', '/')
+          [IO.File]::WriteAllLines($myIni, @(
+            '[mysqld]', "basedir=$base", "datadir=$data", 'port=3307',
+            'bind-address=127.0.0.1', 'skip-name-resolve'
+          ), [Text.UTF8Encoding]::new($false))
+          $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'
+          & $mysqld --install-manual SAGE-MySQL-Smoke "--defaults-file=$myIni"
+          if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não instalou' }
+          Start-Service SAGE-MySQL-Smoke
+          $admin = Join-Path $mysqlRoot 'bin\mysqladmin.exe'
+          $maintenance = Join-Path $config 'maintenance-client.cnf'
+          for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            & $admin "--defaults-extra-file=$maintenance" ping --silent 2>$null
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não ficou pronto' }
+          & (Join-Path $output 'service\initialize-mysql.ps1')
+          if ($LASTEXITCODE -ne 0) { throw 'Segundo bootstrap MySQL não foi idempotente' }
+          Stop-Service SAGE-MySQL-Smoke
+          & $mysqld --remove SAGE-MySQL-Smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não foi removido' }
+
+      - name: Descartar estado do smoke MySQL
+        if: always()
+        shell: powershell
+        run: |
+          $service = Get-Service SAGE-MySQL-Smoke -ErrorAction SilentlyContinue
+          if ($null -ne $service) {
+            if ($service.Status -ne 'Stopped') { Stop-Service SAGE-MySQL-Smoke -Force }
+            $mysqld = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
+            if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGE-MySQL-Smoke }
+          }
+          $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
+          if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
 
       - name: Descartar protótipo
         if: always()
