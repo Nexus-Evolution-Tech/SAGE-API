@@ -114,7 +114,7 @@ async function assembleWindowsLayout({
       await extractArchive(path.join(inputs.artifacts, item.fileName), extracted);
       const runtime = path.join(extracted, item.fileName.replace(/\.zip$/i, ''));
       await regularFile(path.join(runtime, id === 'node' ? 'node.exe' : 'bin/mysqld.exe'), `${id} Windows`);
-      await copyEntry(runtime, path.join(staging, 'runtime', id));
+      await copyEntry(runtime, path.join(staging, 'runtime', id), { trustedArtifact: true });
     }
     await copyEntry(path.join(inputs.artifacts, artifact('winsw').fileName), path.join(staging, 'service', 'SAGE-API.exe'));
     const releaseDir = path.join(staging, 'releases', pkg.version);

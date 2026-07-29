@@ -56,7 +56,10 @@ async function fixture() {
   const artifactManifestPath = path.join(root, 'artifacts.json');
   await write(root, 'artifacts.json', JSON.stringify({ schemaVersion: 1, target: 'win32-x64', artifacts }));
   const extractArchive = async (archive, destination) => {
-    if (path.basename(archive) === 'node-fake.zip') await write(destination, 'node-fake/node.exe');
+    if (path.basename(archive) === 'node-fake.zip') {
+      await write(destination, 'node-fake/node.exe');
+      await write(destination, 'node-fake/node_modules/npm/.npmrc', 'upstream config');
+    }
     if (path.basename(archive) === 'mysql-fake.zip') await write(destination, 'mysql-fake/bin/mysqld.exe');
   };
   return { root, apiSourceRoot: api, webBuildDir: web, artifactCache, artifactManifestPath,
@@ -92,6 +95,7 @@ describe('layout reproduzível da release Windows', () => {
     });
     const files = release.files.map((entry) => entry.path);
     expect(files).toContain('runtime/node/node.exe');
+    expect(files).toContain('runtime/node/node_modules/npm/.npmrc');
     expect(files).toContain('runtime/mysql/bin/mysqld.exe');
     expect(files).toContain('service/SAGE-API.exe');
     expect(files).toContain('releases/1.2.3/api/node_modules/bcrypt/index.js');

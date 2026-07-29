@@ -56,20 +56,20 @@ function isInside(base, target) {
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
-async function copyEntry(source, destination) {
+async function copyEntry(source, destination, { trustedArtifact = false } = {}) {
   const stat = await fsp.lstat(source);
   if (stat.isSymbolicLink()) throw new Error(`Link simbólico recusado: ${source}`);
   if (stat.isDirectory()) {
     const entries = (await fsp.readdir(source)).sort();
     await fsp.mkdir(destination, { recursive: true });
     for (const entry of entries) {
-      await copyEntry(path.join(source, entry), path.join(destination, entry));
+      await copyEntry(path.join(source, entry), path.join(destination, entry), { trustedArtifact });
     }
     return;
   }
   if (!stat.isFile()) throw new Error(`Entrada não regular recusada: ${source}`);
-  if (/^(?:\.npmrc|\.env(?:\..*)?)$/i.test(path.basename(source))
-    || /\.(?:key|pem|pfx|p12)$/i.test(source)) {
+  if (!trustedArtifact && (/^(?:\.npmrc|\.env(?:\..*)?)$/i.test(path.basename(source))
+    || /\.(?:key|pem|pfx|p12)$/i.test(source))) {
     throw new Error(`Configuração secreta recusada: ${source}`);
   }
   await fsp.mkdir(path.dirname(destination), { recursive: true });
