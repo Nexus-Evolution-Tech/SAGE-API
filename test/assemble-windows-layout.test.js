@@ -24,6 +24,8 @@ async function fixture() {
   await write(api, 'package-lock.json', '{}');
   await write(api, 'database/migration_alpha.sql');
   await write(api, 'database/migrations/0001_alpha.sql', 'SELECT 1;');
+  await write(api, 'installer/windows/initialize-state.ps1');
+  await write(api, 'installer/windows/initialize-mysql.ps1');
   await write(api, 'node_modules/.package-lock.json', '{}');
   await write(api, 'node_modules/bcrypt/index.js');
   const web = path.join(root, 'web');
@@ -98,6 +100,8 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('runtime/node/node_modules/npm/.npmrc');
     expect(files).toContain('runtime/mysql/bin/mysqld.exe');
     expect(files).toContain('service/SAGE-API.exe');
+    expect(files).toContain('service/initialize-state.ps1');
+    expect(files).toContain('service/initialize-mysql.ps1');
     expect(files).toContain('releases/1.2.3/api/node_modules/bcrypt/index.js');
     expect(files).toContain('releases/1.2.3/web/index.html');
     expect(release.files.every(({ sha256 }) => /^[a-f0-9]{64}$/.test(sha256))).toBe(true);

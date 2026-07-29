@@ -117,6 +117,9 @@ async function assembleWindowsLayout({
       await copyEntry(runtime, path.join(staging, 'runtime', id), { trustedArtifact: true });
     }
     await copyEntry(path.join(inputs.artifacts, artifact('winsw').fileName), path.join(staging, 'service', 'SAGE-API.exe'));
+    for (const script of ['initialize-state.ps1', 'initialize-mysql.ps1']) {
+      await copyEntry(path.join(inputs.api, 'installer', 'windows', script), path.join(staging, 'service', script));
+    }
     const releaseDir = path.join(staging, 'releases', pkg.version);
     await fsp.mkdir(releaseDir, { recursive: true });
     await assembleApiPayload(inputs.api, path.join(releaseDir, 'api'));
