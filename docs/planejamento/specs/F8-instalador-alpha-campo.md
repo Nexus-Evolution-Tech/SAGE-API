@@ -112,6 +112,8 @@ revisão de segurança documentar o risco residual.
 - O runner grava `in_progress` antes do SQL, `applied` somente depois da conclusão e `failed` quando
   captura erro. Encontrar `in_progress` ou `failed` na partida interrompe o update e exige
   intervenção; DDL parcialmente aplicado não é reexecutado às cegas.
+- Antes de registrar `failed`, o runner tenta `ROLLBACK`; migration que retorna deixando transação
+  aberta é rejeitada e desfeita.
 - Migration roda antes de ativar o release.
 - Falha de migration impede a troca de versão.
 - Migration de produção é para frente; rollback volta o código, não desfaz dados destrutivamente.

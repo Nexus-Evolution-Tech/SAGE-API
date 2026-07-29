@@ -1,7 +1,9 @@
 const crypto = require('crypto');
 const fs = require('fs/promises');
+const mysql = require('mysql2/promise');
 const os = require('os');
 const path = require('path');
+const { configConexao, criarBancoDeTeste, temBancoDisponivel } = require('./helpers/banco');
 const {
   MigrationError,
   lockNameForSchema,
@@ -19,7 +21,8 @@ const checksum = (sql) => crypto.createHash('sha256').update(sql).digest('hex');
 
 function db({
   ledger = [], insertError, shared, onMigrationSql, schema = 'sage_test',
-  releaseResult = 1, releaseError, migrationError, statusUpdateResult = 1
+  releaseResult = 1, releaseError, migrationError, statusUpdateResult = 1,
+  rollbackError, failedStatusUpdateResult = 1, transactionState = 0
 } = {}) {
   const calls = [];
   return {
@@ -36,6 +39,13 @@ function db({
         if (shared) shared.locked = false;
         return [[{ released: releaseResult }]];
       }
+      if (sql === 'ROLLBACK') {
+        if (rollbackError) throw rollbackError;
+        return [[]];
+      }
+      if (sql === 'DO 0') {
+        return [{ serverStatus: transactionState ? 1 : 2 }];
+      }
       if (sql.startsWith('SELECT version')) return [ledger];
       if (sql.startsWith('CREATE TABLE IF NOT EXISTS retry_table')) await onMigrationSql?.();
       if (sql.startsWith('INSERT')) {
@@ -49,8 +59,10 @@ function db({
         return [{ affectedRows: statusUpdateResult }];
       }
       if (sql.startsWith('UPDATE schema_migrations SET status = \'failed\'')) {
-        ledger.find(({ version }) => version === params[0]).status = 'failed';
-        return [{ affectedRows: 1 }];
+        if (failedStatusUpdateResult === 1) {
+          ledger.find(({ version }) => version === params[0]).status = 'failed';
+        }
+        return [{ affectedRows: failedStatusUpdateResult }];
       }
       if (migrationError && sql === migrationError.sql) throw migrationError.error;
       return [[]];
@@ -143,6 +155,66 @@ describe('runner de migrations versionadas', () => {
     expect(ledger).toHaveLength(1);
   });
 
+  it('faz rollback antes de marcar failed e preserva o erro do SQL', async () => {
+    const sql = 'START TRANSACTION; INSERT INTO retry_table VALUES (1);';
+    const connection = db({ migrationError: { sql, error: new Error('insert inválido') } });
+    await expect(runMigrations({
+      connection, appVersion: 'x', migrationsDir: await migrations({ '0001_retry.sql': sql })
+    })).rejects.toThrow('insert inválido');
+
+    const calls = connection.calls.map(([query]) => query);
+    expect(calls.indexOf(sql)).toBeLessThan(calls.indexOf('ROLLBACK'));
+    expect(calls.indexOf('ROLLBACK')).toBeLessThan(calls.findIndex((query) => (
+      query.startsWith("UPDATE schema_migrations SET status = 'failed'")
+    )));
+  });
+
+  it('deixa in_progress quando o rollback falha e preserva o erro do SQL', async () => {
+    const sql = 'START TRANSACTION; INSERT INTO retry_table VALUES (1);';
+    const ledger = [];
+    const connection = db({
+      ledger,
+      migrationError: { sql, error: new Error('conexão interrompida') },
+      rollbackError: new Error('rollback indisponível')
+    });
+    await expect(runMigrations({
+      connection, appVersion: 'x', migrationsDir: await migrations({ '0001_retry.sql': sql })
+    })).rejects.toThrow('conexão interrompida');
+
+    expect(ledger).toEqual([{ version: '0001', checksum: checksum(sql), status: 'in_progress' }]);
+    expect(connection.calls.some(([query]) => query.startsWith("UPDATE schema_migrations SET status = 'failed'"))).toBe(false);
+  });
+
+  it('preserva o erro do SQL quando não consegue registrar failed', async () => {
+    const sql = 'SELECT erro;';
+    const ledger = [];
+    const connection = db({
+      ledger,
+      migrationError: { sql, error: new Error('falha primária') },
+      failedStatusUpdateResult: 0
+    });
+    await expect(runMigrations({
+      connection, appVersion: 'x', migrationsDir: await migrations({ '0001_retry.sql': sql })
+    })).rejects.toThrow('falha primária');
+
+    expect(ledger).toEqual([{ version: '0001', checksum: checksum(sql), status: 'in_progress' }]);
+  });
+
+  it('rejeita migration que termina com transação aberta', async () => {
+    const sql = 'START TRANSACTION; INSERT INTO retry_table VALUES (1);';
+    const ledger = [];
+    const connection = db({ ledger, transactionState: 1 });
+    await expect(runMigrations({
+      connection, appVersion: 'x', migrationsDir: await migrations({ '0001_retry.sql': sql })
+    })).rejects.toMatchObject({ code: 'MIGRATION_TRANSACTION_LEFT_OPEN' });
+
+    expect(ledger).toEqual([{ version: '0001', checksum: checksum(sql), status: 'failed' }]);
+    const calls = connection.calls.map(([query]) => query);
+    expect(calls.indexOf('ROLLBACK')).toBeLessThan(calls.findIndex((query) => (
+      query.startsWith("UPDATE schema_migrations SET status = 'failed'")
+    )));
+  });
+
   it('bloqueia estado in_progress deixado por queda antes de executar SQL', async () => {
     const sql = 'SELECT 1;';
     const connection = db({ ledger: [{ version: '0001', checksum: checksum(sql), status: 'in_progress' }] });
@@ -171,5 +243,67 @@ describe('runner de migrations versionadas', () => {
       migrationsDir: dir
     })).rejects.toMatchObject({ code: 'MIGRATION_ORDER_GAP' });
     expect(connection.calls).not.toContainEqual([one, undefined]);
+  });
+});
+
+const describeMySql = await temBancoDisponivel() ? describe : describe.skip;
+
+describeMySql('runner de migrations no MySQL real (CI: 8.4)', () => {
+  let banco;
+
+  beforeAll(async () => {
+    banco = await criarBancoDeTeste('migration_runner_rollback');
+  }, 120000);
+
+  beforeEach(async () => {
+    await banco.pool.query('DROP TABLE IF EXISTS schema_migrations');
+    await banco.pool.query('DROP TABLE IF EXISTS migration_runner_atomic_probe');
+    await banco.pool.query('CREATE TABLE migration_runner_atomic_probe (id INT PRIMARY KEY) ENGINE=InnoDB');
+  });
+
+  afterAll(async () => {
+    if (banco) await banco.destruir();
+  });
+
+  it('faz rollback atômico antes de persistir failed', async () => {
+    const connection = await mysql.createConnection({ ...configConexao(), database: banco.nome });
+    const sql = `START TRANSACTION;
+INSERT INTO migration_runner_atomic_probe (id) VALUES (1);
+INSERT INTO migration_runner_atomic_probe (id) VALUES (1);
+    COMMIT;`;
+    try {
+      await expect(runMigrations({
+        connection, appVersion: '8.1.0', migrationsDir: await migrations({ '0001_atomic.sql': sql })
+      })).rejects.toThrow(/Duplicate entry/);
+
+      const [rows] = await connection.query('SELECT id FROM migration_runner_atomic_probe');
+      const [ledger] = await connection.query('SELECT status FROM schema_migrations WHERE version = ?', ['0001']);
+      const [transaction] = await connection.query(
+        'SELECT COUNT(*) AS active FROM information_schema.innodb_trx WHERE trx_mysql_thread_id = CONNECTION_ID()'
+      );
+      expect(rows).toEqual([]);
+      expect(ledger).toEqual([{ status: 'failed' }]);
+      expect(Number(transaction[0].active)).toBe(0);
+    } finally {
+      await connection.end();
+    }
+  });
+
+  it('rejeita e desfaz migration que esquece o commit', async () => {
+    const connection = await mysql.createConnection({ ...configConexao(), database: banco.nome });
+    const sql = `START TRANSACTION;
+INSERT INTO migration_runner_atomic_probe (id) VALUES (2);`;
+    try {
+      await expect(runMigrations({
+        connection, appVersion: '8.1.0', migrationsDir: await migrations({ '0002_open.sql': sql })
+      })).rejects.toMatchObject({ code: 'MIGRATION_TRANSACTION_LEFT_OPEN' });
+
+      const [rows] = await connection.query('SELECT id FROM migration_runner_atomic_probe WHERE id = 2');
+      const [ledger] = await connection.query('SELECT status FROM schema_migrations WHERE version = ?', ['0002']);
+      expect(rows).toEqual([]);
+      expect(ledger).toEqual([{ status: 'failed' }]);
+    } finally {
+      await connection.end();
+    }
   });
 });

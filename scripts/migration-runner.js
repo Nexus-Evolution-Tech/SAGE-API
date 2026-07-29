@@ -5,6 +5,7 @@ const path = require('path');
 const MIGRATION_FILE = /^(\d{4})_([a-z0-9_-]+)\.sql$/;
 const LOCK_PREFIX = 'sage:migrations:';
 const LOCK_TIMEOUT_SECONDS = 30;
+const SERVER_STATUS_IN_TRANS = 0x0001;
 
 class MigrationError extends Error {
   constructor(message, code) {
@@ -144,6 +145,20 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
         );
         inProgress = true;
         await connection.query(migration.sql);
+        const transactionProbe = rowsOf(await connection.query('DO 0'));
+        const serverStatus = Number(transactionProbe?.serverStatus);
+        if (!Number.isSafeInteger(serverStatus)) {
+          throw new MigrationError(
+            `Não foi possível verificar a transação da migration ${migration.version}`,
+            'MIGRATION_TRANSACTION_STATE_UNAVAILABLE'
+          );
+        }
+        if ((serverStatus & SERVER_STATUS_IN_TRANS) !== 0) {
+          throw new MigrationError(
+            `Migration ${migration.version} deixou transação aberta`,
+            'MIGRATION_TRANSACTION_LEFT_OPEN'
+          );
+        }
         const statusResult = rowsOf(await connection.query(
           `UPDATE schema_migrations SET status = 'applied', applied_at = CURRENT_TIMESTAMP(6)
             WHERE version = ? AND status = 'in_progress'`,
@@ -157,11 +172,22 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
         }
       } catch (error) {
         if (inProgress) {
-          await connection.query(
-            `UPDATE schema_migrations SET status = 'failed'
-              WHERE version = ? AND status = 'in_progress'`,
-            [migration.version]
-          ).catch(() => {});
+          try {
+            await connection.query('ROLLBACK');
+            const failedResult = rowsOf(await connection.query(
+              `UPDATE schema_migrations SET status = 'failed'
+                WHERE version = ? AND status = 'in_progress'`,
+              [migration.version]
+            ));
+            if (Number(failedResult?.affectedRows) !== 1) {
+              throw new MigrationError(
+                `Não foi possível registrar a falha da migration ${migration.version}`,
+                'MIGRATION_FAILED_STATUS_UPDATE_FAILED'
+              );
+            }
+          } catch (_) {
+            // O erro da migration é a causa primária; sem rollback não confirmamos failed.
+          }
         }
         throw error;
       }
@@ -188,5 +214,6 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
 }
 
 module.exports = {
-  LOCK_PREFIX, LOCK_TIMEOUT_SECONDS, MigrationError, loadMigrations, lockNameForSchema, runMigrations
+  LOCK_PREFIX, LOCK_TIMEOUT_SECONDS, SERVER_STATUS_IN_TRANS,
+  MigrationError, loadMigrations, lockNameForSchema, runMigrations
 };
