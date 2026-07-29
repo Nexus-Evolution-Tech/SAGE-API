@@ -93,6 +93,8 @@ async function contarAcessos() {
 }
 
 async function contarDuplicatas() {
+  // A identidade abaixo vale apenas para eventos da catraca. Acessos manuais/históricos usam
+  // catraca_log_id NULL e podem coexistir por decisão de schema; agrupá-los geraria falso positivo.
   const [linhas] = await banco.pool.query(
     `SELECT dispositivo_id, catraca_log_id, COUNT(*) AS n
      FROM Acesso
