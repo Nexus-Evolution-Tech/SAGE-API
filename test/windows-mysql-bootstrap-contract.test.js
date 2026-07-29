@@ -12,6 +12,7 @@ describe('bootstrap privado do MySQL no Windows', () => {
     expect(source).toContain("'--initialize-insecure'");
     expect(source).toContain("'--skip-networking'");
     expect(source).toContain("'--shared-memory'");
+    expect(source).toContain("'--mysqlx=0'");
     expect(source).toContain('"--init-file=$initSql"');
     expect(source.indexOf("'--skip-networking'")).toBeLessThan(source.indexOf("'--bind-address=127.0.0.1'"));
   });

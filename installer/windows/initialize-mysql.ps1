@@ -105,7 +105,7 @@ function Start-Server {
   param([string[]]$Extra)
   $arguments = @(
     '--no-defaults', "--basedir=$mysqlRoot", "--datadir=$dataDir",
-    "--log-error=$bootstrapLog", '--log-error-verbosity=1'
+    "--log-error=$bootstrapLog", '--log-error-verbosity=1', '--mysqlx=0'
   ) + $Extra
   return Start-Native $mysqld $arguments
 }
