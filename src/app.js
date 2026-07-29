@@ -7,11 +7,14 @@ const logger = require("./config/logger");
 const { globalDB, db } = require("./config/queryBuilder");
 global.db = globalDB;
 const path = require("path");
+const fs = require("fs");
 
 const swaggerUi = require("swagger-ui-express");
-const YAML = require("yamljs");
-const swaggerDocument = YAML.load("./src/docs/swagger.yml");
-const fs = require('fs');
+const YAML = require("yaml");
+// Resolve a especificação a partir deste módulo; serviços Windows não garantem o cwd do processo.
+const swaggerDocument = YAML.parse(
+  fs.readFileSync(path.join(__dirname, "docs", "swagger.yml"), "utf8")
+);
 
 const app = express();
 
