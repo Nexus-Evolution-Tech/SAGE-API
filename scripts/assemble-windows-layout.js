@@ -74,8 +74,11 @@ async function selectedWebFiles(webRoot) {
 
 async function assembleWindowsLayout({
   apiSourceRoot, webBuildDir, artifactCache, destination,
-  artifactManifestPath, extractArchive = extractZipWindows
+  apiCommit, webCommit, artifactManifestPath, extractArchive = extractZipWindows
 }) {
+  if (![apiCommit, webCommit].every((commit) => /^[a-f0-9]{40,64}$/i.test(commit || ''))) {
+    throw new Error('Commits de origem inválidos');
+  }
   const inputs = {
     api: await canonicalInput(apiSourceRoot),
     web: await canonicalInput(webBuildDir),
@@ -127,6 +130,7 @@ async function assembleWindowsLayout({
       product: 'SAGE',
       version: pkg.version,
       target: artifactManifest.target,
+      source: { apiCommit, webCommit },
       inventoryScope: 'payload-files-excluding-release.json',
       distribution: {
         status: 'prototype-only',
@@ -150,12 +154,12 @@ async function assembleWindowsLayout({
 }
 
 if (require.main === module) {
-  const [apiSourceRoot, webBuildDir, artifactCache, destination] = process.argv.slice(2);
-  if (![apiSourceRoot, webBuildDir, artifactCache, destination].every(Boolean)) {
-    console.error('Uso: node scripts/assemble-windows-layout.js <api> <web> <cache-artefatos> <destino>');
+  const [apiSourceRoot, webBuildDir, artifactCache, destination, apiCommit, webCommit] = process.argv.slice(2);
+  if (![apiSourceRoot, webBuildDir, artifactCache, destination, apiCommit, webCommit].every(Boolean)) {
+    console.error('Uso: node scripts/assemble-windows-layout.js <api> <web> <cache> <destino> <api-sha> <web-sha>');
     process.exitCode = 2;
   } else {
-    assembleWindowsLayout({ apiSourceRoot, webBuildDir, artifactCache, destination })
+    assembleWindowsLayout({ apiSourceRoot, webBuildDir, artifactCache, destination, apiCommit, webCommit })
       .then((release) => console.log(`Release Windows montada: SAGE ${release.version}`))
       .catch((error) => { console.error(error.message); process.exitCode = 1; });
   }

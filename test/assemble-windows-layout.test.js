@@ -60,7 +60,8 @@ async function fixture() {
     if (path.basename(archive) === 'mysql-fake.zip') await write(destination, 'mysql-fake/bin/mysqld.exe');
   };
   return { root, apiSourceRoot: api, webBuildDir: web, artifactCache, artifactManifestPath,
-    extractArchive, destination: path.join(root, 'output') };
+    extractArchive, destination: path.join(root, 'output'),
+    apiCommit: 'a'.repeat(40), webCommit: 'b'.repeat(40) };
 }
 
 describe('layout reproduzível da release Windows', () => {
@@ -73,6 +74,7 @@ describe('layout reproduzível da release Windows', () => {
       product: 'SAGE',
       version: '1.2.3',
       target: 'win32-x64',
+      source: { apiCommit: 'a'.repeat(40), webCommit: 'b'.repeat(40) },
       distribution: {
         status: 'prototype-only',
         public: false,
