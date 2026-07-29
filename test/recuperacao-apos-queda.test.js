@@ -94,8 +94,11 @@ async function contarAcessos() {
 
 async function contarDuplicatas() {
   const [linhas] = await banco.pool.query(
-    `SELECT pessoa_id, dispositivo_id, data_hora, COUNT(*) AS n
-     FROM Acesso GROUP BY pessoa_id, dispositivo_id, data_hora HAVING n > 1`
+    `SELECT dispositivo_id, catraca_log_id, COUNT(*) AS n
+     FROM Acesso
+     WHERE catraca_log_id IS NOT NULL
+     GROUP BY dispositivo_id, catraca_log_id
+     HAVING n > 1`
   );
   return linhas.length;
 }

@@ -63,6 +63,61 @@ function dataHoraParaTimestampUnix(dataHora) {
   return Math.floor(d.getTime() / 1000);
 }
 
+function inteiroPositivoSeguro(valor) {
+  if (typeof valor !== 'number' && !(typeof valor === 'string' && /^\d+$/.test(valor))) {
+    return null;
+  }
+  const numero = Number(valor);
+  return Number.isSafeInteger(numero) && numero > 0 ? numero : null;
+}
+
+async function carregarPessoasPorIds(ids) {
+  const unicos = [...new Set(ids)];
+  if (unicos.length === 0) return new Map();
+
+  const [pessoas] = await db.query(
+    'SELECT id, nome FROM Pessoa WHERE id IN (?)',
+    [unicos]
+  );
+  return new Map(pessoas.map((pessoa) => [Number(pessoa.id), pessoa]));
+}
+
+async function inserirAcessoDaCatraca({
+  pessoa_id,
+  dispositivo_id,
+  catraca_log_id,
+  status,
+  permitido,
+  metodo_auth,
+  data_hora
+}) {
+  const [resultado] = await db.query(
+    `INSERT INTO Acesso
+       (pessoa_id, dispositivo_id, catraca_log_id, status, permitido, metodo_auth, data_hora, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?
+     FROM DUAL
+     WHERE NOT EXISTS (
+       SELECT 1 FROM Acesso
+       WHERE dispositivo_id = ? AND catraca_log_id = ?
+     )
+     ON DUPLICATE KEY UPDATE id = id`,
+    [
+      pessoa_id,
+      dispositivo_id,
+      catraca_log_id,
+      status,
+      permitido,
+      metodo_auth,
+      data_hora,
+      new Date(),
+      dispositivo_id,
+      catraca_log_id
+    ]
+  );
+
+  return resultado.insertId > 0;
+}
+
 // Calcula idade
 function calcularIdade(dataNascimento) {
   const hoje = new Date();
@@ -201,8 +256,8 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   // Diagnóstico e ajuste: se o último acesso no banco está à frente do relógio da catraca, nenhum log passaria. Processar TODOS os logs já trazidos (ex.: fallback 24h) para não perder acesso de hoje (ex.: 13h).
   let effectiveTimestampInicial = timestampInicial;
   if (logs.length > 0) {
-    const ids = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
-    const times = logs.map((l) => (l.time != null ? Number(l.time) : NaN)).filter((n) => !isNaN(n));
+    const ids = logs.map((l) => (l?.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
+    const times = logs.map((l) => (l?.time != null ? Number(l.time) : NaN)).filter((n) => !isNaN(n));
     const minId = ids.length ? Math.min(...ids) : null;
     const maxId = ids.length ? Math.max(...ids) : null;
     const minTime = times.length ? Math.min(...times) : null;
@@ -213,7 +268,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
         `[SYNC] ${dispositivo.nome}: timestampInicial (${timestampInicial}) à frente do max time da catraca (${maxTime}). Processando todos os ${logs.length} logs já trazidos (effectiveTimestampInicial=${effectiveTimestampInicial}) para incluir acessos de hoje (ex.: 13h).`
       );
     }
-    const passamPrimeiroFiltro = logs.filter((l) => (l.id != null && Number(l.id) > MIN_ID) && (l.time != null && Number(l.time) > effectiveTimestampInicial)).length;
+    const passamPrimeiroFiltro = logs.filter((l) => (l?.id != null && Number(l.id) > MIN_ID) && (l?.time != null && Number(l.time) > effectiveTimestampInicial)).length;
     logger.info(
       `[SYNC] ${dispositivo.nome}: diagnóstico catraca → id [${minId}, ${maxId}], time [${minTime}, ${maxTime}], effectiveTimestampInicial=${effectiveTimestampInicial}, MIN_ID=${MIN_ID}, passam 1º filtro=${passamPrimeiroFiltro}/${logs.length}`
     );
@@ -254,91 +309,92 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   const { cacheMutation, invalidateMultiple, CACHE_KEYS } = require('../cache/helpers');
   const { emitNotification } = require('./notificationService');
 
-  // Processar lista em memória: só MySQL (SELECT/INSERT); nenhuma nova requisição à catraca.
+  const logsProcessaveis = [];
   for (const log of logs) {
-    if (log.id <= MIN_ID || log.time <= effectiveTimestampInicial) continue;
-    if (log.user_id == null || log.user_id === 0 || String(log.user_id).trim() === '') continue;
+    if (!log || typeof log !== 'object') continue;
+    const catracaLogId = inteiroPositivoSeguro(log.id);
+    const time = inteiroPositivoSeguro(log.time);
+    if (catracaLogId == null || time == null) continue;
+    if (catracaLogId <= MIN_ID || time <= effectiveTimestampInicial) continue;
 
     const pessoa_id = userIdCatracaParaPessoaId(log.user_id);
-    if (pessoa_id == null || isNaN(pessoa_id) || pessoa_id < 1) continue;
+    if (!Number.isSafeInteger(pessoa_id) || pessoa_id < 1) continue;
+    logsProcessaveis.push({ log, catracaLogId, time, pessoa_id });
+  }
 
-    const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
-    const pessoa = pessoaResult[0];
+  const pessoasPorId = await carregarPessoasPorIds(logsProcessaveis.map((item) => item.pessoa_id));
+
+  // Processar lista em memória: só MySQL; nenhuma nova requisição à catraca.
+  for (const { log, catracaLogId, time, pessoa_id } of logsProcessaveis) {
+    const pessoa = pessoasPorId.get(pessoa_id);
     if (!pessoa) {
       ignoradosPessoa++;
       logger.debug(`[SYNC] Ignorando: user_id=${log.user_id} → pessoa_id=${pessoa_id} não existe`);
       continue;
     }
     const dispositivo_id = dispositivo.id;
-    const data_hora = timestampParaData(log.time);
+    const data_hora = timestampParaData(time);
     // Guardar em UTC como string para ORDER BY data_hora DESC mostrar o mais recente (conexão MySQL usa -03:00)
     const data_hora_utc = data_hora.toISOString().slice(0, 19).replace('T', ' ');
     const status = identificarAcesso(log.portal_id);
     const metodo_auth = mapearMetodo(log.card_value);
     const permitido = true;
 
-    // Verifica se já existe: tenta por UTC e por Date (registros antigos podem estar em horário Brasil)
-    let [acessoExistenteResult] = await db.query(
-      'SELECT * FROM Acesso WHERE pessoa_id = ? AND dispositivo_id = ? AND data_hora = ? LIMIT 1',
-      [pessoa_id, dispositivo_id, data_hora_utc]
-    );
-    if (!acessoExistenteResult[0]) {
-      [acessoExistenteResult] = await db.query(
-        'SELECT * FROM Acesso WHERE pessoa_id = ? AND dispositivo_id = ? AND data_hora = ? LIMIT 1',
-        [pessoa_id, dispositivo_id, data_hora]
-      );
+    const inserido = await inserirAcessoDaCatraca({
+      pessoa_id,
+      dispositivo_id,
+      catraca_log_id: catracaLogId,
+      status,
+      permitido,
+      metodo_auth,
+      data_hora: data_hora_utc
+    });
+    if (!inserido) {
+      ignoradosDuplicata++;
+      continue;
     }
-    const acessoExistente = acessoExistenteResult[0];
-    if (acessoExistente) ignoradosDuplicata++;
 
-    if (!acessoExistente) {
-      await db.query(
-        `INSERT INTO Acesso (pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora_utc, new Date()]
-      );
-      acessosSincronizados++;
+    acessosSincronizados++;
 
-      // Avanço PROGRESSIVO do ponteiro (só no full sync, e só em ordem crescente de id).
-      // Se o processo morrer agora, a retomada começa exatamente daqui — em vez de depender do
-      // filtro por timestamp, que já provocou perda permanente de acessos antigos.
-      // A cada N para não transformar isto em uma escrita por linha (HD mecânico).
-      if (!monitorOnly && Number.isFinite(Number(log.id))) {
-        maiorLogIdGravado = Math.max(maiorLogIdGravado, Number(log.id));
-        if (acessosSincronizados % PASSO_PONTEIRO === 0) {
-          try {
-            await db.query(
-              'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
-              [maiorLogIdGravado, dispositivo.id]
-            );
-          } catch (e) {
-            logger.error(`[SYNC] ${dispositivo.nome}: falha ao avançar ponteiro: ${e.message}`);
-          }
+    // Avanço PROGRESSIVO do ponteiro (só no full sync, e só em ordem crescente de id).
+    // Se o processo morrer agora, a retomada começa exatamente daqui — em vez de depender do
+    // filtro por timestamp, que já provocou perda permanente de acessos antigos.
+    // A cada N para não transformar isto em uma escrita por linha (HD mecânico).
+    if (!monitorOnly) {
+      maiorLogIdGravado = Math.max(maiorLogIdGravado, catracaLogId);
+      if (acessosSincronizados % PASSO_PONTEIRO === 0) {
+        try {
+          await db.query(
+            'UPDATE Dispositivo SET ultimo_log_id_sincronizado = ? WHERE id = ?',
+            [maiorLogIdGravado, dispositivo.id]
+          );
+        } catch (e) {
+          logger.error(`[SYNC] ${dispositivo.nome}: falha ao avançar ponteiro: ${e.message}`);
         }
       }
-
-      try {
-        globalState.incrementAcessoTodiaSuccesso();
-        emitToRoom('acessos', 'acesso:novo', {
-          pessoa_id,
-          dispositivo_id,
-          status,
-          permitido: true,
-          data_hora: data_hora.toISOString(),
-          pessoa_nome: pessoa?.nome
-        });
-        emitToRoom('stats', 'stats:update', globalState.getStats());
-      } catch (e) {
-        // não falhar a sync por causa de WebSocket
-      }
-
-      await verificarEAtribuirPresenca(pessoa_id, data_hora);
-      logger.debug(`[SYNC] Acesso registrado: ${pessoa.nome} (pessoa_id=${pessoa_id}) em ${dispositivo.nome}`);
-      // Invalidar cache logo após inserir para F5 na tela de monitoramento mostrar o novo acesso
-      try {
-        await invalidateMultiple([CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-      } catch (e) { /* ignorar */ }
     }
+
+    try {
+      globalState.incrementAcessoTodiaSuccesso();
+      emitToRoom('acessos', 'acesso:novo', {
+        pessoa_id,
+        dispositivo_id,
+        status,
+        permitido: true,
+        data_hora: data_hora.toISOString(),
+        pessoa_nome: pessoa?.nome
+      });
+      emitToRoom('stats', 'stats:update', globalState.getStats());
+    } catch (e) {
+      // não falhar a sync por causa de WebSocket
+    }
+
+    await verificarEAtribuirPresenca(pessoa_id, data_hora);
+    logger.debug(`[SYNC] Acesso registrado: ${pessoa.nome} (pessoa_id=${pessoa_id}) em ${dispositivo.nome}`);
+    // Invalidar cache logo após inserir para F5 na tela de monitoramento mostrar o novo acesso
+    try {
+      await invalidateMultiple([CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
+    } catch (e) { /* ignorar */ }
   }
 
   logger.info(
@@ -348,7 +404,9 @@ async function sincronizarAcessos(dispositivo, options = {}) {
 
   // Persistir maior log.id da catraca para próxima sync pedir só id > ultimo_log_id_sincronizado (apenas em sync full, não em monitor)
   if (!monitorOnly) {
-    const logIds = logs.map((l) => (l.id != null ? Number(l.id) : NaN)).filter((n) => !isNaN(n));
+    // Política preservada no PR #3: avançar também sobre pessoa inexistente evita retry infinito.
+    // O custo aceito é não recuperar automaticamente esse acesso se a pessoa for cadastrada depois.
+    const logIds = logs.map((l) => inteiroPositivoSeguro(l?.id)).filter((id) => id != null);
     if (logIds.length > 0) {
       const maxLogId = Math.max(...logIds);
       const currentMax = dispositivo.ultimo_log_id_sincronizado != null ? Number(dispositivo.ultimo_log_id_sincronizado) : 0;
@@ -365,11 +423,10 @@ async function sincronizarAcessos(dispositivo, options = {}) {
     }
   }
 
-  // Invalidar cache da lista sempre que rodar sync (para GET /acessos devolver dados frescos)
-  try {
-    await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-  } catch (e) { /* ignorar */ }
   if (acessosSincronizados > 0) {
+    try {
+      await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
+    } catch (e) { /* ignorar */ }
     logger.info(`[SYNC] ${dispositivo.nome}: ${acessosSincronizados} novo(s) acesso(s) inserido(s)`);
     try {
       emitNotification({
@@ -486,14 +543,17 @@ async function processarNotificacaoMonitorDao(payload) {
   const logger = require('../config/logger');
   const { emitToRoom } = require('../websocket/wsServer');
   const globalState = require('../state/globalState');
-  const { cacheMutation, invalidateMultiple, CACHE_KEYS } = require('../cache/helpers');
+  const { cacheMutation, CACHE_KEYS } = require('../cache/helpers');
+  const { emitNotification } = require('./notificationService');
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) payload = {};
 
   const result = { processados: 0, ignorados: 0, erros: [] };
   // Contador de tentativas com identificação não cadastrada. Era usado nas linhas abaixo sem
   // nunca ter sido declarado, o que lançava ReferenceError (o `++` lê antes de escrever, então
   // falha inclusive em modo não-strict). Coberto por test/regressao-monitor-dao.test.js.
   let tentativasNegadas = 0;
-  const deviceIdControlId = payload.device_id != null ? Number(payload.device_id) : null;
+  const deviceIdControlId = inteiroPositivoSeguro(payload.device_id);
   const objectChanges = Array.isArray(payload.object_changes) ? payload.object_changes : [];
 
   if (objectChanges.length === 0) {
@@ -537,21 +597,30 @@ async function processarNotificacaoMonitorDao(payload) {
 
   const maxEventAgeSeconds = parseInt(process.env.MONITOR_MAX_EVENT_AGE_SECONDS || '300', 10); // 5 min padrão (proteção replay)
   const nowUnix = Math.floor(Date.now() / 1000);
+  const logsMonitor = [];
 
   for (const change of objectChanges) {
-    if (change.object !== 'access_logs' || change.type !== 'inserted' || !change.values) {
+    if (
+      !change ||
+      typeof change !== 'object' ||
+      change.object !== 'access_logs' ||
+      change.type !== 'inserted' ||
+      !change.values ||
+      typeof change.values !== 'object'
+    ) {
       result.ignorados++;
       continue;
     }
 
     const v = change.values;
-    const time = v.time != null ? Number(v.time) : null;
-    const user_id_catraca = v.user_id != null ? Number(v.user_id) : null;
-    const portal_id = v.portal_id != null ? Number(v.portal_id) : 1;
+    const catracaLogId = inteiroPositivoSeguro(v.id);
+    const time = inteiroPositivoSeguro(v.time);
+    const user_id_catraca = inteiroPositivoSeguro(v.user_id);
+    const portal_id = v.portal_id != null ? inteiroPositivoSeguro(v.portal_id) : 1;
     let card_value = String(v.card_value != null ? v.card_value : '');
     if (card_value.length > 64) card_value = card_value.slice(0, 64);
 
-    if (time == null || Number.isNaN(time)) {
+    if (catracaLogId == null || time == null || portal_id == null) {
       result.ignorados++;
       continue;
     }
@@ -563,55 +632,68 @@ async function processarNotificacaoMonitorDao(payload) {
     }
 
     const pessoa_id = userIdCatracaParaPessoaId(user_id_catraca);
-    if (pessoa_id == null || !Number.isInteger(pessoa_id) || pessoa_id < 1) {
+    if (!Number.isSafeInteger(pessoa_id) || pessoa_id < 1) {
       tentativasNegadas++;
       result.ignorados++;
       continue;
     }
     const data_hora = timestampParaData(time);
+    const data_hora_utc = data_hora.toISOString().slice(0, 19).replace('T', ' ');
     const status = identificarAcesso(portal_id);
     const metodo_auth = mapearMetodo(card_value);
     const permitido = true;
+    logsMonitor.push({
+      catracaLogId,
+      pessoa_id,
+      data_hora,
+      data_hora_utc,
+      status,
+      metodo_auth,
+      permitido
+    });
+  }
 
-    const [pessoaResult] = await db.query('SELECT id, nome FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
-    const pessoa = pessoaResult[0];
+  const pessoasPorId = await carregarPessoasPorIds(logsMonitor.map((log) => log.pessoa_id));
+
+  for (const log of logsMonitor) {
+    const pessoa = pessoasPorId.get(log.pessoa_id);
     if (!pessoa) {
       tentativasNegadas++;
-      logger.debug(`[MONITOR DAO] Pessoa id ${pessoa_id} não existe, ignorando log`);
-      result.ignorados++;
-      continue;
-    }
-
-    const [acessoExistenteResult] = await db.query(
-      'SELECT id FROM Acesso WHERE pessoa_id = ? AND dispositivo_id = ? AND data_hora = ? LIMIT 1',
-      [pessoa_id, dispositivo_id, data_hora]
-    );
-    if (acessoExistenteResult[0]) {
+      logger.debug(`[MONITOR DAO] Pessoa id ${log.pessoa_id} não existe, ignorando log`);
       result.ignorados++;
       continue;
     }
 
     try {
-      await db.query(
-        `INSERT INTO Acesso (pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, new Date()]
-      );
+      const inserido = await inserirAcessoDaCatraca({
+        pessoa_id: log.pessoa_id,
+        dispositivo_id,
+        catraca_log_id: log.catracaLogId,
+        status: log.status,
+        permitido: log.permitido,
+        metodo_auth: log.metodo_auth,
+        data_hora: log.data_hora_utc
+      });
+      if (!inserido) {
+        result.ignorados++;
+        continue;
+      }
+
       result.processados++;
 
       globalState.incrementAcessoTodiaSuccesso();
       emitToRoom('acessos', 'acesso:novo', {
-        pessoa_id,
+        pessoa_id: log.pessoa_id,
         dispositivo_id,
-        status,
+        status: log.status,
         permitido: true,
-        data_hora: data_hora.toISOString(),
+        data_hora: log.data_hora.toISOString(),
         pessoa_nome: pessoa.nome
       });
       emitToRoom('stats', 'stats:update', globalState.getStats());
 
-      await verificarEAtribuirPresenca(pessoa_id, data_hora);
-      logger.debug(`[MONITOR DAO] Acesso registrado: pessoa ${pessoa_id}, dispositivo ${dispositivo_id}`);
+      await verificarEAtribuirPresenca(log.pessoa_id, log.data_hora);
+      logger.debug(`[MONITOR DAO] Acesso registrado: pessoa ${log.pessoa_id}, dispositivo ${dispositivo_id}`);
     } catch (err) {
       logger.error(`[MONITOR DAO] Erro ao inserir acesso: ${err.message}`);
       result.erros.push(err.message);
