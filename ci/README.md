@@ -1,27 +1,8 @@
-# CI — pipeline pronto, aguardando um passo manual
+# CI — pipeline ativo
 
-O arquivo `github-actions-ci.yml` é o workflow do GitHub Actions da Fase 1: roda a suíte com
-MySQL 8.4 LTS de verdade e barra merge vermelho.
-
-**Ele não está ativo ainda.** O push foi recusado com:
-
-> refusing to allow an OAuth App to create or update workflow `.github/workflows/ci.yml`
-> without `workflow` scope
-
-Ou seja: o token usado não tem permissão para criar workflows — uma proteção do próprio GitHub,
-não um erro do projeto. O conteúdo está versionado aqui para não se perder.
-
-## Para ativar
-
-```bash
-gh auth refresh -s workflow          # concede o escopo (abre o navegador)
-git mv ci/github-actions-ci.yml .github/workflows/ci.yml
-git commit -m "ci: ativar pipeline"
-git push
-```
-
-Alternativa sem CLI: criar o arquivo pela interface do GitHub (Actions → new workflow) e colar o
-conteúdo daqui.
+O workflow da Fase 1 está em `.github/workflows/ci.yml`. Ele roda a suíte com MySQL 8.4 LTS de
+verdade em pushes e pull requests e impede que um resultado vermelho seja tratado como entrega
+válida.
 
 ## O que o pipeline faz além de rodar os testes
 
