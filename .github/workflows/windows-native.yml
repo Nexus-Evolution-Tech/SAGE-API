@@ -127,7 +127,7 @@ jobs:
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           if (Test-Path -LiteralPath $state) { throw 'Runner não está limpo para o smoke MySQL' }
           & (Join-Path $output 'service\initialize-mysql.ps1')
-          if ($LASTEXITCODE -ne 0) { throw 'Bootstrap MySQL falhou' }
+          if (-not $?) { throw 'Bootstrap MySQL falhou' }
           $config = Join-Path $state 'config'
           if (-not (Test-Path -LiteralPath (Join-Path $config 'mysql-accounts.ready'))) {
             throw 'Bootstrap MySQL não promoveu o marcador'
@@ -157,7 +157,7 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não ficou pronto' }
           & (Join-Path $output 'service\initialize-mysql.ps1')
-          if ($LASTEXITCODE -ne 0) { throw 'Segundo bootstrap MySQL não foi idempotente' }
+          if (-not $?) { throw 'Segundo bootstrap MySQL não foi idempotente' }
           Stop-Service SAGE-MySQL-Smoke
           & $mysqld --remove SAGE-MySQL-Smoke
           if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não foi removido' }
