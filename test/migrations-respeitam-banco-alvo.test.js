@@ -7,10 +7,10 @@ const path = require('path');
 
 const DIRETORIO_DATABASE = path.join(__dirname, '..', 'database');
 
-describe('migrations automáticas respeitam o banco escolhido pelo instalador', () => {
-  it('nenhuma migration_*.sql troca o banco ativo com USE', () => {
+describe('scripts SQL respeitam o banco escolhido pelo operador ou instalador', () => {
+  it('nenhum arquivo SQL troca o banco ativo com USE', () => {
     const migrationsComUseFixo = fs.readdirSync(DIRETORIO_DATABASE)
-      .filter((arquivo) => arquivo.startsWith('migration_') && arquivo.endsWith('.sql'))
+      .filter((arquivo) => arquivo.endsWith('.sql'))
       .filter((arquivo) => {
         const sql = fs.readFileSync(path.join(DIRETORIO_DATABASE, arquivo), 'utf8');
         return /^\s*USE\s+(?:`[^`]+`|[a-zA-Z0-9_]+)\s*;/im.test(sql);
