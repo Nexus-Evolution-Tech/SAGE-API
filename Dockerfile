@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copiar apenas arquivos de dependências primeiro (melhor cache de camadas)
 COPY package.json package-lock.json ./
+COPY vendor ./vendor
 
 # Instalar apenas dependências de produção
 # O postinstall depende de scripts que só são copiados na camada seguinte. No artefato de
