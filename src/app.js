@@ -10,6 +10,11 @@ const path = require("path");
 const fs = require("fs");
 const { paths, ensureDataDirs } = require("./config/paths");
 const { webDir, indexFile, webBuildAvailable, isSpaNavigation } = require("./config/web");
+const {
+  createReadinessChecker,
+  createReadinessHandler
+} = require("./services/readinessService");
+const { version: packageVersion } = require("../package.json");
 
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
@@ -122,8 +127,18 @@ logger.info("Arquivos estáticos disponíveis em: /uploads");
 if (webBuildIsAvailable) app.use(serveSpaNavigation);
 
 // Rotas da aplicação (com tratamento de erro)
+let routesReady = false;
 try {
-  loadRoutes(app);
+  const loadedRoutes = loadRoutes(app);
+  const essentialRoutes = [
+    'accessRoutes.js',
+    'deviceRoutes.js',
+    'notificationRoutes.js',
+    'peopleRoutes.js',
+    'schoolRoutes.js'
+  ];
+  routesReady = essentialRoutes.every((route) => loadedRoutes.includes(route));
+  if (!routesReady) throw new Error('Rotas essenciais não foram carregadas');
   logger.info('✓ Rotas carregadas com sucesso');
 } catch (error) {
   logger.error(`✗ Erro ao carregar rotas: ${error.message}`);
@@ -167,6 +182,24 @@ app.get('/health', (req, res) => {
     }
   });
 });
+
+const checkReadiness = createReadinessChecker({
+  db,
+  dataDirectories: [
+    paths.config,
+    paths.logs,
+    paths.uploads,
+    paths.exports,
+    paths.backups
+  ],
+  routesReady: () => routesReady,
+  webReady: webBuildAvailable,
+  requireWeb: process.env.NODE_ENV === 'production' || process.env.SAGE_REQUIRE_WEB === 'true'
+});
+app.get(
+  '/ready',
+  createReadinessHandler(checkReadiness, process.env.API_VERSION || packageVersion)
+);
 
 // Assets são resolvidos depois da infraestrutura. O fallback repete a lista explícita de rotas
 // do painel, para não transformar endpoints desconhecidos da API em index.html.

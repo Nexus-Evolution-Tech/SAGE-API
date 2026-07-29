@@ -77,9 +77,17 @@ describe('F8.3b — painel servido pela API', () => {
   });
 
   it('serve apenas navegação HTML das rotas SPA, preservando API e Socket.IO', async () => {
-    const { processo, porta } = await iniciarApp({ SAGE_WEB_DIR: webDir, NODE_ENV: 'test' });
+    const { processo, porta } = await iniciarApp({
+      SAGE_WEB_DIR: webDir,
+      NODE_ENV: 'test',
+      DB_HOST: '127.0.0.1',
+      DB_PORT: '1',
+      DB_USER: 'indisponivel',
+      DB_PASSWORD: 'indisponivel',
+      DB_NAME: 'indisponivel'
+    });
     try {
-      const [raiz, asset, turmasHtml, turmasJson, turmasSemAccept, turmasWildcard, profunda, health, docs, apiProtegida, apiAusente, endpointApiAusente, socket, uploadAusente] = await Promise.all([
+      const [raiz, asset, turmasHtml, turmasJson, turmasSemAccept, turmasWildcard, profunda, health, ready, docs, apiProtegida, apiAusente, endpointApiAusente, socket, uploadAusente] = await Promise.all([
         requisitar(porta, '/', { accept: 'text/html' }),
         requisitar(porta, '/app.js'),
         requisitar(porta, '/turmas', { accept: 'text/html' }),
@@ -88,6 +96,7 @@ describe('F8.3b — painel servido pela API', () => {
         requisitar(porta, '/turmas', { accept: '*/*' }),
         requisitar(porta, '/tabelas/alunos/42', { accept: 'text/html' }),
         requisitar(porta, '/health'),
+        requisitar(porta, '/ready'),
         requisitar(porta, '/docs/'),
         requisitar(porta, '/materias'),
         requisitar(porta, '/api/nao-existe'),
@@ -108,6 +117,10 @@ describe('F8.3b — painel servido pela API', () => {
       expect(profunda.body).toContain('SAGE painel');
       expect(health.status).toBe(200);
       expect(health.headers['content-type']).toContain('application/json');
+      expect(ready).toMatchObject({
+        status: 503,
+        body: expect.stringContaining('database_unavailable')
+      });
       expect(docs.status).toBe(200);
       expect(docs.body).not.toContain('SAGE painel');
       expect(apiProtegida).toMatchObject({ status: 401, body: expect.stringContaining('Token não fornecido') });
