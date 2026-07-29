@@ -337,6 +337,26 @@ jobs:
             $mysqld = Join-Path $program 'runtime\mysql\bin\mysqld.exe'
             if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGEMySQL }
           }
+          $programPrefix = $program.TrimEnd('\') + '\'
+          $remaining = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
+              $programPrefix, [StringComparison]::OrdinalIgnoreCase
+            )
+          })
+          foreach ($process in $remaining) {
+            Write-Host "Encerrando processo residual do SAGE: $($process.Name) ($($process.ProcessId))"
+            Stop-Process -Id $process.ProcessId -Force
+          }
+          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            $remaining = @(Get-CimInstance Win32_Process | Where-Object {
+              $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
+                $programPrefix, [StringComparison]::OrdinalIgnoreCase
+              )
+            })
+            if ($remaining.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+          }
+          if ($remaining.Count -ne 0) { throw 'Processo residual do SAGE não encerrou' }
           for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $program); $attempt++) {
             try {
               Remove-Item -LiteralPath $program -Recurse -Force -ErrorAction Stop

@@ -52,7 +52,8 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain("Stop-Process -Id $mysqlProcess.ProcessId -Force");
     expect(source).toContain('Segredo apareceu em processo, XML ou log');
     expect(source).toContain('Descartar serviços do smoke');
-    expect(source.match(/for \(\$attempt = 0; \$attempt -lt 20/g)).toHaveLength(2);
+    expect(source.match(/for \(\$attempt = 0; \$attempt -lt 20/g)).toHaveLength(3);
+    expect(source).toContain('Processo residual do SAGE não encerrou');
     expect(source).toContain('Remove-Item -LiteralPath $program -Recurse -Force -ErrorAction Stop');
     expect(source).toContain('Descartar estado do smoke MySQL');
     expect(source).toContain("'mysql-bootstrap-client.cnf'");
