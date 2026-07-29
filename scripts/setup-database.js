@@ -6,6 +6,9 @@ const bcrypt = require('bcrypt');
 const logger = require('../src/config/logger');
 const fs = require('fs').promises;
 const path = require('path');
+const { ensureLegacyBaseline } = require('./legacy-baseline');
+const { runMigrations } = require('./migration-runner');
+const APP_VERSION = process.env.SAGE_APP_VERSION || require('../package.json').version;
 
 // Configuração do banco (agora com variáveis do .env carregadas)
 const dbConfig = {
@@ -171,6 +174,30 @@ async function executarMigration(filePath) {
   }
 }
 
+async function normalizarLegado(migrationsDir) {
+  logger.info('\n4️⃣ Normalizando migrations legadas...');
+  const melhoriasPath = path.join(migrationsDir, 'melhorias_sistema.sql');
+  try {
+    await fs.access(melhoriasPath);
+    if (!await executarMigration(melhoriasPath)) {
+      throw new Error('melhorias_sistema.sql falhou — veja os erros acima');
+    }
+  } catch (error) {
+    if (error.code === 'ENOENT') logger.warn('   melhorias_sistema.sql ausente; pulando.');
+    else throw error;
+  }
+
+  const migrationFiles = await fs.readdir(migrationsDir);
+  const migrations = migrationFiles
+    .filter((file) => file.startsWith('migration_') && file.endsWith('.sql'))
+    .sort();
+  for (const file of migrations) {
+    if (!await executarMigration(path.join(migrationsDir, file))) {
+      throw new Error(`${file} falhou — veja os erros acima`);
+    }
+  }
+}
+
 async function verificarTabelasExistem() {
   try {
     const connection = await mysql.createConnection({
@@ -332,40 +359,26 @@ async function setupBancoDados() {
     logger.info('    Estrutura do banco já existe');
   }
 
-  // 4.1 Aplicar melhorias incrementais (idempotente: ignora colunas/índices existentes)
-  logger.info('\n4️⃣ Aplicando melhorias incrementais (melhorias_sistema.sql)...');
-  const melhoriasPath = path.join(migrationsDir, 'melhorias_sistema.sql');
+  // O baseline só é registrado depois de o schema legado atingir todas as sentinelas. A partir
+  // dele, upgrades usam exclusivamente arquivos versionados com checksum e estado persistido.
+  const migrationConnection = await mysql.createConnection({
+    ...dbConfig,
+    database: dbName,
+    multipleStatements: true
+  });
   try {
-    await fs.access(melhoriasPath);
-    const ok = await executarMigration(melhoriasPath);
-    if (!ok) {
-      throw new Error('melhorias_sistema.sql falhou — veja os erros acima');
-    }
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      logger.warn('   Arquivo melhorias_sistema.sql não encontrado em /database; pulando.');
-    } else {
-      logger.error(`    Erro ao executar melhorias_sistema.sql: ${error.message}`);
-      throw error;
-    }
-  }
-
-  // 4.2 Aplicar migrações incrementais (migration_*.sql) — idempotentes
-  const migrationFiles = await fs.readdir(migrationsDir).catch(() => []);
-  const migrations = migrationFiles
-    .filter((f) => f.startsWith('migration_') && f.endsWith('.sql'))
-    .sort();
-  for (const file of migrations) {
-    const migrationPath = path.join(migrationsDir, file);
-    try {
-      const ok = await executarMigration(migrationPath);
-      if (!ok) {
-        throw new Error(`${file} falhou — veja os erros acima`);
-      }
-    } catch (error) {
-      logger.error(`    Erro ao executar ${file}: ${error.message}`);
-      throw error;
-    }
+    await ensureLegacyBaseline({
+      connection: migrationConnection,
+      appVersion: APP_VERSION,
+      normalizeLegacy: () => normalizarLegado(migrationsDir)
+    });
+    await runMigrations({
+      connection: migrationConnection,
+      appVersion: APP_VERSION,
+      migrationsDir: path.join(migrationsDir, 'migrations')
+    });
+  } finally {
+    await migrationConnection.end().catch(() => {});
   }
 
   // 5. Validar estrutura

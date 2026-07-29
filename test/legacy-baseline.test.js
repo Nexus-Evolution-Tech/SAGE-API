@@ -105,6 +105,16 @@ describe('baseline legado 0000', () => {
     }
     expect(normalizeLegacy).not.toHaveBeenCalled();
   });
+
+  it('não registra 0000 quando a normalização falha', async () => {
+    const db = connection();
+    await expect(ensureLegacyBaseline({
+      connection: db,
+      appVersion: '8.0.0',
+      normalizeLegacy: async () => { throw new Error('migration legada falhou'); }
+    })).rejects.toThrow('migration legada falhou');
+    expect(db.calls.some(([sql]) => sql.startsWith('INSERT INTO schema_migrations'))).toBe(false);
+  });
 });
 
 const describeMySql = await temBancoDisponivel() ? describe : describe.skip;
@@ -124,6 +134,9 @@ describeMySql('baseline legado 0000 no MySQL real (CI: 8.4)', () => {
     const connection = await mysql.createConnection({ ...configConexao(), database: banco.nome });
     const normalizeLegacy = vi.fn();
     try {
+      // O instalador real agora cria o ledger; removê-lo recria somente o estado legado que este
+      // teste precisa adotar, sem apagar schema nem dados normalizados.
+      await connection.query('DROP TABLE schema_migrations');
       await expect(ensureLegacyBaseline({
         connection, appVersion: '8.0.0', normalizeLegacy
       })).resolves.toEqual({ adopted: true });
