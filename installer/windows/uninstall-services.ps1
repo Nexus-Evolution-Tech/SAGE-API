@@ -129,7 +129,7 @@ Remove-ServiceRecord 'SAGEAPI'
 Disable-And-StopService 'SAGEMySQL'
 Remove-ServiceRecord 'SAGEMySQL'
 
-$remaining = Get-SageProcesses
+$remaining = @(Get-SageProcesses)
 foreach ($process in $remaining) {
   if (-not $process.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)) {
     Stop-Process -Id $process.ProcessId -Force
@@ -137,7 +137,7 @@ foreach ($process in $remaining) {
 }
 
 for ($attempt = 0; $attempt -lt 240; $attempt++) {
-  $remaining = Get-SageProcesses
+  $remaining = @(Get-SageProcesses)
   if ($remaining.Count -eq 0 -and -not (Get-ServiceRecord 'SAGEAPI') -and
       -not (Get-ServiceRecord 'SAGEMySQL')) { break }
   Start-Sleep -Milliseconds 250

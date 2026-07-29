@@ -45,6 +45,7 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).toContain('$_.ExecutablePath.StartsWith(');
     expect(script).toContain('-not $process.ExecutablePath.Equals($mysqld');
     expect(script).toContain('MySQL não encerrou de forma segura; encerramento forçado recusado');
+    expect(script.match(/@\(Get-SageProcesses\)/g)).toHaveLength(2);
     expect(script).toContain('$attempt -lt 240');
     expect(script).toContain('Processo ou serviço SAGE permaneceu após a remoção');
   });
