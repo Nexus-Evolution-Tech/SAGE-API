@@ -1,0 +1,119 @@
+name: Windows native release smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      web_ref:
+        description: Commit exato do frontend SAGE
+        required: true
+        default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
+  push:
+    branches: [agent/f8-windows-native-builder]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-smoke:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    env:
+      WEB_REF: ${{ inputs.web_ref || 'e8c5131e1d155e2bcf8d7c58ffefb4e81677407f' }}
+
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: api
+          persist-credentials: false
+
+      - name: Checkout frontend fixado
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Nexus-Evolution-Tech/SAGE
+          ref: ${{ env.WEB_REF }}
+          path: web
+          persist-credentials: false
+
+      - name: Configurar Node 24 x64
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          architecture: x64
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Confirmar Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5) {
+            throw "Builder exige Windows PowerShell 5.1; recebido $($PSVersionTable.PSVersion)"
+          }
+          if (-not [Environment]::Is64BitOperatingSystem) { throw 'Runner Windows não é x64' }
+
+      - name: Restaurar cache de binários verificados
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}\sage-build\artifacts
+          key: windows-x64-artifacts-${{ hashFiles('api/installer/windows/artifacts.json') }}
+
+      - name: Testar contratos do builder
+        working-directory: api
+        shell: powershell
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci da API falhou' }
+          npx vitest run test/windows-artifacts.test.js test/fetch-windows-artifacts.test.js `
+            test/assemble-windows-layout.test.js test/windows-native-builder-contract.test.js `
+            test/windows-initialize-state-contract.test.js test/backup-maintenance-credential.test.js
+          if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
+          npm audit --omit=dev --audit-level=high
+          if ($LASTEXITCODE -ne 0) { throw 'Audit de produção da API falhou' }
+
+      - name: Montar layout no Windows nativo
+        shell: powershell
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'api'
+          $web = Join-Path $env:GITHUB_WORKSPACE 'web'
+          $work = Join-Path $env:RUNNER_TEMP 'sage-build'
+          $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
+          & (Join-Path $api 'installer\windows\build-release.ps1') `
+            -ApiRepository $api -WebRepository $web `
+            -WorkDirectory $work -OutputDirectory $output
+          if ($LASTEXITCODE -ne 0) { throw 'Builder Windows falhou' }
+
+      - name: Validar layout sem publicar
+        shell: powershell
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
+          $release = Get-Content -LiteralPath (Join-Path $output 'release.json') -Raw | ConvertFrom-Json
+          if ($release.target -ne 'win32-x64') { throw 'Target inesperado no release.json' }
+          if ($release.distribution.public -ne $false) { throw 'Smoke não pode produzir release público' }
+          if ($release.source.apiCommit -ne $env:GITHUB_SHA) { throw 'SHA da API diverge do checkout' }
+          if ($release.source.webCommit -ne $env:WEB_REF) { throw 'SHA do frontend diverge do checkout' }
+          & (Join-Path $output 'runtime\node\node.exe') --version
+          if ($LASTEXITCODE -ne 0) { throw 'Node Windows do layout não executou' }
+          & (Join-Path $output 'runtime\mysql\bin\mysqld.exe') --version
+          if ($LASTEXITCODE -ne 0) { throw 'MySQL Windows do layout não executou' }
+          & (Join-Path $output 'service\SAGE-API.exe') version
+          if ($LASTEXITCODE -ne 0) { throw 'WinSW Windows do layout não executou' }
+          $api = Join-Path $output "releases\$($release.version)\api"
+          Push-Location -LiteralPath $api
+          try {
+            & (Join-Path $output 'runtime\node\node.exe') -e `
+              "require('bcrypt').hash('windows-smoke',4).then(()=>process.exit(0)).catch(()=>process.exit(1))"
+            if ($LASTEXITCODE -ne 0) { throw 'bcrypt Windows do layout não carregou' }
+          } finally { Pop-Location }
+
+      - name: Descartar protótipo
+        if: always()
+        shell: powershell
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
+          if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse -Force }
