@@ -133,6 +133,34 @@ function Write-ConfigOnce {
   Assert-Config $Path $Expected
 }
 
+function Write-PrivateTextOnce {
+  param([string]$Path, [string]$ExpectedContent)
+  if (Test-Path -LiteralPath $Path) {
+    Assert-RegularLocalPath $Path
+    Assert-PrivateAcl $Path
+    if ([IO.File]::ReadAllText($Path) -cne $ExpectedContent) { throw "Arquivo privado divergente: $Path" }
+    return
+  }
+  $partial = "$Path.partial-$PID-$([guid]::NewGuid().ToString('N'))"
+  $writer = $null
+  try {
+    $stream = [IO.FileStream]::new($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write,
+      [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough)
+    try {
+      $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false))
+      $writer.Write($ExpectedContent); $writer.Flush(); $stream.Flush($true)
+    } finally {
+      if ($null -ne $writer) { $writer.Dispose() } else { $stream.Dispose() }
+    }
+    New-PrivateAcl $partial $false
+    [IO.File]::Move($partial, $Path)
+  } finally {
+    if (Test-Path -LiteralPath $partial) { [IO.File]::Delete($partial) }
+  }
+  Assert-PrivateAcl $Path
+  if ([IO.File]::ReadAllText($Path) -cne $ExpectedContent) { throw "Arquivo privado divergente: $Path" }
+}
+
 $mutex = [Threading.Mutex]::new($false, 'Global\SAGE-State-Initialization')
 $lockTaken = $false
 try {
@@ -160,6 +188,9 @@ Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=$secretMarker
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
   MYSQL_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysql.exe')
+  SAGE_REQUIRE_MAINTENANCE_DB='true'
+  SAGE_MAINTENANCE_CONFIG_FILE=(Join-Path $configDir 'maintenance.env')
+  MYSQL_DEFAULTS_EXTRA_FILE=(Join-Path $configDir 'maintenance-client.cnf')
 }) {
   [ordered]@{
   NODE_ENV='production'; PORT='3000'; SAGE_DATA_DIR=$dataRoot; SAGE_REQUIRE_WEB='true'
@@ -168,6 +199,9 @@ Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=(New-Secret)
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
   MYSQL_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysql.exe')
+  SAGE_REQUIRE_MAINTENANCE_DB='true'
+  SAGE_MAINTENANCE_CONFIG_FILE=(Join-Path $configDir 'maintenance.env')
+  MYSQL_DEFAULTS_EXTRA_FILE=(Join-Path $configDir 'maintenance-client.cnf')
   }
 }
 Write-ConfigOnce (Join-Path $configDir 'maintenance.env') ([ordered]@{
@@ -179,6 +213,15 @@ Write-ConfigOnce (Join-Path $configDir 'maintenance.env') ([ordered]@{
   DB_NAME='sage'
   }
 }
+$maintenancePasswordLines = @([IO.File]::ReadAllLines((Join-Path $configDir 'maintenance.env')) |
+  Where-Object { $_.StartsWith('DB_PASSWORD=') })
+if ($maintenancePasswordLines.Count -ne 1) { throw 'Senha de manutenção inválida' }
+$maintenancePassword = $maintenancePasswordLines[0].Substring('DB_PASSWORD='.Length)
+$clientContent = @(
+  '[client]', 'host=127.0.0.1', 'port=3307', 'user=sage_maintenance',
+  "password=$maintenancePassword", ''
+) -join [Environment]::NewLine
+Write-PrivateTextOnce (Join-Path $configDir 'maintenance-client.cnf') $clientContent
 
 Write-Host 'Estado privado do SAGE inicializado; nenhum segredo foi exibido.'
 } finally {

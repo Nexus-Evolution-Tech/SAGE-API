@@ -17,20 +17,68 @@
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
-const { execFile, spawn } = require('child_process');
-const { promisify } = require('util');
+const os = require('os');
+const { spawn } = require('child_process');
 const mysql = require('mysql2/promise');
 const logger = require('../config/logger');
 const { paths } = require('../config/paths');
-const execFileAsync = promisify(execFile);
+
+function privateFile(file, label) {
+  if (!path.isAbsolute(file)) throw new Error(`${label} deve ser absoluto`);
+  const stat = fsSync.lstatSync(file);
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`${label} inválido`);
+  return file;
+}
+
+function maintenanceDatabase() {
+  const file = process.env.SAGE_MAINTENANCE_CONFIG_FILE;
+  if (!file) return null;
+  const parsed = {};
+  for (const line of fsSync.readFileSync(privateFile(file, 'Config de manutenção'), 'utf8').split(/\r?\n/)) {
+    if (!line) continue;
+    const match = /^([A-Z][A-Z0-9_]*)=(.+)$/.exec(line);
+    if (!match || Object.hasOwn(parsed, match[1])) throw new Error('Config de manutenção inválida');
+    parsed[match[1]] = match[2];
+  }
+  const expected = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+  if (Object.keys(parsed).sort().join(',') !== expected.sort().join(',')) {
+    throw new Error('Config de manutenção possui chaves inválidas');
+  }
+  if (parsed.DB_USER !== 'sage_maintenance' || parsed.DB_HOST !== '127.0.0.1'
+      || parsed.DB_PORT !== '3307' || parsed.DB_NAME !== 'sage'
+      || !/^[A-Za-z0-9_-]{32,}$/.test(parsed.DB_PASSWORD)) {
+    throw new Error('Config de manutenção não corresponde à instância privada');
+  }
+  return parsed;
+}
+
+function maintenanceClientFile(file, maintenance) {
+  const checked = privateFile(file, 'Option file do MySQL');
+  if (!maintenance) return checked;
+  const expected = [
+    '[client]', 'host=127.0.0.1', 'port=3307', 'user=sage_maintenance',
+    `password=${maintenance.DB_PASSWORD}`, ''
+  ].join('\n');
+  if (fsSync.readFileSync(checked, 'utf8').replace(/\r\n/g, '\n') !== expected) {
+    throw new Error('Option file do MySQL não corresponde à manutenção');
+  }
+  return checked;
+}
 
 function config() {
+  const maintenance = maintenanceDatabase();
+  const privileged = maintenance || process.env;
+  const defaultsFile = process.env.MYSQL_DEFAULTS_EXTRA_FILE;
+  if (process.env.SAGE_REQUIRE_MAINTENANCE_DB === 'true' && (!defaultsFile || !maintenance)) {
+    throw new Error('Backup de produção exige credencial de manutenção separada');
+  }
   return {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'sage',
+    host: privileged.DB_HOST || 'localhost',
+    port: parseInt(privileged.DB_PORT || '3306', 10),
+    user: privileged.DB_USER || 'root',
+    password: privileged.DB_PASSWORD || '',
+    database: privileged.DB_NAME || 'sage',
+    defaultsFile: defaultsFile ? maintenanceClientFile(defaultsFile, maintenance) : null,
     diretorio: process.env.BACKUP_DIR || paths.backups,
     // No Windows o instalador conhece o caminho do MySQL que ele mesmo instalou.
     mysqldump: process.env.MYSQLDUMP_PATH || 'mysqldump',
@@ -38,6 +86,38 @@ function config() {
     reterDias: parseInt(process.env.BACKUP_RETER_DIAS || '14', 10),
     reterMinimo: parseInt(process.env.BACKUP_RETER_MINIMO || '3', 10)
   };
+}
+
+async function withClientOptionFile(cfg, operation) {
+  if (cfg.defaultsFile) return operation(cfg.defaultsFile);
+  if (process.platform === 'win32') {
+    throw new Error('Windows exige option file provisionado com DACL privada');
+  }
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'sage-mysql-client-'));
+  const file = path.join(directory, 'client.cnf');
+  if (/[\r\n\0]/.test(String(cfg.password))) throw new Error('Senha do MySQL inválida');
+  const password = String(cfg.password).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  try {
+    await fs.chmod(directory, 0o700);
+    await fs.writeFile(file, `[client]\npassword="${password}"\n`, { flag: 'wx', mode: 0o600 });
+    return await operation(file);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+}
+
+function subprocessEnvironment() {
+  const allowed = ['SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'PATH', 'LANG', 'LC_ALL'];
+  return Object.fromEntries(allowed.filter((key) => process.env[key] !== undefined)
+    .map((key) => [key, process.env[key]]));
+}
+
+function clientArgs(cfg, defaultsFile, database) {
+  return [
+    `--defaults-extra-file=${defaultsFile}`,
+    `--host=${cfg.host}`, `--port=${cfg.port}`, `--user=${cfg.user}`,
+    ...(database ? [database] : [])
+  ];
 }
 
 /** Tabelas cuja ausência significa backup inútil. */
@@ -89,22 +169,20 @@ async function gerarBackup() {
   await fs.mkdir(cfg.diretorio, { recursive: true });
   const destino = path.join(cfg.diretorio, nomeArquivo());
 
-  const args = [
-    `--host=${cfg.host}`, `--port=${cfg.port}`, `--user=${cfg.user}`,
+  const dumpOptions = [
     '--single-transaction', '--quick', '--routines', '--events',
     '--default-character-set=utf8mb4',
     // Sem isto o mysqldump emite um aviso sobre GTIDs e SAI COM CÓDIGO 2 — ou seja, o backup
     // falharia em produção por causa de um aviso, e a mensagem não deixa isso óbvio.
     // Descoberto ao rodar contra MySQL real; é também o que se quer para restaurar noutro banco.
-    '--set-gtid-purged=OFF',
-    cfg.database
+    '--set-gtid-purged=OFF'
   ];
 
-  await new Promise((resolve, reject) => {
+  await withClientOptionFile(cfg, (defaultsFile) => new Promise((resolve, reject) => {
     const saida = fsSync.createWriteStream(destino);
-    const proc = spawn(cfg.mysqldump, args, {
-      env: { ...process.env, MYSQL_PWD: cfg.password }
-    });
+    const proc = spawn(cfg.mysqldump, [
+      ...clientArgs(cfg, defaultsFile), ...dumpOptions, cfg.database
+    ], { env: subprocessEnvironment() });
     let stderr = '';
     proc.stdout.pipe(saida);
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -114,7 +192,7 @@ async function gerarBackup() {
       if (code !== 0) return reject(new Error(`mysqldump falhou (código ${code}): ${stderr.slice(0, 500)}`));
       resolve();
     });
-  });
+  }));
 
   const st = await fs.stat(destino);
   if (st.size === 0) {
@@ -146,10 +224,10 @@ async function verificarBackup(caminhoArquivo) {
     await admin.query(`CREATE DATABASE \`${bancoTemp}\` CHARACTER SET utf8mb4`);
 
     // Restaura de verdade
-    await new Promise((resolve, reject) => {
-      const proc = spawn(cfg.mysql, [
-        `--host=${cfg.host}`, `--port=${cfg.port}`, `--user=${cfg.user}`, bancoTemp
-      ], { env: { ...process.env, MYSQL_PWD: cfg.password } });
+    await withClientOptionFile(cfg, (defaultsFile) => new Promise((resolve, reject) => {
+      const proc = spawn(cfg.mysql, clientArgs(cfg, defaultsFile, bancoTemp), {
+        env: subprocessEnvironment()
+      });
       let stderr = '';
       fsSync.createReadStream(caminhoArquivo).pipe(proc.stdin);
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -158,7 +236,7 @@ async function verificarBackup(caminhoArquivo) {
         if (code !== 0) return reject(new Error(`restauração falhou (código ${code}): ${stderr.slice(0, 500)}`));
         resolve();
       });
-    });
+    }));
 
     const restaurado = await mysql.createConnection({ ...conexaoAdmin, database: bancoTemp });
     const origem = await mysql.createConnection({ ...conexaoAdmin, database: cfg.database });
@@ -226,5 +304,8 @@ module.exports = {
   aplicarRetencao,
   selecionarParaRemover,
   nomeArquivo,
-  TABELAS_ESSENCIAIS
+  TABELAS_ESSENCIAIS,
+  config,
+  clientArgs,
+  subprocessEnvironment
 };

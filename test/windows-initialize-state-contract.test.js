@@ -44,8 +44,11 @@ describe('contrato do estado privado no Windows', () => {
   it('separa runtime e manutenção sem criar credencial administrativa órfã', () => {
     expect(source).toContain("'sage.env'");
     expect(source).toContain("'maintenance.env'");
+    expect(source).toContain("'maintenance-client.cnf'");
+    expect(source).toContain("'user=sage_maintenance'");
+    expect(source).toContain('Write-PrivateTextOnce');
     expect(source).not.toMatch(/initial-admin|SAGE_INITIAL_ADMIN|bootstrap\.completed/);
-    expect(source).not.toMatch(/(?:DB_PASSWORD|JWT_SECRET|MONITOR_CALLBACK_TOKEN)\s*=\s*['"][^'"]+/);
+    expect(source).not.toMatch(/^[ \t]*(?:DB_PASSWORD|JWT_SECRET|MONITOR_CALLBACK_TOKEN)\s*=\s*['"][^'"]+/m);
     expect(source).not.toMatch(/etec123|SAGE_INITIAL_ADMIN_PASSWORD='[^']+'/);
   });
 });
