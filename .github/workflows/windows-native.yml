@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services]
 
 permissions:
   contents: read
@@ -72,7 +72,9 @@ jobs:
           npx vitest run test/windows-artifacts.test.js test/fetch-windows-artifacts.test.js `
             test/assemble-windows-layout.test.js test/windows-native-builder-contract.test.js `
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
-            test/backup-maintenance-credential.test.js
+            test/windows-services-contract.test.js test/start-with-setup.test.js `
+            test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
+            test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
           npm audit --omit=dev --audit-level=high
           if ($LASTEXITCODE -ne 0) { throw 'Audit de produção da API falhou' }
@@ -142,7 +144,7 @@ jobs:
           $base = $mysqlRoot.Replace('\', '/')
           [IO.File]::WriteAllLines($myIni, @(
             '[mysqld]', "basedir=$base", "datadir=$data", 'port=3307',
-            'bind-address=127.0.0.1', 'skip-name-resolve'
+            'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve'
           ), [Text.UTF8Encoding]::new($false))
           $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'
           & $mysqld --install-manual SAGE-MySQL-Smoke "--defaults-file=$myIni"
@@ -205,6 +207,137 @@ jobs:
             $mysqld = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
             if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGE-MySQL-Smoke }
           }
+          $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
+          if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
+
+      - name: Provar serviços privados e recuperação
+        shell: powershell
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
+          $program = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
+          $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
+          if (Test-Path -LiteralPath $program) { throw 'Program Files não está limpo para o smoke' }
+          Copy-Item -LiteralPath $output -Destination $program -Recurse
+          $provision = Join-Path $program 'service\provision-services.ps1'
+          & $provision
+          if (-not $?) { throw 'Primeiro provisionamento dos serviços falhou' }
+
+          $release = Get-Content -LiteralPath (Join-Path $program 'release.json') -Raw | ConvertFrom-Json
+          $config = Join-Path $state 'config'
+          $api = Join-Path $program "releases\$($release.version)\api"
+          $secretBytes = [byte[]]::new(32)
+          $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+          try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
+          $env:SAGE_INITIAL_ADMIN_LOGIN = 'windows_service_ci'
+          $env:SAGE_INITIAL_ADMIN_PASSWORD = [Convert]::ToBase64String($secretBytes).Replace('+', '-').Replace('/', '_')
+          $env:SAGE_INITIAL_SCHOOL_NAME = 'Unidade Serviço CI'
+          $env:SAGE_CONFIG_FILE = Join-Path $config 'maintenance.env'
+          Push-Location -LiteralPath $api
+          try {
+            & (Join-Path $program 'runtime\node\node.exe') scripts/setup-database.js
+            if ($LASTEXITCODE -ne 0) { throw 'Setup anterior ao serviço API falhou' }
+          } finally {
+            Pop-Location
+            Remove-Item Env:SAGE_INITIAL_ADMIN_LOGIN, Env:SAGE_INITIAL_ADMIN_PASSWORD, `
+              Env:SAGE_INITIAL_SCHOOL_NAME, Env:SAGE_CONFIG_FILE
+          }
+
+          & $provision -StartApi
+          if (-not $?) { throw 'Ativação dos serviços falhou' }
+          & $provision -StartApi
+          if (-not $?) { throw 'Segundo provisionamento não foi idempotente' }
+
+          $mysqlService = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
+          $apiService = Get-CimInstance Win32_Service -Filter "Name='SAGEAPI'"
+          if ($mysqlService.StartName -ne 'NT AUTHORITY\LocalService' -or
+              $apiService.StartName -ne 'NT AUTHORITY\LocalService') { throw 'Conta dos serviços diverge' }
+          if ($mysqlService.StartMode -ne 'Auto' -or $apiService.StartMode -ne 'Auto') {
+            throw 'Serviços não estão automáticos'
+          }
+          $delayed = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\SAGEAPI'
+          if ($delayed.DelayedAutoStart -ne 1) { throw 'SAGEAPI não usa início automático atrasado' }
+          if ((Get-Service SAGEAPI).RequiredServices.Name -notcontains 'SAGEMySQL') {
+            throw 'Dependência SAGEAPI -> SAGEMySQL ausente'
+          }
+          $sqlListeners = @(Get-NetTCPConnection -State Listen -LocalPort 3307 -ErrorAction SilentlyContinue)
+          if ($sqlListeners.Count -eq 0 -or @($sqlListeners | Where-Object LocalAddress -ne '127.0.0.1').Count) {
+            throw 'MySQL clássico não está restrito ao loopback'
+          }
+          if (Get-NetTCPConnection -State Listen -LocalPort 33060 -ErrorAction SilentlyContinue) {
+            throw 'MySQL X Protocol foi exposto'
+          }
+
+          function Wait-SageReady {
+            for ($attempt = 0; $attempt -lt 80; $attempt++) {
+              try {
+                $body = Invoke-RestMethod 'http://127.0.0.1:3000/ready' -TimeoutSec 2
+                if ($body.status -eq 'ready' -and $body.version -eq $release.version) { return }
+              } catch { }
+              Start-Sleep -Milliseconds 500
+            }
+            throw 'SAGEAPI não recuperou readiness'
+          }
+          Wait-SageReady
+          $nodeBefore = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+            Where-Object CommandLine -Match 'start-with-setup\.js' | Select-Object -First 1
+          if ($null -eq $nodeBefore) { throw 'Processo principal da API não encontrado' }
+          $childBefore = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+            Where-Object ParentProcessId -eq $nodeBefore.ProcessId | Select-Object -First 1
+          if ($null -eq $childBefore) { throw 'Processo HTTP filho não encontrado' }
+          Stop-Process -Id $nodeBefore.ProcessId -Force
+          Wait-SageReady
+          $nodeAfter = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+            Where-Object CommandLine -Match 'start-with-setup\.js' | Select-Object -First 1
+          if ($null -eq $nodeAfter -or $nodeAfter.ProcessId -eq $nodeBefore.ProcessId) {
+            throw 'WinSW não reiniciou a API'
+          }
+          $childAfter = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+            Where-Object ParentProcessId -eq $nodeAfter.ProcessId | Select-Object -First 1
+          if ($null -eq $childAfter -or
+              $null -ne (Get-Process -Id $childBefore.ProcessId -ErrorAction SilentlyContinue)) {
+            throw 'WinSW preservou processo órfão da API'
+          }
+          $mysqlProcess = Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
+            Where-Object CommandLine -Match 'SAGEMySQL' | Select-Object -First 1
+          if ($null -eq $mysqlProcess) { throw 'Processo SAGEMySQL não encontrado' }
+          Stop-Process -Id $mysqlProcess.ProcessId -Force
+          Wait-SageReady
+          $mysqlAfter = Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
+            Where-Object CommandLine -Match 'SAGEMySQL' | Select-Object -First 1
+          if ($null -eq $mysqlAfter -or $mysqlAfter.ProcessId -eq $mysqlProcess.ProcessId) {
+            throw 'SCM não reiniciou o MySQL'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $state 'logs\api\SAGE-API.out.log'))) {
+            throw 'Log rotativo da API não foi criado'
+          }
+          $secretValues = Get-Content (Join-Path $config 'sage.env'), (Join-Path $config 'maintenance.env') |
+            Where-Object { $_ -match '^(?:DB_PASSWORD|JWT_SECRET|MONITOR_CALLBACK_TOKEN)=' } |
+            ForEach-Object { $_.Substring($_.IndexOf('=') + 1) }
+          $observed = @((Get-CimInstance Win32_Process).CommandLine) +
+            @([IO.File]::ReadAllText((Join-Path $program 'service\SAGE-API.xml'))) +
+            @(Get-ChildItem (Join-Path $state 'logs') -File -Recurse | Get-Content -ErrorAction SilentlyContinue)
+          foreach ($secret in $secretValues) {
+            if (($observed -join "`n").Contains($secret)) { throw 'Segredo apareceu em processo, XML ou log' }
+          }
+
+      - name: Descartar serviços do smoke
+        if: always()
+        shell: powershell
+        run: |
+          $program = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
+          $apiService = Get-Service SAGEAPI -ErrorAction SilentlyContinue
+          if ($null -ne $apiService) {
+            if ($apiService.Status -ne 'Stopped') { Stop-Service SAGEAPI -Force }
+            $winsw = Join-Path $program 'service\SAGE-API.exe'
+            if (Test-Path -LiteralPath $winsw) { & $winsw uninstall }
+          }
+          $mysqlService = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+          if ($null -ne $mysqlService) {
+            if ($mysqlService.Status -ne 'Stopped') { Stop-Service SAGEMySQL -Force }
+            $mysqld = Join-Path $program 'runtime\mysql\bin\mysqld.exe'
+            if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGEMySQL }
+          }
+          if (Test-Path -LiteralPath $program) { Remove-Item -LiteralPath $program -Recurse -Force }
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
 

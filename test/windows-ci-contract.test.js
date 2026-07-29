@@ -45,6 +45,13 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain("$env:MYSQL_PATH = Join-Path $mysqlRoot 'bin\\mysql.exe'");
     expect(source).toContain('b.verificarBackup(x.caminho)');
     expect(source).toContain('Backup/restauração com grants restritos falhou');
+    expect(source).toContain('Provar serviços privados e recuperação');
+    expect(source).toContain('& $provision -StartApi');
+    expect(source).toContain("LocalPort 33060");
+    expect(source).toContain("Stop-Process -Id $nodeBefore.ProcessId -Force");
+    expect(source).toContain("Stop-Process -Id $mysqlProcess.ProcessId -Force");
+    expect(source).toContain('Segredo apareceu em processo, XML ou log');
+    expect(source).toContain('Descartar serviços do smoke');
     expect(source).toContain('Descartar estado do smoke MySQL');
     expect(source).toContain("'mysql-bootstrap-client.cnf'");
     expect(source).toContain('credencial root após sucesso');
