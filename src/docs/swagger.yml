@@ -475,7 +475,7 @@ paths:
                   description: ID da unidade escolar
                 tipo:
                   type: string
-                  description: Tipo da foto (ex: FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTROS)
+                  description: "Tipo da foto (ex: FACHADA, PLANTA, EVENTOS, INTERNA, EXTERNA, LOGO, OUTROS)"
                 descricao:
                   type: string
                   description: Descrição da imagem
