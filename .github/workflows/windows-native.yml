@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall]
 
 permissions:
   contents: read
@@ -72,7 +72,8 @@ jobs:
           npx vitest run test/windows-artifacts.test.js test/fetch-windows-artifacts.test.js `
             test/assemble-windows-layout.test.js test/windows-native-builder-contract.test.js `
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
-            test/windows-services-contract.test.js test/start-with-setup.test.js `
+            test/windows-services-contract.test.js test/windows-firewall-contract.test.js `
+            test/start-with-setup.test.js `
             test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
             test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
@@ -266,6 +267,30 @@ jobs:
           if (Get-NetTCPConnection -State Listen -LocalPort 33060 -ErrorAction SilentlyContinue) {
             throw 'MySQL X Protocol foi exposto'
           }
+          $firewall = @(Get-NetFirewallRule -PolicyStore ActiveStore -Name SAGE-API-LAN `
+            -TracePolicyStore)
+          $firewallPort = @(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $firewall[0])
+          $firewallAddress = @(Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $firewall[0])
+          $firewallApp = @(Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $firewall[0])
+          $expectedNode = Join-Path $program 'runtime\node\node.exe'
+          if ($firewall.Count -ne 1 -or [int]$firewall[0].Profile -ne 3 -or
+              $firewall[0].Direction.ToString() -ne 'Inbound' -or
+              $firewall[0].Action.ToString() -ne 'Allow' -or
+              $firewall[0].OverrideBlockRules.ToString() -ne 'False' -or
+              $firewall[0].PolicyStoreSourceType.ToString() -ne 'Local' -or
+              $firewallPort.LocalPort.ToString() -ne '3000' -or
+              @($firewallAddress.RemoteAddress).Count -ne 1 -or
+              $firewallAddress.RemoteAddress -ne 'LocalSubnet' -or
+              $firewallApp.Program -ne $expectedNode) {
+            throw 'Firewall da API não está mínimo e privado'
+          }
+          $profiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore -Name Domain,Private,Public)
+          if ($profiles.Count -ne 3 -or @($profiles | Where-Object {
+                $_.Enabled.ToString() -ne 'True' -or
+                $_.DefaultInboundAction.ToString() -ne 'Block'
+              }).Count -ne 0) {
+            throw 'Política efetiva do Windows Firewall não está fail-closed'
+          }
 
           function Wait-SageReady {
             for ($attempt = 0; $attempt -lt 80; $attempt++) {
@@ -325,6 +350,9 @@ jobs:
         shell: powershell
         run: |
           $program = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
+          $firewall = Get-NetFirewallRule -PolicyStore PersistentStore -Name SAGE-API-LAN `
+            -ErrorAction SilentlyContinue | Where-Object Group -CEQ 'SAGE'
+          if ($null -ne $firewall) { $firewall | Remove-NetFirewallRule }
           $apiService = Get-Service SAGEAPI -ErrorAction SilentlyContinue
           if ($null -ne $apiService) {
             if ($apiService.Status -ne 'Stopped') { Stop-Service SAGEAPI -Force }

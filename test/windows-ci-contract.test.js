@@ -48,6 +48,11 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain('Provar serviços privados e recuperação');
     expect(source).toContain('& $provision -StartApi');
     expect(source).toContain("LocalPort 33060");
+    expect(source).toContain('Get-NetFirewallRule -PolicyStore ActiveStore -Name SAGE-API-LAN');
+    expect(source).toContain('-TracePolicyStore');
+    expect(source).toContain("$firewall[0].PolicyStoreSourceType.ToString() -ne 'Local'");
+    expect(source).toContain('Política efetiva do Windows Firewall não está fail-closed');
+    expect(source).toContain("$firewallAddress.RemoteAddress -ne 'LocalSubnet'");
     expect(source).toContain("Stop-Process -Id $nodeBefore.ProcessId -Force");
     expect(source).toContain("Stop-Process -Id $mysqlProcess.ProcessId -Force");
     expect(source).toContain('Segredo apareceu em processo, XML ou log');

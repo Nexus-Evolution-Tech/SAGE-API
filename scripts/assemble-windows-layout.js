@@ -123,7 +123,9 @@ async function assembleWindowsLayout({
     const serviceXml = serviceTemplate.replaceAll('__SAGE_VERSION__', pkg.version);
     if (serviceXml.includes('__SAGE_VERSION__')) throw new Error('Template WinSW não foi resolvido');
     await fsp.writeFile(path.join(staging, 'service', 'SAGE-API.xml'), serviceXml);
-    for (const script of ['initialize-state.ps1', 'initialize-mysql.ps1', 'provision-services.ps1']) {
+    for (const script of [
+      'initialize-state.ps1', 'initialize-mysql.ps1', 'configure-firewall.ps1', 'provision-services.ps1'
+    ]) {
       await copyEntry(path.join(inputs.api, 'installer', 'windows', script), path.join(staging, 'service', script));
     }
     const releaseDir = path.join(staging, 'releases', pkg.version);

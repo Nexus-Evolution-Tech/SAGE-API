@@ -222,6 +222,8 @@ for ($attempt = 0; $attempt -lt 60; $attempt++) {
 if ($LASTEXITCODE -ne 0) { throw 'SAGEMySQL não ficou pronto' }
 
 if ($StartApi) {
+  & (Join-Path $PSScriptRoot 'configure-firewall.ps1')
+  if (-not $?) { throw 'Firewall privado do SAGE falhou' }
   $apiService = Get-Service SAGEAPI
   if ($apiService.Status -eq 'Running') { Restart-Service SAGEAPI -Force }
   else { Start-Service SAGEAPI }

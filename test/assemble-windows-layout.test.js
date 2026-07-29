@@ -26,6 +26,7 @@ async function fixture() {
   await write(api, 'database/migrations/0001_alpha.sql', 'SELECT 1;');
   await write(api, 'installer/windows/initialize-state.ps1');
   await write(api, 'installer/windows/initialize-mysql.ps1');
+  await write(api, 'installer/windows/configure-firewall.ps1');
   await write(api, 'installer/windows/provision-services.ps1');
   await write(api, 'installer/windows/SAGE-API.xml.template', [
     '<service>', '<id>SAGEAPI</id>', '<depend>SAGEMySQL</depend>',
@@ -108,6 +109,7 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('service/SAGE-API.xml');
     expect(files).toContain('service/initialize-state.ps1');
     expect(files).toContain('service/initialize-mysql.ps1');
+    expect(files).toContain('service/configure-firewall.ps1');
     expect(files).toContain('service/provision-services.ps1');
     expect(files).toContain('releases/1.2.3/api/node_modules/bcrypt/index.js');
     expect(files).toContain('releases/1.2.3/web/index.html');
