@@ -158,6 +158,37 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não ficou pronto' }
           & (Join-Path $output 'service\initialize-mysql.ps1')
           if (-not $?) { throw 'Segundo bootstrap MySQL não foi idempotente' }
+
+          $release = Get-Content -LiteralPath (Join-Path $output 'release.json') -Raw | ConvertFrom-Json
+          $api = Join-Path $output "releases\$($release.version)\api"
+          $secretBytes = [byte[]]::new(32)
+          $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+          try { $rng.GetBytes($secretBytes) } finally { $rng.Dispose() }
+          $env:SAGE_INITIAL_ADMIN_LOGIN = 'windows_ci_admin'
+          $env:SAGE_INITIAL_ADMIN_PASSWORD = [Convert]::ToBase64String($secretBytes).Replace('+', '-').Replace('/', '_')
+          $env:SAGE_INITIAL_SCHOOL_NAME = 'Unidade CI Windows'
+          $env:SAGE_CONFIG_FILE = Join-Path $config 'maintenance.env'
+          Push-Location -LiteralPath $api
+          try {
+            & (Join-Path $output 'runtime\node\node.exe') scripts/setup-database.js
+            if ($LASTEXITCODE -ne 0) { throw 'Setup com manutenção restrita falhou' }
+          } finally {
+            Pop-Location
+            Remove-Item Env:SAGE_INITIAL_ADMIN_LOGIN, Env:SAGE_INITIAL_ADMIN_PASSWORD, `
+              Env:SAGE_INITIAL_SCHOOL_NAME, Env:SAGE_CONFIG_FILE
+          }
+
+          $env:SAGE_CONFIG_FILE = Join-Path $config 'sage.env'
+          $env:SAGE_DATA_DIR = $state
+          Push-Location -LiteralPath $api
+          try {
+            & (Join-Path $output 'runtime\node\node.exe') -e `
+              "const b=require('./src/services/backupBanco');(async()=>{const x=await b.gerarBackup();const v=await b.verificarBackup(x.caminho);if(!v.ok)throw Error('backup restrito inválido')})().catch(e=>{console.error(e.message);process.exit(1)})"
+            if ($LASTEXITCODE -ne 0) { throw 'Backup/restauração com grants restritos falhou' }
+          } finally {
+            Pop-Location
+            Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_DATA_DIR
+          }
           Stop-Service SAGE-MySQL-Smoke
           & $mysqld --remove SAGE-MySQL-Smoke
           if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não foi removido' }
