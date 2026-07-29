@@ -537,7 +537,7 @@ async function criarAcesso(dados) {
  * Processa o payload POST /api/notifications/dao enviado pelo Monitor da Control iD.
  * Documentação: https://www.controlid.com.br/docs/access-api-pt/monitor/introducao-ao-monitor/
  * @param {object} payload - { object_changes: [{ object, type, values }], device_id }
- * @returns {Promise<{ processados: number, ignorados: number, erros: string[] }>}
+ * @returns {Promise<{ processados: number, ignorados: number, ignoradosSemId: number, erros: string[] }>}
  */
 async function processarNotificacaoMonitorDao(payload) {
   const logger = require('../config/logger');
@@ -548,7 +548,7 @@ async function processarNotificacaoMonitorDao(payload) {
 
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) payload = {};
 
-  const result = { processados: 0, ignorados: 0, erros: [] };
+  const result = { processados: 0, ignorados: 0, ignoradosSemId: 0, erros: [] };
   // Contador de tentativas com identificação não cadastrada. Era usado nas linhas abaixo sem
   // nunca ter sido declarado, o que lançava ReferenceError (o `++` lê antes de escrever, então
   // falha inclusive em modo não-strict). Coberto por test/regressao-monitor-dao.test.js.
@@ -620,7 +620,16 @@ async function processarNotificacaoMonitorDao(payload) {
     let card_value = String(v.card_value != null ? v.card_value : '');
     if (card_value.length > 64) card_value = card_value.slice(0, 64);
 
-    if (catracaLogId == null || time == null || portal_id == null) {
+    if (catracaLogId == null) {
+      result.ignorados++;
+      result.ignoradosSemId++;
+      logger.error(
+        `[MONITOR DAO] Evento access_logs sem id válido descartado (device_id=${deviceIdControlId})`
+      );
+      continue;
+    }
+
+    if (time == null || portal_id == null) {
       result.ignorados++;
       continue;
     }

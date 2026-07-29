@@ -59,6 +59,16 @@ describe('processarNotificacaoMonitorDao — identificação não cadastrada', (
           object: 'access_logs',
           type: 'inserted',
           values: {
+            time: Math.floor(Date.now() / 1000),
+            user_id: 111000001,
+            portal_id: 1,
+            card_value: '12345678'
+          }
+        },
+        {
+          object: 'access_logs',
+          type: 'inserted',
+          values: {
             id: true,
             time: Math.floor(Date.now() / 1000),
             user_id: 111000001,
@@ -107,7 +117,8 @@ describe('processarNotificacaoMonitorDao — identificação não cadastrada', (
     const resultado = await accessService.processarNotificacaoMonitorDao(payload);
 
     expect(resultado).toBeDefined();
-    expect(resultado.ignorados).toBe(4);
+    expect(resultado.ignorados).toBe(5);
+    expect(resultado.ignoradosSemId).toBe(3);
     expect(resultado.processados).toBe(1);
     const [[acesso]] = await banco.pool.query('SELECT metodo_auth FROM Acesso');
     expect(acesso.metodo_auth).toBe('QR_CODE');
