@@ -337,9 +337,23 @@ jobs:
             $mysqld = Join-Path $program 'runtime\mysql\bin\mysqld.exe'
             if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGEMySQL }
           }
-          if (Test-Path -LiteralPath $program) { Remove-Item -LiteralPath $program -Recurse -Force }
+          for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $program); $attempt++) {
+            try {
+              Remove-Item -LiteralPath $program -Recurse -Force -ErrorAction Stop
+            } catch {
+              if ($attempt -eq 19) { throw }
+              Start-Sleep -Milliseconds 500
+            }
+          }
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
-          if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
+          for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $state); $attempt++) {
+            try {
+              Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction Stop
+            } catch {
+              if ($attempt -eq 19) { throw }
+              Start-Sleep -Milliseconds 500
+            }
+          }
 
       - name: Descartar protótipo
         if: always()
