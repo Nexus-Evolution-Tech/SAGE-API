@@ -12,7 +12,9 @@ describe('firewall Windows mínimo do SAGE', () => {
     expect(firewall).toContain('-RemoteAddress LocalSubnet');
     expect(firewall).toContain('-Protocol TCP -LocalPort 3000');
     expect(firewall).toContain('-EdgeTraversalPolicy Block');
-    expect(firewall).toContain("$Rule.OverrideBlockRules.ToString() -cne 'False'");
+    expect(firewall).toContain('Get-NetFirewallSecurityFilter -AssociatedNetFirewallRule $Rule');
+    expect(firewall).toContain("$security.OverrideBlockRules.ToString() -cne 'False'");
+    expect(firewall).toContain('-OverrideBlockRules $false');
     expect(firewall).toContain('Get-NetFirewallProfile -PolicyStore ActiveStore -Name Domain,Private,Public');
     expect(firewall).toContain("$_.DefaultInboundAction.ToString() -cne 'Block'");
     expect(firewall).not.toMatch(/3307|33060|Profile (?:Any|Public)/);

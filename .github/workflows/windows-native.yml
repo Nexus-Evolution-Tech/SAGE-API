@@ -272,16 +272,22 @@ jobs:
           $firewallPort = @(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $firewall[0])
           $firewallAddress = @(Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $firewall[0])
           $firewallApp = @(Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $firewall[0])
+          $firewallSecurity = @(Get-NetFirewallSecurityFilter -AssociatedNetFirewallRule $firewall[0])
           $expectedNode = Join-Path $program 'runtime\node\node.exe'
           if ($firewall.Count -ne 1 -or [int]$firewall[0].Profile -ne 3 -or
+              $firewall[0].Enabled.ToString() -ne 'True' -or
               $firewall[0].Direction.ToString() -ne 'Inbound' -or
               $firewall[0].Action.ToString() -ne 'Allow' -or
-              $firewall[0].OverrideBlockRules.ToString() -ne 'False' -or
+              $firewall[0].EdgeTraversalPolicy.ToString() -ne 'Block' -or
               $firewall[0].PolicyStoreSourceType.ToString() -ne 'Local' -or
+              $firewallPort.Count -ne 1 -or $firewallPort.Protocol.ToString() -ne 'TCP' -or
               $firewallPort.LocalPort.ToString() -ne '3000' -or
-              @($firewallAddress.RemoteAddress).Count -ne 1 -or
+              $firewallPort.RemotePort.ToString() -ne 'Any' -or
+              $firewallAddress.Count -ne 1 -or @($firewallAddress.RemoteAddress).Count -ne 1 -or
               $firewallAddress.RemoteAddress -ne 'LocalSubnet' -or
-              $firewallApp.Program -ne $expectedNode) {
+              $firewallApp.Count -ne 1 -or $firewallApp.Program -ne $expectedNode -or
+              $firewallSecurity.Count -ne 1 -or
+              $firewallSecurity.OverrideBlockRules.ToString() -ne 'False') {
             throw 'Firewall da API não está mínimo e privado'
           }
           $profiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore -Name Domain,Private,Public)

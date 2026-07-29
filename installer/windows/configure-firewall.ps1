@@ -38,16 +38,17 @@ function Assert-SageFirewallRule {
   $port = @(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $Rule)
   $address = @(Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $Rule)
   $application = @(Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $Rule)
+  $security = @(Get-NetFirewallSecurityFilter -AssociatedNetFirewallRule $Rule)
   $remote = @($address.RemoteAddress)
   if ($Rule.DisplayName -cne $displayName -or $Rule.Group -cne $group -or
       $Rule.Direction.ToString() -cne 'Inbound' -or $Rule.Action.ToString() -cne 'Allow' -or
       $Rule.Enabled.ToString() -cne 'True' -or [int]$Rule.Profile -ne 3 -or
-      $Rule.OverrideBlockRules.ToString() -cne 'False' -or
       $Rule.EdgeTraversalPolicy.ToString() -cne 'Block' -or
       $port.Count -ne 1 -or $port.Protocol.ToString() -cne 'TCP' -or
       $port.LocalPort.ToString() -cne '3000' -or $port.RemotePort.ToString() -cne 'Any' -or
       $address.Count -ne 1 -or $remote.Count -ne 1 -or $remote[0] -cne 'LocalSubnet' -or
-      $application.Count -ne 1 -or $application.Program -cne $node) {
+      $application.Count -ne 1 -or $application.Program -cne $node -or
+      $security.Count -ne 1 -or $security.OverrideBlockRules.ToString() -cne 'False') {
     throw "Regra de firewall $Source divergente: $ruleName"
   }
 }
@@ -66,7 +67,7 @@ try {
     New-NetFirewallRule -PolicyStore PersistentStore -Name $ruleName -DisplayName $displayName `
       -Group $group -Direction Inbound -Action Allow -Enabled True -Profile Domain,Private `
       -Protocol TCP -LocalPort 3000 -RemoteAddress LocalSubnet -Program $node `
-      -EdgeTraversalPolicy Block | Out-Null
+      -EdgeTraversalPolicy Block -OverrideBlockRules $false | Out-Null
     $rules = @(Get-NetFirewallRule -PolicyStore PersistentStore -Name $ruleName)
   }
   if ($rules.Count -ne 1) { throw "Regra de firewall não foi criada: $ruleName" }
