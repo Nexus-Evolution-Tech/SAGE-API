@@ -171,6 +171,7 @@ async function gerarBackup() {
 
   const dumpOptions = [
     '--single-transaction', '--quick', '--routines', '--events',
+    '--no-tablespaces',
     '--default-character-set=utf8mb4',
     // Sem isto o mysqldump emite um aviso sobre GTIDs e SAI COM CÓDIGO 2 — ou seja, o backup
     // falharia em produção por causa de um aviso, e a mensagem não deixa isso óbvio.

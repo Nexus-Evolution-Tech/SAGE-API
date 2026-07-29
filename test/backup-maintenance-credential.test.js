@@ -69,6 +69,7 @@ describe('backup usa credencial privilegiada separada', () => {
   it('não entrega senha por argumento nem variável de ambiente do subprocesso', () => {
     const source = fsSync.readFileSync(SOURCE, 'utf8');
     expect(source).not.toMatch(/MYSQL_PWD|--password|-p\$\{/);
+    expect(source).toContain("'--no-tablespaces'");
     expect(source).toContain('--defaults-extra-file=${defaultsFile}');
     expect(source).toContain('env: subprocessEnvironment()');
     expect(source).toContain("process.platform === 'win32'");
