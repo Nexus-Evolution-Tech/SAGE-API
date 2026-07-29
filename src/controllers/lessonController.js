@@ -234,13 +234,14 @@ const lessonController = {
   },
 
   // --------------------------------------------------
-  // GET /aulas/horarios/:turma_id  (COMPAT)
+  // GET /aulas/horarios/:turma_id/:divisao  (COMPAT)
   // --------------------------------------------------
   async getHorariosPorTurma(req, res) {
-    const { turma_id } = req.params;
-    const turmaId = parseId(turma_id);
+    const { turma_id, divisao } = req.params;
+    const turmaId = Number(turma_id);
+    const divisoes = new Set(['INT', 'DIV A', 'DIV B']);
 
-    if (!turmaId) {
+    if (!Number.isInteger(turmaId) || turmaId <= 0 || !divisoes.has(divisao)) {
       return res.status(400).json({ message: 'Parâmetros inválidos' });
     }
 
@@ -251,17 +252,23 @@ const lessonController = {
           a.id AS aulaId,
           a.nome,
           h.dia_semana AS diaSemana,
-          h.inicio,
-          h.fim
+          h.horario
         FROM HorarioAula h
         JOIN Aula a ON a.id = h.aula_id
         WHERE h.turma_id = ?
-        ORDER BY h.dia_semana, h.inicio
+          AND h.divisao IN (?, 'INT')
+        ORDER BY h.dia_semana, h.horario
         `,
-        [turmaId]
+        [turmaId, divisao]
       );
 
-      res.json(rows || []);
+      const horarios = (rows || []).map(({ horario, ...aula }) => {
+        const match = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/.exec(horario);
+        if (!match) throw new Error(`HorarioAula.horario inválido para aula ${aula.aulaId}`);
+        return { ...aula, inicio: `${match[1]}:${match[2]}`, fim: `${match[3]}:${match[4]}` };
+      });
+
+      res.json(horarios);
     } catch (error) {
       logger.error(`Erro ao buscar horários por turma: ${error.message}`);
       res.status(500).json({ message: 'Erro ao buscar horários' });

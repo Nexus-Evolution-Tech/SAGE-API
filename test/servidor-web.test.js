@@ -4,15 +4,17 @@ const os = require('os');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
+const jwt = require('jsonwebtoken');
 
 const execFileAsync = promisify(execFile);
 const RAIZ = path.join(__dirname, '..');
 const APP = path.join(RAIZ, 'src', 'app.js');
 const WEB_CONFIG = path.join(RAIZ, 'src', 'config', 'web.js');
+const JWT_SECRET = 'teste-servidor-web-sage-32-caracteres';
 
-function requisitar(porta, rota, headers = {}) {
+function requisitar(porta, rota, headers = {}, method = 'GET') {
   return new Promise((resolve, reject) => {
-    const request = http.request({ hostname: '127.0.0.1', port: porta, path: rota, headers }, (response) => {
+    const request = http.request({ hostname: '127.0.0.1', port: porta, path: rota, headers, method }, (response) => {
       const partes = [];
       response.on('data', (parte) => partes.push(parte));
       response.on('end', () => resolve({
@@ -84,10 +86,12 @@ describe('F8.3b — painel servido pela API', () => {
       DB_PORT: '1',
       DB_USER: 'indisponivel',
       DB_PASSWORD: 'indisponivel',
-      DB_NAME: 'indisponivel'
+      DB_NAME: 'indisponivel',
+      JWT_SECRET
     });
     try {
-      const [raiz, asset, turmasHtml, turmasJson, turmasSemAccept, turmasWildcard, profunda, health, ready, docs, apiProtegida, apiAusente, endpointApiAusente, socket, uploadAusente] = await Promise.all([
+      const authorization = `Bearer ${jwt.sign({ id: 1 }, JWT_SECRET)}`;
+      const [raiz, asset, turmasHtml, turmasJson, turmasSemAccept, turmasWildcard, profunda, health, ready, docs, apiProtegida, apiAusente, endpointApiAusente, socket, uploadAusente, horarios, horarioId, horariosPost, horarioPut, horarioDelete, horarioValidar, horariosAulas] = await Promise.all([
         requisitar(porta, '/', { accept: 'text/html' }),
         requisitar(porta, '/app.js'),
         requisitar(porta, '/turmas', { accept: 'text/html' }),
@@ -102,7 +106,14 @@ describe('F8.3b — painel servido pela API', () => {
         requisitar(porta, '/api/nao-existe'),
         requisitar(porta, '/endpoint-api-inexistente', { accept: 'text/html' }),
         requisitar(porta, '/socket.io/?EIO=4&transport=polling'),
-        requisitar(porta, '/uploads/nao-existe')
+        requisitar(porta, '/uploads/nao-existe'),
+        requisitar(porta, '/horarios', { authorization }),
+        requisitar(porta, '/horarios/42', { authorization }),
+        requisitar(porta, '/horarios', { authorization }, 'POST'),
+        requisitar(porta, '/horarios/42', { authorization }, 'PUT'),
+        requisitar(porta, '/horarios/42', { authorization }, 'DELETE'),
+        requisitar(porta, '/horarios/validar', { authorization }, 'POST'),
+        requisitar(porta, '/horarios-aulas')
       ]);
 
       expect(raiz.status).toBe(200);
@@ -128,6 +139,13 @@ describe('F8.3b — painel servido pela API', () => {
       expect(endpointApiAusente).toMatchObject({ status: 404, body: expect.stringContaining('Rota não encontrada') });
       expect(socket).toMatchObject({ status: 200, body: expect.stringContaining('"sid"') });
       expect(uploadAusente).toMatchObject({ status: 404, body: expect.stringContaining('Rota não encontrada') });
+      expect(horarios).toMatchObject({ status: 410, body: expect.stringContaining('/horarios-aulas') });
+      expect(horarioId).toMatchObject({ status: 410, body: expect.stringContaining('/horarios-aulas') });
+      for (const resposta of [horariosPost, horarioPut, horarioDelete, horarioValidar]) {
+        expect(resposta.status).toBe(410);
+      }
+      expect(horarios.headers.deprecation).toBe('true');
+      expect(horariosAulas).toMatchObject({ status: 401, body: expect.stringContaining('Token não fornecido') });
     } finally {
       await encerrarApp(processo);
     }
