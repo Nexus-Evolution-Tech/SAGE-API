@@ -118,11 +118,13 @@ function Assert-Accounts {
   $runtimeLines = @($runtimeGrants.Trim() -split "`r?`n")
   $maintenanceLines = @($maintenanceGrants.Trim() -split "`r?`n")
   if ($runtimeLines.Count -ne 2 -or
+      @($runtimeLines -match '^GRANT USAGE ON \*\.\* TO `sage_runtime`@`127\.0\.0\.1`$').Count -ne 1 -or
       @($runtimeLines -match 'GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON `sage`\.\*').Count -ne 1 -or
-      $runtimeGrants -match 'GRANT OPTION|ALL PRIVILEGES| ON \*\.\*') {
+      $runtimeGrants -match 'GRANT OPTION|ALL PRIVILEGES') {
     throw 'Privilégios do runtime divergentes'
   }
   if ($maintenanceLines.Count -ne 4 -or
+      @($maintenanceLines -match '^GRANT USAGE ON \*\.\* TO `sage_maintenance`@`127\.0\.0\.1`$').Count -ne 1 -or
       @($maintenanceLines -match 'GRANT SHOW_ROUTINE ON \*\.\*').Count -ne 1 -or
       @($maintenanceLines -match 'GRANT ALL PRIVILEGES ON `sage`\.\*').Count -ne 1 -or
       @($maintenanceLines -match 'sage.*verif.*%').Count -ne 1 -or

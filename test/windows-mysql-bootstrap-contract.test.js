@@ -22,6 +22,8 @@ describe('bootstrap privado do MySQL no Windows', () => {
     expect(source).toContain('GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON `sage`.*');
     expect(source).toContain('GRANT SHOW_ROUTINE ON *.*');
     expect(source).toContain('GRANT ALL PRIVILEGES ON `sage\\_verif\\_%`.*');
+    expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_runtime`');
+    expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_maintenance`');
     expect(source).not.toMatch(/'sage_(?:runtime|maintenance)'@'%'|GRANT ALL PRIVILEGES ON \*\.\*/);
     const grants = source.split('\n').filter((line) => line.startsWith('GRANT '));
     expect(grants.join('\n')).not.toMatch(/\bGRANT OPTION\b/);
