@@ -8,7 +8,7 @@ describe('bootstrap privado do MySQL no Windows', () => {
 
   it('faz primeiro boot sem rede e não recebe segredo ou caminho externo', () => {
     const parameters = source.slice(0, source.indexOf('Set-StrictMode'));
-    expect(parameters).toBe('[CmdletBinding()]\nparam()\n\n');
+    expect(parameters.replace(/\r\n/g, '\n')).toBe('[CmdletBinding()]\nparam()\n\n');
     expect(source).toContain("'--initialize-insecure'");
     expect(source).toContain("'--skip-networking'");
     expect(source).toContain("'--shared-memory'");
