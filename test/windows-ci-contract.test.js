@@ -41,6 +41,8 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain('--install-manual SAGE-MySQL-Smoke');
     expect(source).toContain('Segundo bootstrap MySQL não foi idempotente');
     expect(source).toContain('scripts/setup-database.js');
+    expect(source).toContain("$env:MYSQLDUMP_PATH = Join-Path $mysqlRoot 'bin\\mysqldump.exe'");
+    expect(source).toContain("$env:MYSQL_PATH = Join-Path $mysqlRoot 'bin\\mysql.exe'");
     expect(source).toContain('b.verificarBackup(x.caminho)');
     expect(source).toContain('Backup/restauração com grants restritos falhou');
     expect(source).toContain('Descartar estado do smoke MySQL');

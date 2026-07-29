@@ -180,6 +180,8 @@ jobs:
 
           $env:SAGE_CONFIG_FILE = Join-Path $config 'sage.env'
           $env:SAGE_DATA_DIR = $state
+          $env:MYSQLDUMP_PATH = Join-Path $mysqlRoot 'bin\mysqldump.exe'
+          $env:MYSQL_PATH = Join-Path $mysqlRoot 'bin\mysql.exe'
           Push-Location -LiteralPath $api
           try {
             & (Join-Path $output 'runtime\node\node.exe') -e `
@@ -187,7 +189,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Backup/restauração com grants restritos falhou' }
           } finally {
             Pop-Location
-            Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_DATA_DIR
+            Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_DATA_DIR, Env:MYSQLDUMP_PATH, Env:MYSQL_PATH
           }
           Stop-Service SAGE-MySQL-Smoke
           & $mysqld --remove SAGE-MySQL-Smoke
