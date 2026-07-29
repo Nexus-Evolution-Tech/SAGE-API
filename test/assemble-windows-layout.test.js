@@ -26,6 +26,11 @@ async function fixture() {
   await write(api, 'database/migrations/0001_alpha.sql', 'SELECT 1;');
   await write(api, 'installer/windows/initialize-state.ps1');
   await write(api, 'installer/windows/initialize-mysql.ps1');
+  await write(api, 'installer/windows/provision-services.ps1');
+  await write(api, 'installer/windows/SAGE-API.xml.template', [
+    '<service>', '<id>SAGEAPI</id>', '<depend>SAGEMySQL</depend>',
+    '<arguments>__SAGE_VERSION__</arguments>', '</service>'
+  ].join('\n'));
   await write(api, 'node_modules/.package-lock.json', '{}');
   await write(api, 'node_modules/bcrypt/index.js');
   const web = path.join(root, 'web');
@@ -100,10 +105,17 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('runtime/node/node_modules/npm/.npmrc');
     expect(files).toContain('runtime/mysql/bin/mysqld.exe');
     expect(files).toContain('service/SAGE-API.exe');
+    expect(files).toContain('service/SAGE-API.xml');
     expect(files).toContain('service/initialize-state.ps1');
     expect(files).toContain('service/initialize-mysql.ps1');
+    expect(files).toContain('service/provision-services.ps1');
     expect(files).toContain('releases/1.2.3/api/node_modules/bcrypt/index.js');
     expect(files).toContain('releases/1.2.3/web/index.html');
+    const serviceXml = await fs.readFile(path.join(input.destination, 'service', 'SAGE-API.xml'), 'utf8');
+    expect(serviceXml).toContain('<id>SAGEAPI</id>');
+    expect(serviceXml).toContain('<depend>SAGEMySQL</depend>');
+    expect(serviceXml).toContain('<arguments>1.2.3</arguments>');
+    expect(serviceXml).not.toContain('__SAGE_VERSION__');
     expect(release.files.every(({ sha256 }) => /^[a-f0-9]{64}$/.test(sha256))).toBe(true);
     expect(JSON.parse(await fs.readFile(path.join(input.destination, 'release.json'), 'utf8')))
       .toEqual(release);

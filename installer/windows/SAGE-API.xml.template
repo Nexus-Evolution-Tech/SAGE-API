@@ -1,0 +1,26 @@
+<service>
+  <id>SAGEAPI</id>
+  <name>SAGE API</name>
+  <description>API e painel local do SAGE</description>
+  <executable>%BASE%\..\runtime\node\node.exe</executable>
+  <arguments>"%BASE%\..\releases\__SAGE_VERSION__\api\scripts\start-with-setup.js"</arguments>
+  <workingdirectory>%BASE%\..\releases\__SAGE_VERSION__\api</workingdirectory>
+  <env name="SAGE_CONFIG_FILE" value="%ProgramData%\SAGE\config\sage.env"/>
+  <env name="SAGE_DATA_DIR" value="%ProgramData%\SAGE"/>
+  <startmode>Manual</startmode>
+  <depend>SAGEMySQL</depend>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="120 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <logpath>%ProgramData%\SAGE\logs\api</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>
