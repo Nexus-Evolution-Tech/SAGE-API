@@ -13,6 +13,7 @@ const paths = Object.freeze({
   dataRoot,
   config: path.join(dataRoot, 'config'),
   logs: path.join(dataRoot, 'logs'),
+  apiLogs: path.join(dataRoot, 'logs', 'api'),
   uploads: configuredDataDir ? path.join(dataRoot, 'uploads') : path.join(appRoot, 'src', 'uploads'),
   exports: path.join(dataRoot, 'exports'),
   backups: path.join(dataRoot, 'backups'),
@@ -20,7 +21,7 @@ const paths = Object.freeze({
 });
 
 function ensureDataDirs() {
-  for (const dir of [paths.config, paths.logs, paths.uploads, paths.exports, paths.backups]) {
+  for (const dir of [paths.config, paths.logs, paths.apiLogs, paths.uploads, paths.exports, paths.backups]) {
     fs.mkdirSync(dir, { recursive: true });
   }
   return paths;

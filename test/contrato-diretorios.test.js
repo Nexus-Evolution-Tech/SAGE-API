@@ -57,6 +57,7 @@ describe('F8.2 — contrato de diretórios', () => {
       expect(resultado.paths.dataRoot).toBe(dataDir);
       expect(await fs.realpath(resultado.paths.appRoot)).toBe(await fs.realpath(release));
       expect(resultado.paths.uploads).toBe(path.join(dataDir, 'uploads'));
+      expect(resultado.paths.apiLogs).toBe(path.join(dataDir, 'logs', 'api'));
       expect(resultado.paths.models).toBe(path.join(resultado.paths.appRoot, 'models'));
       expect(resultado.backupValido).toBe(true);
       expect(resultado.prefixoIrmao).toBe(false);
@@ -64,6 +65,7 @@ describe('F8.2 — contrato de diretórios', () => {
       for (const dir of ['config', 'logs', 'uploads', 'exports', 'backups']) {
         expect((await fs.stat(path.join(dataDir, dir))).isDirectory()).toBe(true);
       }
+      expect((await fs.stat(path.join(dataDir, 'logs', 'api'))).isDirectory()).toBe(true);
       expect(await fs.readdir(release)).toEqual(['node_modules', 'src']);
     } finally {
       await tornarRemovivel(release);

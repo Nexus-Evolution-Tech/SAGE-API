@@ -39,6 +39,9 @@ describe('contrato do estado privado no Windows', () => {
     expect(source).toContain("'^[A-Za-z0-9_-]{32,}$'");
     expect(source).toContain('$found[$key] -ceq $policy');
     expect(source).toContain('catch [Threading.AbandonedMutexException]');
+    expect(source).toContain("@('SAGEAPI', 'SAGEMySQL')");
+    expect(source).toContain('ChangePermissions');
+    expect(source).toContain('TakeOwnership');
   });
 
   it('separa runtime e manutenção sem criar credencial administrativa órfã', () => {
@@ -50,5 +53,15 @@ describe('contrato do estado privado no Windows', () => {
     expect(source).not.toMatch(/initial-admin|SAGE_INITIAL_ADMIN|bootstrap\.completed/);
     expect(source).not.toMatch(/^[ \t]*(?:DB_PASSWORD|JWT_SECRET|MONITOR_CALLBACK_TOKEN)\s*=\s*['"][^'"]+/m);
     expect(source).not.toMatch(/etec123|SAGE_INITIAL_ADMIN_PASSWORD='[^']+'/);
+  });
+
+  it('gera configuração MySQL local e diretórios privados dos serviços', () => {
+    expect(source).toContain("'mysql\\tmp'");
+    expect(source).toContain("'logs\\api'");
+    expect(source).toContain("'logs\\mysql'");
+    expect(source).toContain("'bind-address=127.0.0.1'");
+    expect(source).toContain("'mysqlx=0'");
+    expect(source).toContain("'innodb-flush-log-at-trx-commit=1'");
+    expect(source).toContain("'mysql.ini'");
   });
 });

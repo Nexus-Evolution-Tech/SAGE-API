@@ -186,8 +186,7 @@ app.get('/health', (req, res) => {
 const checkReadiness = createReadinessChecker({
   db,
   dataDirectories: [
-    paths.config,
-    paths.logs,
+    paths.apiLogs,
     paths.uploads,
     paths.exports,
     paths.backups

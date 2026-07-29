@@ -22,6 +22,14 @@ if (-not [IO.Path]::IsPathRooted($dataRoot) -or $dataRoot -notmatch '^[A-Za-z]:\
 $systemSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
 $adminsSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
 $requiredSids = @($systemSid.Value, $adminsSid.Value)
+$serviceSids = @(@('SAGEAPI', 'SAGEMySQL') | ForEach-Object {
+  try {
+    [Security.Principal.NTAccount]::new('NT SERVICE', $_).Translate(
+      [Security.Principal.SecurityIdentifier]
+    ).Value
+  } catch { $null }
+} | Where-Object { $_ })
+$allowedSids = @($requiredSids) + @($serviceSids)
 $secretMarker = '__GENERATED_SECRET__'
 
 function New-PrivateAcl {
@@ -53,10 +61,14 @@ function Assert-PrivateAcl {
   $seen = @{}
   foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
     $sid = $rule.IdentityReference.Value
-    if ($requiredSids -notcontains $sid -or
+    $forbiddenServiceRights = [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+      [Security.AccessControl.FileSystemRights]::TakeOwnership
+    if ($allowedSids -notcontains $sid -or
         $rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
-        ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
-          [Security.AccessControl.FileSystemRights]::FullControl) {
+        ($requiredSids -contains $sid -and
+          ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+            [Security.AccessControl.FileSystemRights]::FullControl) -or
+        ($serviceSids -contains $sid -and ($rule.FileSystemRights -band $forbiddenServiceRights))) {
       throw "ACL não autorizada: $Path"
     }
     $seen[$sid] = $true
@@ -167,7 +179,10 @@ try {
 try { $lockTaken = $mutex.WaitOne(0) }
 catch [Threading.AbandonedMutexException] { $lockTaken = $true }
 if (-not $lockTaken) { throw 'Outro provisionamento do SAGE está em execução' }
-$directories = @('config', 'mysql', 'logs', 'backups', 'uploads', 'exports')
+$directories = @(
+  'config', 'mysql', 'mysql\tmp', 'logs', 'logs\api', 'logs\mysql',
+  'backups', 'uploads', 'exports'
+)
 $rootExisted = Test-Path -LiteralPath $dataRoot
 [void][IO.Directory]::CreateDirectory($dataRoot)
 Assert-RegularLocalPath $dataRoot
@@ -222,6 +237,23 @@ $clientContent = @(
   "password=$maintenancePassword", ''
 ) -join [Environment]::NewLine
 Write-PrivateTextOnce (Join-Path $configDir 'maintenance-client.cnf') $clientContent
+
+$mysqlIniContent = @(
+  '[mysqld]'
+  "basedir=$((Join-Path $programRoot 'runtime\mysql').Replace('\', '/'))"
+  "datadir=$((Join-Path $dataRoot 'mysql\data').Replace('\', '/'))"
+  "tmpdir=$((Join-Path $dataRoot 'mysql\tmp').Replace('\', '/'))"
+  'port=3307'
+  'bind-address=127.0.0.1'
+  'mysqlx=0'
+  'skip-name-resolve'
+  'local-infile=OFF'
+  'innodb-flush-log-at-trx-commit=1'
+  "log-error=$((Join-Path $dataRoot 'logs\mysql\mysql-error.log').Replace('\', '/'))"
+  'log-error-verbosity=2'
+  ''
+) -join [Environment]::NewLine
+Write-PrivateTextOnce (Join-Path $configDir 'mysql.ini') $mysqlIniContent
 
 Write-Host 'Estado privado do SAGE inicializado; nenhum segredo foi exibido.'
 } finally {
