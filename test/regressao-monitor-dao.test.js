@@ -36,16 +36,16 @@ afterAll(async () => {
 });
 
 describe('processarNotificacaoMonitorDao — identificação não cadastrada', () => {
-  it('não deve lançar ReferenceError ao receber push de credencial desconhecida', async () => {
-    if (!temBanco) {
-      console.warn('[SKIP] MySQL indisponível — configure DB_HOST/DB_USER/DB_PASSWORD');
-      return;
-    }
+  it('não deve lançar ReferenceError ao receber push de credencial desconhecida', async ({ skip }) => {
+    skip(!temBanco, 'MySQL indisponível');
 
     // Cadastra um dispositivo para o payload conseguir ser mapeado
     await banco.pool.query(
       `INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, control_id_device_id)
        VALUES ('Catraca Teste', 'IDBlock', '127.0.0.1', '80', 'admin', 'admin', 999001)`
+    );
+    await banco.pool.query(
+      "INSERT INTO Pessoa (id, nome, tipo, visivel) VALUES (1, 'Pessoa Monitor', 'ALUNO', 1)"
     );
 
     const accessService = require('../src/services/accessService');
@@ -54,12 +54,48 @@ describe('processarNotificacaoMonitorDao — identificação não cadastrada', (
     const payload = {
       device_id: 999001,
       object_changes: [
+        null,
         {
           object: 'access_logs',
+          type: 'inserted',
+          values: {
+            id: true,
+            time: Math.floor(Date.now() / 1000),
+            user_id: 111000001,
+            portal_id: 1,
+            card_value: '12345678'
+          }
+        },
+        {
+          object: 'access_logs',
+          type: 'inserted',
+          values: {
+            id: '1e3',
+            time: Math.floor(Date.now() / 1000),
+            user_id: 111000001,
+            portal_id: 1,
+            card_value: '12345678'
+          }
+        },
+        {
+          object: 'access_logs',
+          type: 'inserted',
           values: {
             id: 1,
             time: Math.floor(Date.now() / 1000),
             user_id: 111999999,
+            portal_id: 1,
+            card_value: '12345678'
+          }
+        },
+        {
+          // A identificação desconhecida não pode abortar o restante da notificação.
+          object: 'access_logs',
+          type: 'inserted',
+          values: {
+            id: 2,
+            time: Math.floor(Date.now() / 1000),
+            user_id: 111000001,
             portal_id: 1,
             card_value: '12345678'
           }
@@ -71,7 +107,9 @@ describe('processarNotificacaoMonitorDao — identificação não cadastrada', (
     const resultado = await accessService.processarNotificacaoMonitorDao(payload);
 
     expect(resultado).toBeDefined();
-    expect(resultado.ignorados).toBeGreaterThanOrEqual(1);
-    expect(resultado.processados).toBe(0);
+    expect(resultado.ignorados).toBe(4);
+    expect(resultado.processados).toBe(1);
+    const [[acesso]] = await banco.pool.query('SELECT metodo_auth FROM Acesso');
+    expect(acesso.metodo_auth).toBe('QR_CODE');
   }, 60000);
 });
