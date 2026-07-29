@@ -79,6 +79,11 @@ async function verificarESetup() {
 // Executar verificação e depois iniciar servidor
 verificarESetup()
   .then(() => {
+    // A credencial de bootstrap é de uso único e não deve ser herdada pelo processo da API.
+    delete process.env.SAGE_INITIAL_ADMIN_LOGIN;
+    delete process.env.SAGE_INITIAL_ADMIN_PASSWORD;
+    delete process.env.SAGE_INITIAL_SCHOOL_NAME;
+
     console.log(' Iniciando servidor...\n');
     
     // Iniciar com nodemon se estiver em dev, senão node normal

@@ -67,6 +67,9 @@ jobs:
         env:
           DB_NAME: sage_ci_instalacao
         run: |
+          export SAGE_INITIAL_ADMIN_LOGIN="ci-${GITHUB_RUN_ID}"
+          export SAGE_INITIAL_ADMIN_PASSWORD="$(node -e "process.stdout.write(require('crypto').randomBytes(24).toString('base64url'))")"
+          export SAGE_INITIAL_SCHOOL_NAME="Unidade CI"
           node scripts/setup-database.js
           total=$(mysql -h 127.0.0.1 -u root -psenha_de_ci -N -e \
             "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sage_ci_instalacao'")

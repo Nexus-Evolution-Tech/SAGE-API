@@ -370,44 +370,6 @@ END $$
 DELIMITER ;
 
 -- ════════════════════════════════════════════════════════════════════════════════
--- DADOS INICIAIS
--- ════════════════════════════════════════════════════════════════════════════════
-
--- Inserir ETEC Taboão da Serra como unidade padrão
-INSERT INTO UnidadeEscolar (
-    nome,
-    numero_unidade,
-    cnpj,
-    logradouro,
-    numero,
-    bairro,
-    cidade,
-    estado,
-    cep,
-    telefone_contato,
-    email,
-    login,
-    senha
-) VALUES (
-    'ETEC Taboão da Serra',
-    '206',
-    '62823257000109',
-    'Rua Pedro Bracale',
-    '79',
-    'Jardim Maria Rosa',
-    'Taboão da Serra',
-    'SP',
-    '06764230',
-    '1147888150',
-    NULL,
-    'admin',
-    '$2b$10$SbfhhZqWFpCanApKJ5Ya3Ol.fwnFP6e5lV1.DBwBIYyuBgYMbENCa'
-) ON DUPLICATE KEY UPDATE 
-    nome = VALUES(nome),
-    login = VALUES(login),
-    senha = VALUES(senha);
-
--- ════════════════════════════════════════════════════════════════════════════════
 
 CREATE EVENT atualizar_ou_desligar_alunos
 -- ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 MINUTE

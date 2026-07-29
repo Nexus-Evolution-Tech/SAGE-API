@@ -192,10 +192,11 @@ async function verificarTabelasExistem() {
 }
 
 async function executarSeeds() {
+  let connection;
   try {
     logger.info('🌱 Verificando estrutura inicial...');
     
-    const connection = await mysql.createConnection({
+    connection = await mysql.createConnection({
       ...dbConfig,
       database: dbName
     });
@@ -213,35 +214,36 @@ async function executarSeeds() {
       logger.warn('⚠️ Algumas tabelas podem estar faltando');
     }
 
-    // Seed: UnidadeEscolar inicial (ETEC Taboão da Serra)
+    // A credencial inicial só é consumida quando ainda não existe unidade. Em upgrades, qualquer
+    // valor presente no ambiente deve ser ignorado para nunca redefinir acesso existente.
     const [existingSchool] = await connection.query(
-      `SELECT id, login FROM UnidadeEscolar WHERE id = 1 LIMIT 1`,
-      []
+      `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
     );
 
-    // Hash da senha 'etec123'
-    const senhaHashed = await bcrypt.hash('etec123', 10);
-
     if (existingSchool.length === 0) {
-      logger.info('🌱 Inserindo unidade escolar inicial: ETEC Taboão da Serra');
-      
-      const sqlQuery = `
-        INSERT INTO UnidadeEscolar 
-        (id, nome, numero_unidade, cnpj, login, senha, logradouro, numero, complemento, bairro, cidade, estado, cep, telefone_contato, logo, created_at) 
-        VALUES 
-        (1, 'ETEC Taboão da Serra', '293', '62823257029344', 'etec', ?, 'Praça Miguel Ortega', '135', 'Prédio Principal', 'Parque Assunção', 'Taboão da Serra', 'SP', '06754160', '1147011856', 'logo_etec.png', NOW())
-        ON DUPLICATE KEY UPDATE id=id
-      `;
-      
-      await connection.query(sqlQuery, [senhaHashed]);
+      const login = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
+      const senha = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
+      const nome = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
+
+      if (login.length < 3 || login.length > 100) {
+        throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
+      }
+      if (senha.length < 16) {
+        throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 16 caracteres');
+      }
+      if (!nome) {
+        throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
+      }
+
+      logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
+      const senhaHashed = await bcrypt.hash(senha, 10);
+      await connection.query(
+        `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
+        [nome, login, senhaHashed]
+      );
       logger.info(' Unidade escolar inicial inserida com sucesso');
     } else {
-      // Força credenciais padrão para evitar divergência entre ambientes
-      logger.info('🏫 Unidade escolar já existe, atualizando credenciais padrão (etec/etec123)');
-      await connection.query(
-        `UPDATE UnidadeEscolar SET login = 'etec', senha = ? WHERE id = 1`,
-        [senhaHashed]
-      );
+      logger.info('🏫 Unidade escolar já existe; credencial preservada');
     }
 
     // Seed: Área padrão (para dispositivos/catracas)
@@ -258,11 +260,12 @@ async function executarSeeds() {
       logger.info(' Área padrão inserida');
     }
 
-    await connection.end();
     return true;
   } catch (error) {
     logger.error(` Erro ao verificar estrutura: ${error.message}`);
-    return false;
+    throw error;
+  } finally {
+    if (connection) await connection.end().catch(() => {});
   }
 }
 

@@ -16,6 +16,7 @@
  */
 const mysql = require('mysql2/promise');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
@@ -76,7 +77,10 @@ async function criarBancoDeTeste(sufixo = '') {
         DB_NAME: nome,
         NODE_ENV: 'test',
         LOG_LEVEL: 'error',
-        JWT_SECRET: process.env.JWT_SECRET || 'chave_de_teste_com_mais_de_32_caracteres_ok'
+        JWT_SECRET: process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
+        SAGE_INITIAL_ADMIN_LOGIN: `teste_${process.pid}`,
+        SAGE_INITIAL_ADMIN_PASSWORD: crypto.randomBytes(24).toString('base64url'),
+        SAGE_INITIAL_SCHOOL_NAME: 'Unidade de teste'
       }
     }
   );
