@@ -6,12 +6,13 @@ const { importarPlanilha } = require('../services/importService');
 const { exportarDados } = require('../services/exportService');
 const { emitNotification } = require('../services/notificationService');
 const logger = require('../config/logger');
+const { paths } = require('../config/paths');
 
 const router = express.Router();
 // Configuração robusta de upload para evitar falhas silenciosas
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.resolve('src/uploads'));
+    cb(null, paths.uploads);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.xlsx';
@@ -37,7 +38,7 @@ const upload = multer({
 //  Baixar planilha modelo
 // -------------------------------------------------------
 router.get('/dados/planilha-modelo', autenticar, (req, res) => {
-  const modeloPath = path.resolve('./models/PlanilhaPessoas-Modelo.xlsx');
+  const modeloPath = path.join(paths.models, 'PlanilhaPessoas-Modelo.xlsx');
   res.download(modeloPath, 'PlanilhaPessoas.xlsx');
 });
 
@@ -89,7 +90,7 @@ router.post('/dados/importar/ping', autenticar, handleUploadSingle, async (req, 
 router.get('/dados/exportar', autenticar, async (req, res) => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const exportPath = path.resolve(`exports/exportacao_${timestamp}.xlsx`);
+    const exportPath = path.join(paths.exports, `exportacao_${timestamp}.xlsx`);
 
     await exportarDados(exportPath);
 

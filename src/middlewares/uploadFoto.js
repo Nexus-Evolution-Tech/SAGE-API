@@ -2,8 +2,9 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const { paths } = require('../config/paths');
 
-const pasta = path.resolve(__dirname, '..', 'uploads');
+const pasta = paths.uploads;
 if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
 
 const storage = multer.diskStorage({

@@ -1,5 +1,5 @@
 // index.js
-require('dotenv').config({ debug: false });
+require('./src/config/env');
 
 async function iniciarServidor() {
   console.log('[BOOT] iniciarServidor()');

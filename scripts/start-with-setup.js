@@ -1,4 +1,4 @@
-require('dotenv').config({ debug: false });
+require('../src/config/env');
 const { spawn } = require('child_process');
 
 async function verificarESetup() {

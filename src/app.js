@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./config/env');
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
@@ -8,6 +8,7 @@ const { globalDB, db } = require("./config/queryBuilder");
 global.db = globalDB;
 const path = require("path");
 const fs = require("fs");
+const { paths, ensureDataDirs } = require("./config/paths");
 
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
@@ -94,15 +95,11 @@ app.get('/diagnostico-acessos/:id', (req, res) => {
 });
 logger.info("Diagnóstico de acessos: GET /diagnostico-acessos/:id (em dev sem auth)");
 
-// Garante diretório base de uploads na inicialização
+// Garante que todo estado gravável existe fora do release quando SAGE_DATA_DIR está configurado.
 try {
-  const baseUploads = path.join(__dirname, 'uploads');
-  if (!fs.existsSync(baseUploads)) {
-    fs.mkdirSync(baseUploads, { recursive: true });
-    logger.info('Criado diretório de uploads base: src/uploads');
-  }
+  ensureDataDirs();
 } catch (e) {
-  logger.warn(`Não foi possível garantir diretório de uploads: ${e.message}`);
+  logger.warn(`Não foi possível garantir diretórios de dados: ${e.message}`);
 }
 
 // Rota para Swagger:
@@ -110,7 +107,7 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 logger.info("Documentação Swagger disponível em: /docs");
 
 // Serve arquivos estáticos da pasta "upload"
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(paths.uploads));
 logger.info("Arquivos estáticos disponíveis em: /uploads");
 
 // Rotas da aplicação (com tratamento de erro)

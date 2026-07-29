@@ -4,6 +4,7 @@ const db = require('../config/database');
 const gerarController = require('./genericControllerFactory');
 const { invalidate } = require('../cache/helpers');
 const logger = require('../config/logger');
+const { paths } = require('../config/paths');
 
 const tabela = 'Area';
 const campos = ['id', 'nome', 'unidade_id', 'foto'];
@@ -20,7 +21,7 @@ async function uploadFoto(req, res) {
     return res.status(400).json({ message: 'ID da área é obrigatório' });
   }
 
-  const baseUploads = path.resolve(__dirname, '..', 'uploads');
+  const baseUploads = paths.uploads;
   const pastaDestino = path.join(baseUploads, 'areas');
 
   if (!fs.existsSync(pastaDestino)) {

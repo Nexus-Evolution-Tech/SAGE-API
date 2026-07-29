@@ -21,9 +21,8 @@ const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const mysql = require('mysql2/promise');
 const logger = require('../config/logger');
+const { paths } = require('../config/paths');
 const execFileAsync = promisify(execFile);
-
-const RAIZ = path.join(__dirname, '..', '..');
 
 function config() {
   return {
@@ -32,7 +31,7 @@ function config() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'sage',
-    diretorio: process.env.BACKUP_DIR || path.join(RAIZ, 'backups'),
+    diretorio: process.env.BACKUP_DIR || paths.backups,
     // No Windows o instalador conhece o caminho do MySQL que ele mesmo instalou.
     mysqldump: process.env.MYSQLDUMP_PATH || 'mysqldump',
     mysql: process.env.MYSQL_PATH || 'mysql',

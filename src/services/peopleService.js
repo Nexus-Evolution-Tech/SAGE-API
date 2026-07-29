@@ -19,6 +19,7 @@ const { hashSenha } = require('../utils/criptografia');
 const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
+const { paths } = require('../config/paths');
 const registrarSyncPendente = require('../services/sync');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 
@@ -165,7 +166,7 @@ async function uploadFotoPessoa(req, res) {
   }
 
   // Caminho /pessoas
-  const baseUploads = path.resolve(__dirname, '..', 'uploads');
+  const baseUploads = paths.uploads;
   const pastaDestino = path.join(baseUploads, 'pessoas');
 
   if (!fs.existsSync(pastaDestino)) {
@@ -178,7 +179,7 @@ async function uploadFotoPessoa(req, res) {
     // console.log('Pessoa encontrada:', rows[0]);
 
     if (rows.length === 0) {
-      const arquivoTemp = path.resolve(__dirname, '..', 'uploads', req.file.filename);
+      const arquivoTemp = path.join(baseUploads, req.file.filename);
       if (fs.existsSync(arquivoTemp)) {
         fs.unlinkSync(arquivoTemp);
       }
@@ -197,7 +198,7 @@ async function uploadFotoPessoa(req, res) {
 
     // Gerar nome único para a foto
     const novoNome = `pessoa_${pessoa_id}.png`;
-    const antigoCaminho = path.resolve(__dirname, '..', 'uploads', req.file.filename);
+    const antigoCaminho = path.join(baseUploads, req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
 
     // Mover arquivo para pasta correta
@@ -217,7 +218,7 @@ async function uploadFotoPessoa(req, res) {
     
     // Tentar remover arquivo temporário em caso de erro
     try {
-      const arquivoTemp = path.resolve(__dirname, '..', 'uploads', req.file.filename);
+      const arquivoTemp = path.join(baseUploads, req.file.filename);
       if (fs.existsSync(arquivoTemp)) {
         fs.unlinkSync(arquivoTemp);
       }
@@ -244,7 +245,7 @@ async function removerFotoPessoa(req, res) {
     }
 
     // Remover arquivo físico
-    const baseUploads = path.resolve(__dirname, '..', 'uploads');
+    const baseUploads = paths.uploads;
     const caminhoFoto = path.join(baseUploads, pessoa[0].foto);
     
     if (fs.existsSync(caminhoFoto)) {

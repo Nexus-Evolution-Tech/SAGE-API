@@ -1,5 +1,5 @@
-// Carregar .env no início para ter todas as variáveis disponíveis
-require('dotenv').config();
+// Carregar configuração por caminho absoluto antes de ler as variáveis.
+require('../src/config/env');
 
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');

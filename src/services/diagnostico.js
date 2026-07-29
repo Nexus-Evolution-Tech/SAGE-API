@@ -18,6 +18,7 @@ const fs = require('fs').promises;
 const { sanitizar, sanitizarConfiguracao } = require('./sanitizador');
 const saudeDispositivos = require('./saudeDispositivos');
 const logger = require('../config/logger');
+const { paths } = require('../config/paths');
 
 const RAIZ = path.join(__dirname, '..', '..');
 
@@ -33,7 +34,7 @@ async function versaoPacote() {
 /** Espaço livre em disco — em HD de escola, disco cheio é causa real e frequente. */
 async function espacoEmDisco() {
   try {
-    const st = await fs.statfs(RAIZ);
+    const st = await fs.statfs(paths.dataRoot);
     const totalBytes = st.blocks * st.bsize;
     const livreBytes = st.bavail * st.bsize;
     return {

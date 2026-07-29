@@ -7,6 +7,7 @@ const { compararHash, hashSenha } = require('../utils/criptografia');
 const crud = require('../utils/generic-db-utils');
 const logger = require('../config/logger');
 const { emitNotification, emitNotificationToUser } = require('../services/notificationService');
+const { paths } = require('../config/paths');
 
 const tabela = 'UnidadeEscolar';
 const campos = ['id', 'nome', 'numero_unidade', 'cnpj', 'login', 'senha', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'telefone_contato', 'email', 'logo'];
@@ -138,7 +139,7 @@ const uploadLogo = async (req, res) => {
     if (!id) return res.status(401).json({ message: 'Não autorizado' });
     if (!req.file) return res.status(400).json({ message: 'Arquivo de logo não enviado' });
 
-    const baseUploads = path.resolve(__dirname, '..', 'uploads');
+    const baseUploads = paths.uploads;
     const pastaDestino = path.join(baseUploads, 'unidade');
     if (!fs.existsSync(pastaDestino)) fs.mkdirSync(pastaDestino, { recursive: true });
 
@@ -149,7 +150,7 @@ const uploadLogo = async (req, res) => {
     }
 
     const novoNome = `logo_${id}.png`;
-    const antigoCaminho = path.resolve(__dirname, '..', 'uploads', req.file.filename);
+    const antigoCaminho = path.join(baseUploads, req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
     fs.renameSync(antigoCaminho, novoCaminho);
 
@@ -174,4 +175,3 @@ module.exports = {
   getConfig,
   uploadLogo
 };
-

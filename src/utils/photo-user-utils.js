@@ -1,8 +1,9 @@
 const path = require('path');
 const fs = require('fs/promises');
+const { paths } = require('../config/paths');
 
 const verificaSeFotoUserExiste = async (userId) => {
-  const fotoPath = path.join(__dirname, '..', 'uploads', 'pessoas', `pessoa_${userId}.png`);
+  const fotoPath = path.join(paths.uploads, 'pessoas', `pessoa_${userId}.png`);
   try {
     await fs.access(fotoPath); // tenta acessar o arquivo
     return true; // se conseguiu, o arquivo existe
@@ -12,7 +13,7 @@ const verificaSeFotoUserExiste = async (userId) => {
 };
 
 const deletarFotoUserPorId = async (userId) => {
-  const fotoPath = path.join(__dirname, '..', 'uploads', 'pessoas', `pessoa_${userId}.png`);
+  const fotoPath = path.join(paths.uploads, 'pessoas', `pessoa_${userId}.png`);
 
   try {
     await fs.unlink(fotoPath);

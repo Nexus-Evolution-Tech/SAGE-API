@@ -3,6 +3,7 @@ const db = require('../config/database');
 const path = require('path');
 const fs = require('fs');
 const { get } = require('http');
+const { paths } = require('../config/paths');
 
 const tabela = 'UnidadeFoto';
 const campos = ['id', 'unidade_id', 'tipo', 'caminho', 'descricao'];
@@ -41,7 +42,7 @@ const uploadFoto = async (req, res) => {
   const ext = path.extname(req.file.filename);
 
   // Caminho /escolas
-  const baseUploads = path.resolve(__dirname, '..', 'uploads');
+  const baseUploads = paths.uploads;
   const pastaDestino = path.join(baseUploads, 'escolas');
 
   if (!fs.existsSync(pastaDestino)) {
@@ -56,7 +57,7 @@ const uploadFoto = async (req, res) => {
     );
 
     const novoNome = `escola_${result.insertId}${ext}`;
-    const antigoCaminho = path.resolve(__dirname, '..', 'uploads', req.file.filename);
+    const antigoCaminho = path.join(baseUploads, req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
 
     // Move (ou renomeia) o arquivo para a pasta correta

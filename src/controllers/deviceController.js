@@ -13,6 +13,7 @@ const { limparUsuariosPorPrefixo11 } = require('../utils/controlId-utils');
 const globalState = require('../state/globalState');
 const catracaImportService = require('../services/catracaImportService');
 const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
+const { paths, isInside } = require('../config/paths');
 
 const tabela = 'Dispositivo';
 
@@ -414,9 +415,8 @@ async function backupPorTipo(req, res) {
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
     const result = await deviceService.backupPorTipo(dispositivo, objectType);
-    const backupsDir = path.resolve(process.cwd(), 'backups');
     const resolvedPath = path.resolve(result.filePath);
-    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+    if (!isInside(paths.backups, resolvedPath)) {
       logger.warn(`[BACKUP POR TIPO] Path fora de backups: ${resolvedPath}`);
       return res.status(403).json({ message: 'Caminho do backup inválido' });
     }
@@ -582,9 +582,8 @@ async function backupCompleto(req, res) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
     }
     const { filePath, filename, summary } = await deviceService.gerarBackupCompletoCatraca(dispositivo);
-    const backupsDir = path.resolve(process.cwd(), 'backups');
     const resolvedPath = path.resolve(filePath);
-    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+    if (!isInside(paths.backups, resolvedPath)) {
       logger.warn(`[BACKUP COMPLETO] Path fora de backups: ${resolvedPath}`);
       return res.status(403).json({ message: 'Caminho do backup inválido' });
     }
@@ -611,9 +610,8 @@ async function backupLogs(req, res) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
     }
     const { filePath, filename } = await deviceService.gerarBackupLogsCatraca(dispositivo);
-    const backupsDir = path.resolve(process.cwd(), 'backups');
     const resolvedPath = path.resolve(filePath);
-    if (!resolvedPath.startsWith(backupsDir) || resolvedPath.includes('..')) {
+    if (!isInside(paths.backups, resolvedPath)) {
       logger.warn(`[BACKUP] Tentativa de download com path fora de backups: ${resolvedPath}`);
       return res.status(403).json({ message: 'Caminho do backup inválido' });
     }

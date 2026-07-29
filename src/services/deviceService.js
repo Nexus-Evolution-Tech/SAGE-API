@@ -5,6 +5,7 @@ const logger = require('../config/logger');
 const ErroDispositivo = require('../errors/ErroDispositivo');
 const saudeDispositivos = require('./saudeDispositivos');
 const { ORDEM_ZERAR_CATRACA } = require('../config/syncOrder');
+const { paths } = require('../config/paths');
 
 const CHUNK_SIZE = parseInt(process.env.CATRACA_BACKUP_CHUNK_SIZE || '2000', 10);
 
@@ -368,7 +369,7 @@ async function gerarBackupCompletoCatraca(dispositivo) {
   if (!session) {
     throw new Error('Sessão não obtida na catraca');
   }
-  const backupsDir = path.resolve(process.cwd(), 'backups');
+  const backupsDir = paths.backups;
   if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `catraca_${dispositivo.id}_completo_${timestamp}.json`;
@@ -412,7 +413,7 @@ async function gerarBackupLogsCatraca(dispositivo) {
     throw new Error('Sessão não obtida na catraca');
   }
 
-  const backupsDir = path.resolve(process.cwd(), 'backups');
+  const backupsDir = paths.backups;
   if (!fs.existsSync(backupsDir)) {
     fs.mkdirSync(backupsDir, { recursive: true });
   }
@@ -565,7 +566,7 @@ async function backupPorTipo(dispositivo, objectType) {
   if (!OBJETOS_CATRACA_BACKUP.includes(tipo)) {
     throw new Error(`Backup por tipo não suportado para "${tipo}". Use um dos tipos do backup completo.`);
   }
-  const backupsDir = path.resolve(process.cwd(), 'backups');
+  const backupsDir = paths.backups;
   if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `catraca_${dispositivo.id}_${tipo}_${timestamp}.json`;
