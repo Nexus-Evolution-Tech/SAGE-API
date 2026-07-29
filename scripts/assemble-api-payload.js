@@ -179,4 +179,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { REQUIRED_FILES, SOURCE_FILES, assembleApiPayload };
+module.exports = { REQUIRED_FILES, SOURCE_FILES, assembleApiPayload, copyEntry };
