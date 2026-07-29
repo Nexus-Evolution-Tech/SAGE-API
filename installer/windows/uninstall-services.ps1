@@ -25,12 +25,6 @@ if (-not (Test-Path -LiteralPath $sc -PathType Leaf)) {
   throw "Service Controller do Windows ausente: $sc"
 }
 
-function Invoke-NativeChecked {
-  param([string]$File, [string[]]$Arguments)
-  & $File @Arguments | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "$File falhou com exit $LASTEXITCODE" }
-}
-
 function Get-ServiceRecord {
   param([string]$Name)
   return Get-CimInstance Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
@@ -64,7 +58,7 @@ function Disable-And-StopService {
     Set-Service $Name -StartupType Disabled
     if ($service.Status -ne 'Stopped') {
       Stop-Service $Name -Force
-      $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+      $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
     }
   } catch {
     if (-not (Test-ServiceMarkedForDeletion $_)) { throw }
@@ -102,6 +96,15 @@ function Remove-ServiceRecord {
   }
 }
 
+function Get-SageProcesses {
+  $programPrefix = $programRoot.TrimEnd('\') + '\'
+  return @(Get-CimInstance Win32_Process | Where-Object {
+    $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
+      $programPrefix, [StringComparison]::OrdinalIgnoreCase
+    )
+  })
+}
+
 $lifecycleMutex = [Threading.Mutex]::new($false, 'Global\SAGE-Service-Lifecycle')
 $lifecycleLockTaken = $false
 try {
@@ -120,45 +123,41 @@ $firewallRules = @(Get-NetFirewallRule -PolicyStore PersistentStore -Name $firew
 if ($firewallRules.Count -gt 1) { throw "Mais de uma regra local usa o nome: $firewallName" }
 if ($firewallRules.Count -eq 1) { Assert-FirewallRuleOwned $firewallRules[0] }
 
+Disable-And-StopService 'SAGEAPI'
+Remove-ServiceRecord 'SAGEAPI'
+
+Disable-And-StopService 'SAGEMySQL'
+Remove-ServiceRecord 'SAGEMySQL'
+
+$remaining = Get-SageProcesses
+foreach ($process in $remaining) {
+  if (-not $process.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)) {
+    Stop-Process -Id $process.ProcessId -Force
+  }
+}
+
+for ($attempt = 0; $attempt -lt 240; $attempt++) {
+  $remaining = Get-SageProcesses
+  if ($remaining.Count -eq 0 -and -not (Get-ServiceRecord 'SAGEAPI') -and
+      -not (Get-ServiceRecord 'SAGEMySQL')) { break }
+  Start-Sleep -Milliseconds 250
+}
+if (@($remaining | Where-Object {
+      $_.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)
+    }).Count -ne 0) {
+  throw 'MySQL não encerrou de forma segura; encerramento forçado recusado'
+}
+if ($remaining.Count -ne 0 -or (Get-ServiceRecord 'SAGEAPI') -or
+    (Get-ServiceRecord 'SAGEMySQL')) {
+  throw 'Processo ou serviço SAGE permaneceu após a remoção'
+}
+
 if ($firewallRules.Count -eq 1) {
   $firewallRules[0] | Remove-NetFirewallRule
   if (Get-NetFirewallRule -PolicyStore PersistentStore -Name $firewallName `
       -ErrorAction SilentlyContinue) {
     throw "Regra de firewall não foi removida: $firewallName"
   }
-}
-
-Disable-And-StopService 'SAGEAPI'
-Remove-ServiceRecord 'SAGEAPI'
-
-if (Get-ServiceRecord 'SAGEMySQL') {
-  Invoke-NativeChecked $sc @('failure', 'SAGEMySQL', 'reset=', '0', 'actions=', '')
-  Invoke-NativeChecked $sc @('failureflag', 'SAGEMySQL', '0')
-}
-Disable-And-StopService 'SAGEMySQL'
-Remove-ServiceRecord 'SAGEMySQL'
-
-$programPrefix = $programRoot.TrimEnd('\') + '\'
-$remaining = @(Get-CimInstance Win32_Process | Where-Object {
-  $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
-    $programPrefix, [StringComparison]::OrdinalIgnoreCase
-  )
-})
-foreach ($process in $remaining) { Stop-Process -Id $process.ProcessId -Force }
-
-for ($attempt = 0; $attempt -lt 240; $attempt++) {
-  $remaining = @(Get-CimInstance Win32_Process | Where-Object {
-    $_.ExecutablePath -and $_.ExecutablePath.StartsWith(
-      $programPrefix, [StringComparison]::OrdinalIgnoreCase
-    )
-  })
-  if ($remaining.Count -eq 0 -and -not (Get-ServiceRecord 'SAGEAPI') -and
-      -not (Get-ServiceRecord 'SAGEMySQL')) { break }
-  Start-Sleep -Milliseconds 250
-}
-if ($remaining.Count -ne 0 -or (Get-ServiceRecord 'SAGEAPI') -or
-    (Get-ServiceRecord 'SAGEMySQL')) {
-  throw 'Processo ou serviço SAGE permaneceu após a remoção'
 }
 
 Write-Host 'Serviços e firewall do SAGE removidos; dados escolares preservados.'

@@ -29,11 +29,13 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).toContain('Regra de firewall não foi removida');
   });
 
-  it('desarma recuperação, remove os dois serviços e encerra somente processos do SAGE', () => {
-    expect(script).toContain("'failure', 'SAGEMySQL', 'reset=', '0', 'actions=', ''");
-    expect(script).toContain("'failureflag', 'SAGEMySQL', '0'");
+  it('remove os dois serviços e nunca força o encerramento do MySQL', () => {
     expect(script).toContain("Remove-ServiceRecord 'SAGEAPI'");
     expect(script).toContain("Remove-ServiceRecord 'SAGEMySQL'");
+    expect(script.indexOf("Disable-And-StopService 'SAGEMySQL'")).toBeLessThan(
+      script.indexOf("Remove-ServiceRecord 'SAGEMySQL'")
+    );
+    expect(script).not.toContain("'failure', 'SAGEMySQL'");
     expect(script).toContain('& $sc delete $Name');
     expect(script).toContain('$exitCode -notin @(0, 1060, 1072)');
     expect(script).toContain("$exception.NativeErrorCode -eq 1072");
@@ -41,6 +43,8 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).not.toContain("Invoke-NativeChecked $winsw @('uninstall')");
     expect(script).not.toContain("Invoke-NativeChecked $mysqld @('--remove', 'SAGEMySQL')");
     expect(script).toContain('$_.ExecutablePath.StartsWith(');
+    expect(script).toContain('-not $process.ExecutablePath.Equals($mysqld');
+    expect(script).toContain('MySQL não encerrou de forma segura; encerramento forçado recusado');
     expect(script).toContain('$attempt -lt 240');
     expect(script).toContain('Processo ou serviço SAGE permaneceu após a remoção');
   });
@@ -50,7 +54,7 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).toContain("'Global\\SAGE-Service-Lifecycle'");
     expect(script).toContain('WaitOne([TimeSpan]::FromSeconds(60))');
     expect(script).toContain('$lifecycleMutex.ReleaseMutex()');
-    expect(script).not.toContain("Invoke-NativeChecked 'sc.exe'");
+    expect(script).not.toContain('Invoke-NativeChecked');
   });
 
   it('não apaga ProgramData nem recebe segredos', () => {
