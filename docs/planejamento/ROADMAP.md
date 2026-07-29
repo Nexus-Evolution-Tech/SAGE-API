@@ -10,6 +10,14 @@
 
 ## NOW
 
+### 🟣 Fase 8a — Instalador Windows alfa de campo
+`spec: specs/F8-instalador-alpha-campo.md`
+
+Antecipada por decisão do produto: o instalador será o veículo para homologar o SAGE na primeira
+escola, observar a IDBlock real e distribuir correções. Não substitui o restante da Fase 8.
+**Gate:** EXE offline em VM Windows 11 x64; painel servido pela API, API e MySQL como serviços; reboot,
+upgrade com rollback e uninstall preservando dados provados.
+
 ### ✅ Fase 0 — Consolidação — **CONCLUÍDA (local)** `spec: specs/F0-consolidacao.md`
 Branch `integration` nos dois repos. Backend: 4 commits, grafo de módulos carrega, 111 arquivos sem
 erro de sintaxe. Frontend: `npm run build` passa.

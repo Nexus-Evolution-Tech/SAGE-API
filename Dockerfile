@@ -1,5 +1,5 @@
 # SAGE-API - Imagem Node para produção
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -7,7 +7,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Instalar apenas dependências de produção
-RUN npm ci --omit=dev
+# O postinstall depende de scripts que só são copiados na camada seguinte. No artefato de
+# produção a configuração vem do ambiente; executar esse hook aqui tornava o build não reprodutível.
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copiar código da aplicação
 COPY index.js ./

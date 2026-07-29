@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "API de gestão escolar com controle de acesso",
   "main": "index.js",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "postinstall": "node scripts/check-first-run.js",
     "start": "node scripts/start-with-setup.js",
