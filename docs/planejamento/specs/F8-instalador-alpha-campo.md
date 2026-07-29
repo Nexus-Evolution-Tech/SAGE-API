@@ -1,7 +1,7 @@
 # Spec — Fase 8 antecipada: instalador Windows alfa de campo
 
 **Tier:** T2 — toca autenticação, banco, serviço do sistema, firewall e distribuição.
-**Estado:** proposta para revisão humana antes da implementação.
+**Estado:** em implementação local; ainda sem EXE distribuível.
 **Alvo:** Windows 11 x64, 8 GB RAM, HD mecânico, operação local sem internet.
 
 ## 1. Por que antecipar
@@ -134,6 +134,16 @@ readiness que prove:
 Logs persistentes têm rotação e limite. O bundle de diagnóstico inclui versões, estado dos
 serviços, readiness e logs sanitizados, sem credenciais nem dados pessoais.
 
+### 3.9 Agenda canônica
+
+O instalador provisiona somente `HorarioAula` como agenda executável. O contrato legado
+`/horarios` responde `410` apontando para `/horarios-aulas`; código que consultava a tabela
+inexistente `Horario` foi removido. Slots `INT` são compartilhados com `DIV A` e `DIV B`.
+
+Não migrar nem remover as colunas legadas de `Aula` sem a contagem da escola:
+`SELECT COUNT(*) FROM Aula WHERE inicio IS NOT NULL`. O seed oficial também precisa corrigir o
+intervalo invertido `19:10-19:00` antes de entrar no pacote.
+
 ## 4. Bloqueios antes do primeiro EXE utilizável
 
 1. Remover o seed/reset conhecido `etec/etec123` e exigir credencial gerada.
@@ -145,6 +155,7 @@ serviços, readiness e logs sanitizados, sem credenciais nem dados pessoais.
 7. Servir o build React pela API.
 8. Definir licença para redistribuir MySQL Community antes da landing page pública.
 9. Obter certificado Authenticode antes de chamar o artefato de release público.
+10. Corrigir o intervalo invertido do seed oficial e confirmar a contagem de `Aula.inicio`.
 
 ## 5. Fatias de implementação
 

@@ -95,9 +95,27 @@ não deve conter senha — deve gerar credencial na instalação e exigir troca 
 | A-1 | Fase 1 / Fase 8 | ✅ **corrigido** — desbloqueou o harness de banco isolado da Fase 1 |
 | A-2 | Fase 2 (falha silenciosa) | ✅ **corrigido** com verificação nos dois sentidos |
 | A-3 | Fase 3 (identidade) + Fase 8 | Severidade menor que a inicial (ver correção acima). O `UNIQUE` e a remoção do hash commitado seguem valendo |
+| A-4 | Fase 8 | ✅ rotas legadas encerradas; remoção de colunas aguarda contagem da escola |
 
 **A-1 sobe de prioridade.** Sem ele não há banco de teste isolado, que é o que a Fase 1 precisa para
 Testcontainers. Correção pequena, desbloqueio grande.
+
+## ✅ A-4 — três contratos de agenda disputavam `/horarios` — **ROTAS CORRIGIDAS**
+
+Verificação em 2026-07-29 encontrou três modelos incompatíveis: `HorarioAula` canônico; colunas
+legadas diretamente em `Aula`; e a tabela `Horario`, ausente do schema canônico. O carregador
+dinâmico registrava dois routers em `/horarios`; conforme a ordem do filesystem, o segundo podia
+consultar a tabela inexistente. O endpoint compatível de aulas também lia `h.inicio/h.fim`, embora
+o schema canônico possua apenas `h.horario`.
+
+As rotas antigas agora respondem `410` autenticado apontando para `/horarios-aulas`, o router da
+tabela inexistente foi removido e o endpoint compatível traduz `horario`, validando a divisão e
+incluindo slots compartilhados `INT`. A remoção de `Aula.inicio/fim/turma_id/dia_semana/divisao`
+continua bloqueada até a escola fornecer:
+
+```sql
+SELECT COUNT(*) FROM Aula WHERE inicio IS NOT NULL;
+```
 
 ## Nota de transparência
 
