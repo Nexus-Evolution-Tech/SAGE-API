@@ -101,8 +101,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Node Windows do layout não executou' }
           & (Join-Path $output 'runtime\mysql\bin\mysqld.exe') --version
           if ($LASTEXITCODE -ne 0) { throw 'MySQL Windows do layout não executou' }
-          & (Join-Path $output 'service\SAGE-API.exe') version
-          if ($LASTEXITCODE -ne 0) { throw 'WinSW Windows do layout não executou' }
+          $winswProbe = Join-Path $env:RUNNER_TEMP 'winsw-probe'
+          New-Item -ItemType Directory -Path $winswProbe | Out-Null
+          try {
+            $winswExe = Join-Path $winswProbe 'SAGESmoke.exe'
+            Copy-Item -LiteralPath (Join-Path $output 'service\SAGE-API.exe') -Destination $winswExe
+            [IO.File]::WriteAllText((Join-Path $winswProbe 'SAGESmoke.xml'),
+              '<service><id>SAGESmoke</id><name>SAGE Smoke</name><description>CI</description><executable>cmd.exe</executable></service>')
+            & $winswExe version
+            if ($LASTEXITCODE -ne 0) { throw 'WinSW Windows do layout não executou' }
+          } finally { Remove-Item -LiteralPath $winswProbe -Recurse -Force }
           $api = Join-Path $output "releases\$($release.version)\api"
           Push-Location -LiteralPath $api
           try {

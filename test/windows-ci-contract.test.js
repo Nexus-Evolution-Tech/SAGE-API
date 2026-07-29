@@ -28,7 +28,8 @@ describe('CI do layout Windows nativo', () => {
 
   it('executa runtimes do layout e nunca publica o protótipo', () => {
     expect(source).toContain("runtime\\mysql\\bin\\mysqld.exe') --version");
-    expect(source).toContain("service\\SAGE-API.exe') version");
+    expect(source).toContain("'SAGESmoke.exe'");
+    expect(source).toContain('& $winswExe version');
     expect(source).toContain("require('bcrypt').hash('windows-smoke',4)");
     expect(source).not.toMatch(/upload-artifact|gh release|softprops\/action-gh-release/i);
     expect(source).toContain('Descartar protótipo');
