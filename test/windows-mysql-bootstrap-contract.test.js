@@ -20,11 +20,14 @@ describe('bootstrap privado do MySQL no Windows', () => {
   it('usa identidades TCP locais e grants mínimos comprovados', () => {
     expect(source).toContain("'sage_runtime'@'127.0.0.1'");
     expect(source).toContain("'sage_maintenance'@'127.0.0.1'");
+    expect(source).toContain("'sage_shutdown'@'127.0.0.1'");
     expect(source).toContain('GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON `sage`.*');
     expect(source).toContain('GRANT SHOW_ROUTINE ON *.*');
     expect(source).toContain('GRANT ALL PRIVILEGES ON `sage\\_verif\\_%`.*');
+    expect(source).toContain('GRANT SHUTDOWN ON *.*');
     expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_runtime`');
     expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_maintenance`');
+    expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_shutdown`');
     expect(source).not.toMatch(/'sage_(?:runtime|maintenance)'@'%'|GRANT ALL PRIVILEGES ON \*\.\*/);
     const grants = source.split('\n').filter((line) => line.startsWith('GRANT '));
     expect(grants.join('\n')).not.toMatch(/\bGRANT OPTION\b/);
@@ -45,6 +48,7 @@ describe('bootstrap privado do MySQL no Windows', () => {
     expect(source.indexOf('Write-PrivateTextOnce $marker')).toBeLessThan(source.indexOf('[IO.File]::Delete($rootClient)'));
     expect(source).toContain("catch [Threading.AbandonedMutexException]");
     expect(source).toContain('Data directory sem marcador nem recuperação');
+    expect(source).toContain('Estado MySQL pré-alpha v1 não é atualizável');
   });
 
   it('mantém compatibilidade com Windows PowerShell 5.1', () => {

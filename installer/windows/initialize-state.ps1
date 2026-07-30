@@ -238,6 +238,23 @@ $clientContent = @(
 ) -join [Environment]::NewLine
 Write-PrivateTextOnce (Join-Path $configDir 'maintenance-client.cnf') $clientContent
 
+$shutdownClient = Join-Path $configDir 'shutdown-client.cnf'
+$shutdownPassword = New-Secret
+if (Test-Path -LiteralPath $shutdownClient) {
+  Assert-RegularLocalPath $shutdownClient
+  Assert-PrivateAcl $shutdownClient
+  $shutdownPasswordLines = @([IO.File]::ReadAllLines($shutdownClient) |
+    Where-Object { $_.StartsWith('password=') })
+  if ($shutdownPasswordLines.Count -ne 1) { throw 'Senha de shutdown inválida' }
+  $shutdownPassword = $shutdownPasswordLines[0].Substring('password='.Length)
+}
+if ($shutdownPassword -notmatch '^[A-Za-z0-9_-]{32,}$') { throw 'Senha de shutdown inválida' }
+$shutdownContent = @(
+  '[client]', 'protocol=TCP', 'host=127.0.0.1', 'port=3307', 'user=sage_shutdown',
+  "password=$shutdownPassword", ''
+) -join [Environment]::NewLine
+Write-PrivateTextOnce $shutdownClient $shutdownContent
+
 $mysqlIniContent = @(
   '[mysqld]'
   "basedir=$((Join-Path $programRoot 'runtime\mysql').Replace('\', '/'))"

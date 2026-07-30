@@ -15,7 +15,9 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 $programRoot = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
 $configRoot = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE\config'
 $mysqld = Join-Path $programRoot 'runtime\mysql\bin\mysqld.exe'
+$mysqladmin = Join-Path $programRoot 'runtime\mysql\bin\mysqladmin.exe'
 $mysqlIni = Join-Path $configRoot 'mysql.ini'
+$shutdownClient = Join-Path $configRoot 'shutdown-client.cnf'
 $winsw = Join-Path $programRoot 'service\SAGE-API.exe'
 $node = Join-Path $programRoot 'runtime\node\node.exe'
 $sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
@@ -50,6 +52,34 @@ function Test-ServiceMarkedForDeletion {
   return $false
 }
 
+function Assert-RegularFile {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Arquivo obrigatório ausente: $Path" }
+  $current = $Path
+  while ($current) {
+    if ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+      throw "Reparse point não permitido: $current"
+    }
+    $parent = Split-Path -Parent $current
+    if ($parent -eq $current) { break }
+    $current = $parent
+  }
+}
+
+function Assert-SystemAdminAcl {
+  param([string]$Path)
+  $acl = Get-Acl -LiteralPath $Path
+  $rules = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+  $allowed = @('S-1-5-18', 'S-1-5-32-544')
+  $identities = @($rules.IdentityReference.Value | Sort-Object -Unique)
+  if (-not $acl.AreAccessRulesProtected -or $rules.Count -ne 2 -or $identities.Count -ne 2 -or
+      @($rules | Where-Object {
+        $allowed -notcontains $_.IdentityReference.Value -or $_.AccessControlType -ne 'Allow' -or
+        ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+          [Security.AccessControl.FileSystemRights]::FullControl
+      }).Count -ne 0) { throw "ACL privada divergente: $Path" }
+}
+
 function Disable-And-StopService {
   param([string]$Name)
   $service = Get-Service $Name -ErrorAction SilentlyContinue
@@ -62,6 +92,25 @@ function Disable-And-StopService {
     }
   } catch {
     if (-not (Test-ServiceMarkedForDeletion $_)) { throw }
+  }
+}
+
+function Stop-MySqlGracefully {
+  $service = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+  if ($null -eq $service -or $service.Status -eq 'Stopped') { return }
+  try { Set-Service SAGEMySQL -StartupType Disabled }
+  catch { if (-not (Test-ServiceMarkedForDeletion $_)) { throw } }
+  Assert-RegularFile $mysqladmin
+  Assert-RegularFile $shutdownClient
+  Assert-SystemAdminAcl $shutdownClient
+  & $mysqladmin "--defaults-extra-file=$shutdownClient" shutdown 2>$null | Out-Null
+  $exitCode = $LASTEXITCODE
+  $current = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+  if ($exitCode -ne 0 -and $null -ne $current -and $current.Status -ne 'Stopped') {
+    throw "MySQL recusou parada segura com exit $exitCode"
+  }
+  if ($null -ne $current -and $current.Status -ne 'Stopped') {
+    $current.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
   }
 }
 
@@ -126,6 +175,7 @@ if ($firewallRules.Count -eq 1) { Assert-FirewallRuleOwned $firewallRules[0] }
 Disable-And-StopService 'SAGEAPI'
 Remove-ServiceRecord 'SAGEAPI'
 
+Stop-MySqlGracefully
 Disable-And-StopService 'SAGEMySQL'
 Remove-ServiceRecord 'SAGEMySQL'
 

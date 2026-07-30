@@ -36,6 +36,12 @@ describe('desinstalação segura dos serviços Windows', () => {
       script.indexOf("Remove-ServiceRecord 'SAGEMySQL'")
     );
     expect(script).not.toContain("'failure', 'SAGEMySQL'");
+    expect(script).toContain('Stop-MySqlGracefully');
+    expect(script).toContain('Assert-RegularFile $mysqladmin');
+    expect(script).toContain('Assert-RegularFile $shutdownClient');
+    expect(script).toContain('Assert-SystemAdminAcl $shutdownClient');
+    expect(script).toContain('"--defaults-extra-file=$shutdownClient" shutdown');
+    expect(script).toContain('MySQL recusou parada segura com exit');
     expect(script).toContain('& $sc delete $Name');
     expect(script).toContain('$exitCode -notin @(0, 1060, 1072)');
     expect(script).toContain("$exception.NativeErrorCode -eq 1072");

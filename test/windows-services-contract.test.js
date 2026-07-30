@@ -54,6 +54,7 @@ describe('serviços Windows privados do SAGE', () => {
     expect(script).toContain('Assert-ServiceAccess $dataDirectory $mysqlSid');
     expect(script).toContain('Assert-ServiceAbsent $dataDirectory $apiSid');
     expect(script).toContain("Assert-ServiceAbsent (Join-Path $configRoot 'sage.env') $mysqlSid");
+    expect(script).not.toContain('shutdown-client.cnf');
   });
   it('serializa mudanças no SCM e usa o controlador absoluto do Windows', () => {
     expect(script).toContain("'Global\\SAGE-Service-Lifecycle'");

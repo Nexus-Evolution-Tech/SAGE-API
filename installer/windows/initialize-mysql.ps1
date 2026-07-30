@@ -115,8 +115,12 @@ function Assert-Accounts {
   $maintenanceGrants = Invoke-Client $mysql (Join-Path $configDir 'maintenance-client.cnf') @(
     '--batch', '--skip-column-names'
   ) "SHOW GRANTS;`n"
+  $shutdownGrants = Invoke-Client $mysql $shutdownClient @(
+    '--batch', '--skip-column-names'
+  ) "SHOW GRANTS;`n"
   $runtimeLines = @($runtimeGrants.Trim() -split "`r?`n")
   $maintenanceLines = @($maintenanceGrants.Trim() -split "`r?`n")
+  $shutdownLines = @($shutdownGrants.Trim() -split "`r?`n")
   if ($runtimeLines.Count -ne 2 -or
       @($runtimeLines -match '^GRANT USAGE ON \*\.\* TO `sage_runtime`@`127\.0\.0\.1`$').Count -ne 1 -or
       @($runtimeLines -match 'GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON `sage`\.\*').Count -ne 1 -or
@@ -131,12 +135,19 @@ function Assert-Accounts {
       $maintenanceGrants -match 'GRANT OPTION|GRANT ALL PRIVILEGES ON \*\.\*') {
     throw 'Privilégios de manutenção divergentes'
   }
+  if ($shutdownLines.Count -ne 2 -or
+      @($shutdownLines -match '^GRANT USAGE ON \*\.\* TO `sage_shutdown`@`127\.0\.0\.1`$').Count -ne 1 -or
+      @($shutdownLines -match '^GRANT SHUTDOWN ON \*\.\* TO `sage_shutdown`@`127\.0\.0\.1`$').Count -ne 1 -or
+      $shutdownGrants -match 'GRANT OPTION|ALL PRIVILEGES') {
+    throw 'Privilégios de shutdown divergentes'
+  }
 }
 
 $runtime = Read-KeyValues (Join-Path $configDir 'sage.env')
 $maintenance = Read-KeyValues (Join-Path $configDir 'maintenance.env')
 Assert-Secret $runtime.DB_PASSWORD
 Assert-Secret $maintenance.DB_PASSWORD
+Assert-Secret $shutdownPassword
 $runtimeContent = @(
   '[client]', 'protocol=TCP', 'host=127.0.0.1', 'port=3307', 'user=sage_runtime',
   "password=$($runtime.DB_PASSWORD)", ''
@@ -154,7 +165,11 @@ try {
   if (Test-Path -LiteralPath $marker) {
     Assert-RegularLocalPath $marker
     Assert-PrivateAcl $marker
-    if ([IO.File]::ReadAllText($marker) -cne "schemaVersion=1`r`n") { throw 'Marcador MySQL inválido' }
+    $markerContent = [IO.File]::ReadAllText($marker)
+    if ($markerContent -ceq "schemaVersion=1`r`n") {
+      throw 'Estado MySQL pré-alpha v1 não é atualizável; recrie-o antes do primeiro release'
+    }
+    if ($markerContent -cne "schemaVersion=2`r`n") { throw 'Marcador MySQL inválido' }
     Assert-Accounts
     Write-Host 'Contas MySQL privadas verificadas; nenhum segredo foi exibido.'
     return
@@ -206,10 +221,15 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'sage_maintenance'@'127.0.0.1';
 GRANT SHOW_ROUTINE ON *.* TO 'sage_maintenance'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON `sage`.* TO 'sage_maintenance'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON `sage\_verif\_%`.* TO 'sage_maintenance'@'127.0.0.1';
+CREATE USER IF NOT EXISTS 'sage_shutdown'@'127.0.0.1' IDENTIFIED BY '__SHUTDOWN_SECRET__';
+ALTER USER 'sage_shutdown'@'127.0.0.1' IDENTIFIED BY '__SHUTDOWN_SECRET__';
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'sage_shutdown'@'127.0.0.1';
+GRANT SHUTDOWN ON *.* TO 'sage_shutdown'@'127.0.0.1';
 '@
   $sql = $sqlTemplate.Replace('__ROOT_SECRET__', $rootSecret)
   $sql = $sql.Replace('__RUNTIME_SECRET__', $runtime.DB_PASSWORD)
   $sql = $sql.Replace('__MAINTENANCE_SECRET__', $maintenance.DB_PASSWORD)
+  $sql = $sql.Replace('__SHUTDOWN_SECRET__', $shutdownPassword)
   Write-PrivateTextOnce $initSql $sql
   $server = Start-Server @(
     '--skip-networking', '--shared-memory', "--shared-memory-base-name=$sharedMemory",
@@ -228,7 +248,7 @@ GRANT ALL PRIVILEGES ON `sage\_verif\_%`.* TO 'sage_maintenance'@'127.0.0.1';
   Assert-Accounts
   Stop-Root $rootClient $server
   $server = $null
-  Write-PrivateTextOnce $marker "schemaVersion=1`r`n"
+  Write-PrivateTextOnce $marker "schemaVersion=2`r`n"
   [IO.File]::Delete($rootClient)
   Write-Host 'MySQL privado inicializado e validado; nenhum segredo foi exibido.'
 } finally {
