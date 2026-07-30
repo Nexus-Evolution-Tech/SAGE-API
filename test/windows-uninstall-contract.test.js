@@ -44,6 +44,7 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).toContain('Assert-SystemAdminAcl $shutdownClient');
     expect(script).toContain('"--defaults-extra-file=$shutdownClient" shutdown');
     expect(script).toContain('MySQL recusou parada segura com exit');
+    expect(script).not.toContain('Get-NetTCPConnection -State Listen -LocalPort 3307');
     expect(script).toContain('& $sc delete $Name');
     expect(script).toContain('$exitCode -notin @(0, 1060, 1072)');
     expect(script).toContain("$exception.NativeErrorCode -eq 1072");

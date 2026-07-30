@@ -194,12 +194,13 @@ for ($attempt = 0; $attempt -lt 240; $attempt++) {
       -not (Get-ServiceRecord 'SAGEMySQL')) { break }
   Start-Sleep -Milliseconds 250
 }
-if (@($remaining | Where-Object {
-      $_.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)
-    }).Count -ne 0) {
+$mysqlRemaining = @($remaining | Where-Object {
+  $_.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)
+})
+if ($mysqlRemaining.Count -ne 0) {
   $record = Get-ServiceRecord 'SAGEMySQL'
   $state = if ($null -eq $record) { 'ausente' } else { "$($record.State)/pid=$($record.ProcessId)" }
-  Write-Host "MySQL residual; SCM=$state; pid=$(@($remaining.ProcessId) -join ',')"
+  Write-Host "MySQL residual; SCM=$state; pid=$(@($mysqlRemaining.ProcessId) -join ',')"
   throw 'MySQL não encerrou de forma segura; encerramento forçado recusado'
 }
 if ($remaining.Count -ne 0 -or (Get-ServiceRecord 'SAGEAPI') -or

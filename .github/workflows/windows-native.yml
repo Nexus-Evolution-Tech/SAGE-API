@@ -328,14 +328,15 @@ jobs:
               $null -ne (Get-Process -Id $childBefore.ProcessId -ErrorAction SilentlyContinue)) {
             throw 'WinSW preservou processo órfão da API'
           }
-          $mysqlProcess = Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
-            Where-Object CommandLine -Match 'SAGEMySQL' | Select-Object -First 1
-          if ($null -eq $mysqlProcess) { throw 'Processo SAGEMySQL não encontrado' }
-          Stop-Process -Id $mysqlProcess.ProcessId -Force
+          $mysqlServiceBefore = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
+          if ($null -eq $mysqlServiceBefore -or $mysqlServiceBefore.ProcessId -eq 0) {
+            throw 'PID do serviço SAGEMySQL não encontrado'
+          }
+          Stop-Process -Id $mysqlServiceBefore.ProcessId -Force
           Wait-SageReady
-          $mysqlAfter = Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
-            Where-Object CommandLine -Match 'SAGEMySQL' | Select-Object -First 1
-          if ($null -eq $mysqlAfter -or $mysqlAfter.ProcessId -eq $mysqlProcess.ProcessId) {
+          $mysqlServiceAfter = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
+          if ($null -eq $mysqlServiceAfter -or $mysqlServiceAfter.ProcessId -eq 0 -or
+              $mysqlServiceAfter.ProcessId -eq $mysqlServiceBefore.ProcessId) {
             throw 'SCM não reiniciou o MySQL'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $state 'logs\api\SAGE-API.out.log'))) {
