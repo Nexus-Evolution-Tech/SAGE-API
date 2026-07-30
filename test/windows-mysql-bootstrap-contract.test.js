@@ -27,7 +27,7 @@ describe('bootstrap privado do MySQL no Windows', () => {
     expect(source).toContain('GRANT SHUTDOWN ON *.*');
     expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_runtime`');
     expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_maintenance`');
-    expect(source).toContain('^GRANT USAGE ON \\*\\.\\* TO `sage_shutdown`');
+    expect(source).toContain('$shutdownLines.Count -ne 1');
     expect(source).not.toMatch(/'sage_(?:runtime|maintenance)'@'%'|GRANT ALL PRIVILEGES ON \*\.\*/);
     const grants = source.split('\n').filter((line) => line.startsWith('GRANT '));
     expect(grants.join('\n')).not.toMatch(/\bGRANT OPTION\b/);

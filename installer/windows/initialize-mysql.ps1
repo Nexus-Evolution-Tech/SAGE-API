@@ -135,8 +135,7 @@ function Assert-Accounts {
       $maintenanceGrants -match 'GRANT OPTION|GRANT ALL PRIVILEGES ON \*\.\*') {
     throw 'Privilégios de manutenção divergentes'
   }
-  if ($shutdownLines.Count -ne 2 -or
-      @($shutdownLines -match '^GRANT USAGE ON \*\.\* TO `sage_shutdown`@`127\.0\.0\.1`$').Count -ne 1 -or
+  if ($shutdownLines.Count -ne 1 -or
       @($shutdownLines -match '^GRANT SHUTDOWN ON \*\.\* TO `sage_shutdown`@`127\.0\.0\.1`$').Count -ne 1 -or
       $shutdownGrants -match 'GRANT OPTION|ALL PRIVILEGES') {
     throw 'Privilégios de shutdown divergentes'
