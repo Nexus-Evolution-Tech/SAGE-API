@@ -98,6 +98,8 @@ function Disable-And-StopService {
 function Stop-MySqlGracefully {
   $service = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
   if ($null -eq $service -or $service.Status -eq 'Stopped') { return }
+  & $sc failureflag SAGEMySQL 0 | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Não foi possível desarmar recovery do MySQL: $LASTEXITCODE" }
   try { Set-Service SAGEMySQL -StartupType Disabled }
   catch { if (-not (Test-ServiceMarkedForDeletion $_)) { throw } }
   Assert-RegularFile $mysqladmin
@@ -195,6 +197,9 @@ for ($attempt = 0; $attempt -lt 240; $attempt++) {
 if (@($remaining | Where-Object {
       $_.ExecutablePath.Equals($mysqld, [StringComparison]::OrdinalIgnoreCase)
     }).Count -ne 0) {
+  $record = Get-ServiceRecord 'SAGEMySQL'
+  $state = if ($null -eq $record) { 'ausente' } else { "$($record.State)/pid=$($record.ProcessId)" }
+  Write-Host "MySQL residual; SCM=$state; pid=$(@($remaining.ProcessId) -join ',')"
   throw 'MySQL não encerrou de forma segura; encerramento forçado recusado'
 }
 if ($remaining.Count -ne 0 -or (Get-ServiceRecord 'SAGEAPI') -or

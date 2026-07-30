@@ -37,6 +37,8 @@ describe('desinstalação segura dos serviços Windows', () => {
     );
     expect(script).not.toContain("'failure', 'SAGEMySQL'");
     expect(script).toContain('Stop-MySqlGracefully');
+    expect(script).toContain('& $sc failureflag SAGEMySQL 0');
+    expect(script).toContain('Não foi possível desarmar recovery do MySQL');
     expect(script).toContain('Assert-RegularFile $mysqladmin');
     expect(script).toContain('Assert-RegularFile $shutdownClient');
     expect(script).toContain('Assert-SystemAdminAcl $shutdownClient');
