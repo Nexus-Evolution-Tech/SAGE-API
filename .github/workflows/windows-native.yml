@@ -328,17 +328,27 @@ jobs:
               $null -ne (Get-Process -Id $childBefore.ProcessId -ErrorAction SilentlyContinue)) {
             throw 'WinSW preservou processo órfão da API'
           }
-          $mysqlServiceBefore = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
-          if ($null -eq $mysqlServiceBefore -or $mysqlServiceBefore.ProcessId -eq 0) {
-            throw 'PID do serviço SAGEMySQL não encontrado'
+          $mysqlListenerBefore = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 `
+            -LocalPort 3307 -ErrorAction SilentlyContinue)
+          if ($mysqlListenerBefore.Count -ne 1 -or $mysqlListenerBefore[0].OwningProcess -eq 0) {
+            throw 'PID do listener SAGEMySQL não encontrado'
           }
-          Stop-Process -Id $mysqlServiceBefore.ProcessId -Force
-          Wait-SageReady
-          $mysqlServiceAfter = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
-          if ($null -eq $mysqlServiceAfter -or $mysqlServiceAfter.ProcessId -eq 0 -or
-              $mysqlServiceAfter.ProcessId -eq $mysqlServiceBefore.ProcessId) {
+          Stop-Process -Id $mysqlListenerBefore[0].OwningProcess -Force
+          $mysqlRecovered = $false
+          for ($attempt = 0; $attempt -lt 80; $attempt++) {
+            $mysqlListenerAfter = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 `
+              -LocalPort 3307 -ErrorAction SilentlyContinue)
+            if ($mysqlListenerAfter.Count -eq 1 -and
+                $mysqlListenerAfter[0].OwningProcess -ne $mysqlListenerBefore[0].OwningProcess) {
+              $mysqlRecovered = $true
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $mysqlRecovered -or (Get-Service SAGEMySQL).Status -ne 'Running') {
             throw 'SCM não reiniciou o MySQL'
           }
+          Wait-SageReady
           if (-not (Test-Path -LiteralPath (Join-Path $state 'logs\api\SAGE-API.out.log'))) {
             throw 'Log rotativo da API não foi criado'
           }

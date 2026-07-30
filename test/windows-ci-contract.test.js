@@ -54,8 +54,8 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain('Política efetiva do Windows Firewall não está fail-closed');
     expect(source).toContain("$firewallAddress.RemoteAddress -ne 'LocalSubnet'");
     expect(source).toContain("Stop-Process -Id $nodeBefore.ProcessId -Force");
-    expect(source).toContain('Stop-Process -Id $mysqlServiceBefore.ProcessId -Force');
-    expect(source).toContain('$mysqlServiceAfter.ProcessId -eq $mysqlServiceBefore.ProcessId');
+    expect(source).toContain('Stop-Process -Id $mysqlListenerBefore[0].OwningProcess -Force');
+    expect(source).toContain('$mysqlListenerAfter[0].OwningProcess -ne $mysqlListenerBefore[0].OwningProcess');
     expect(source).toContain('Segredo apareceu em processo, XML ou log');
     expect(source).toContain("service\\uninstall-services.ps1");
     expect(source).toContain('Desinstalação alterou dados persistentes');
