@@ -452,7 +452,7 @@ come 1-2 GB. Orçamento proposto para 8 GB:
 | Heap do Node | **cap explícito** (`--max-old-space-size≈512`) | Impede o processo crescer até engasgar a máquina. Falhar rápido e reiniciar > degradar tudo |
 | Logs da catraca em memória | paginar via `limit`/`offset` | 48k logs em JSON são dezenas de MB no pico (resposta + `JSON.parse`). Tolerável hoje, **não** se crescer para centenas de milhares |
 | Redis | **não instalar** | Confirmado pela restrição 8: mais um processo e mais memória, para um ganho que o LRU local já dá |
-| Antivírus | **excluir o diretório de dados do MySQL** | Item de manual de instalação. AV varrendo arquivos de banco em HD é uma das piores perdas de desempenho em Windows, e é gratuito de resolver |
+| Antivírus | **não criar exclusão automática** | Medir o impacto no hardware real; qualquer exceção depende de decisão explícita do administrador e revisão de segurança |
 
 ### 8.8 🔴 "Monitorar com delay é pior que não monitorar" — o orçamento de latência
 
@@ -567,10 +567,9 @@ Como o `.exe` instala o banco, a configuração deixa de ser sorte e passa a ser
   flush agressivo que castiga o HD.
 - **Regra de firewall** criada pelo instalador, restrita à sub-rede local (§8.8.1).
 - ⚠️ **Windows Defender ≠ Firewall do Windows.** São coisas distintas: o Firewall filtra rede; o
-  Defender faz varredura de arquivos em tempo real e vem **ligado por padrão no Windows 11**. Ele
-  varrendo o diretório de dados do MySQL num HD mecânico é uma perda de desempenho real. O
-  instalador deve adicionar a exclusão do diretório de dados (e conferir se há AV corporativo da
-  rede da escola, que também vem ligado sem aviso).
+  Defender faz varredura de arquivos em tempo real e vem **ligado por padrão no Windows 11**. O
+  instalador não cria exclusão automática: primeiro mede-se o impacto e, se necessário, o
+  administrador decide uma exceção mínima fora do fluxo silencioso.
 
 ### 8.10 Crescimento da tabela `Acesso` ao longo dos anos
 

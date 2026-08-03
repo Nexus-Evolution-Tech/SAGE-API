@@ -1,8 +1,14 @@
 # Spec — Fase 8 antecipada: instalador Windows alfa de campo
 
 **Tier:** T2 — toca autenticação, banco, serviço do sistema, firewall e distribuição.
-**Estado:** em implementação local; ainda sem EXE distribuível.
+**Estado (2026-08-03):** implementação local em validação; ainda sem EXE distribuível.
 **Alvo:** Windows 11 x64, 8 GB RAM, HD mecânico, operação local sem internet.
+
+O builder/layout, os scripts de estado, bootstrap privado do MySQL, provisionamento da API/MySQL,
+firewall e desinstalação segura já existem e têm contratos automatizados. A prova Windows nativa
+ainda está aberta: o último run (`30503250709`) falhou ao matar o processo que escuta o MySQL,
+porque o serviço nativo não demonstrou criar um novo listener dentro do gate. Portanto a recuperação
+do MySQL após falha **não está aprovada** e nenhum EXE deve ser distribuído.
 
 ## 1. Por que antecipar
 
@@ -208,6 +214,9 @@ Cada item abaixo é um PR de comportamento independente, com alvo de até 300 li
 - PowerShell idempotente para MySQL, config, ACL, WinSW e firewall;
 - Inno Setup chama o bootstrap e falha alto;
 - uninstall preserva `ProgramData`.
+
+Estado parcial: os scripts PowerShell e a desinstalação existem; o fluxo Inno, a recuperação do
+MySQL após kill e a prova em VM ainda estão pendentes.
 
 ### PR F8.6 — update e rollback
 

@@ -91,7 +91,7 @@ barrando import cruzado.
 
 ### Fase 8 — Frota e distribuição
 `schema_migrations` versionado, instalador Windows (MySQL 8.4 LTS, `my.ini` por RAM detectada,
-regra de firewall, exclusão do Defender), serviço, auto-update com rollback, telemetria, bundle de
+regra de firewall sem exclusão automática do Defender), serviço, auto-update com rollback, telemetria, bundle de
 diagnóstico. Site com download.
 **Gate:** instalação limpa em VM Windows 11 por alguém de fora; update com rollback provado.
 

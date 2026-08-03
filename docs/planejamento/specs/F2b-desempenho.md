@@ -65,7 +65,8 @@ acesso aparecer na tela.
 - Cap explícito de heap do Node.
 - Paginação de logs da catraca via `limit`/`offset` (já suportado por `obterLogsCatraca`).
 - Redis removido.
-- **Windows Defender ≠ Firewall**: excluir o diretório de dados do MySQL da varredura em tempo real.
+- **Windows Defender ≠ Firewall**: não criar exclusão automática; medir impacto e exigir decisão
+  explícita do administrador para qualquer exceção mínima.
 - Reavaliar se os 3 índices secundários de `Acesso` são todos necessários — em HD, o INSERT no
   índice clusterizado é append sequencial (barato), mas **cada índice secundário é escrita
   aleatória** por linha. São eles o custo real do backfill.

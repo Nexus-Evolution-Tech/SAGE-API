@@ -15,17 +15,19 @@ API para gestão escolar integrada com sistemas de controle de acesso.
 
 ## 🎯 Estado da homologação
 
-O backend possui suíte automatizada em MySQL 8.4, mas o instalador Windows e o hardware IDBlock
-real ainda são gates abertos. Consulte `docs/planejamento/specs/F8-instalador-alpha-campo.md`.
+O backend possui suíte automatizada em MySQL 8.4. O CI Windows nativo já prova o layout e os
+contratos, mas a VM Windows 11, a recuperação do MySQL e o hardware IDBlock real ainda são gates
+abertos. Consulte `docs/planejamento/specs/F8-instalador-alpha-campo.md` e
+`docs/HANDOFF-WINDOWS-VM.md`.
 
 - ✅ Setup explícito com ledger e falha fechada
 - ✅ Sincronização com catracas ControlID
 - ✅ Geração de QR Code e RFID
 - ✅ Importação de dados em massa (Excel)
-- ⚠️ Compatibilidade Windows ainda precisa de prova em VM limpa
+- ⚠️ Compatibilidade Windows ainda precisa de prova em VM limpa; o último CI falhou no recovery do MySQL
 - ⚠️ Release público depende de assinatura e auditoria de dependências
 
-**Ver detalhes**: [VALIDACAO_COMPLETA.md](./VALIDACAO_COMPLETA.md)
+**Ver detalhes**: [spec do instalador](./docs/planejamento/specs/F8-instalador-alpha-campo.md)
 
 ---
 
@@ -51,7 +53,7 @@ npm start
 ```
 
 **Tempo de instalação**: ~3-5 minutos  
-**Guia detalhado**: [INSTALACAO_WINDOWS.md](./INSTALACAO_WINDOWS.md)
+**Guia detalhado**: [handoff da VM Windows](./docs/HANDOFF-WINDOWS-VM.md)
 
 ---
 
@@ -59,11 +61,9 @@ npm start
 
 | Documento | Descrição |
 |-----------|-----------|
-| [INSTALACAO_WINDOWS.md](./INSTALACAO_WINDOWS.md) | Guia passo a passo para Windows |
-| [VALIDACAO_COMPLETA.md](./VALIDACAO_COMPLETA.md) | Validação técnica detalhada |
-| [CHECKLIST_PRODUCAO.md](./CHECKLIST_PRODUCAO.md) | Checklist de deploy |
-| [RELATORIO_FINAL_PRODUCAO.md](./RELATORIO_FINAL_PRODUCAO.md) | Relatório executivo |
-| [SETUP_RAPIDO_WINDOWS.md](./SETUP_RAPIDO_WINDOWS.md) | Setup rápido |
+| [Spec do instalador](./docs/planejamento/specs/F8-instalador-alpha-campo.md) | Escopo, gates e bloqueios do instalador |
+| [Handoff da VM Windows](./docs/HANDOFF-WINDOWS-VM.md) | Estado executável para continuar a validação |
+| [Achados do instalador](./docs/planejamento/ACHADOS-INSTALADOR.md) | Defeitos de bootstrap já verificados |
 | [/docs](http://localhost:3000/docs) | Swagger API (após iniciar) |
 
 ---
