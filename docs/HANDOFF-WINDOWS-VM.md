@@ -7,7 +7,8 @@ uma VM Windows 11 x64. Ele complementa o handoff arquitetural em `../docs/HANDOF
 
 - Repositório: `Nexus-Evolution-Tech/SAGE-API`
 - Branch: `agent/f8-uninstall`
-- HEAD esperado: `94d28d1`
+- Baseline do código do instalador: `94d28d1`
+- HEAD remoto atual (inclui este handoff): `7e30435`
 - Alvo: Windows 11 x64, Node 24, MySQL 8.4.11, PowerShell 5.1
 - O instalador ainda é alfa interno. Não há EXE distribuível, release público, assinatura
   Authenticode ou licença de redistribuição fechada.
