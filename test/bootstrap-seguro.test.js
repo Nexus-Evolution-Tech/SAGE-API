@@ -27,7 +27,7 @@ function credencialInicial() {
   };
 }
 
-async function executarSetup(nomeBanco, credencial) {
+async function executarSetup(nomeBanco, credencial, envExtra = {}) {
   const cfg = configConexao();
   const env = {
     ...process.env,
@@ -38,7 +38,8 @@ async function executarSetup(nomeBanco, credencial) {
     DB_NAME: nomeBanco,
     NODE_ENV: 'test',
     LOG_LEVEL: 'error',
-    JWT_SECRET: crypto.randomBytes(32).toString('hex')
+    JWT_SECRET: crypto.randomBytes(32).toString('hex'),
+    ...envExtra
   };
 
   delete env.SAGE_INITIAL_ADMIN_LOGIN;
@@ -134,5 +135,21 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     await db.end();
 
     expect(unidades).toEqual([]);
+  });
+
+  it('prepara o schema sem conta quando o onboarding local está habilitado', async () => {
+    const nomeBanco = novoBanco('onboarding');
+    const resultado = await executarSetup(nomeBanco, null, {
+      SAGE_ALLOW_FIRST_RUN_ONBOARDING: 'true'
+    });
+    expect(resultado.codigo).toBe(0);
+    const db = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    const [unidades] = await db.query('SELECT id FROM UnidadeEscolar');
+    const [tabelas] = await db.query(
+      'SELECT COUNT(*) AS total FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?', [nomeBanco]
+    );
+    await db.end();
+    expect(unidades).toEqual([]);
+    expect(tabelas[0].total).toBeGreaterThan(0);
   });
 });

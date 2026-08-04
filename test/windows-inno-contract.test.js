@@ -20,16 +20,10 @@ describe('instalador Inno interno do SAGE', () => {
   });
 
   it('coleta credencial inicial sem colocá-la em argv ou log', () => {
-    expect(iss).toContain('CreateInputQueryPage');
-    expect(iss).toContain('Add(\'Senha inicial\', True)');
-    expect(iss).toContain('initial-admin.pending');
-    expect(iss).not.toMatch(/SAGE_INITIAL_ADMIN_PASSWORD.*ExpandConstant|--password/i);
-    expect(install).toContain("[IO.File]::Delete($CredentialFile)");
-    expect(install).toContain("Get-Acl -LiteralPath (Split-Path -Parent $Path)");
-    expect(install).toContain('[IO.FileAttributes]::ReparsePoint');
-    expect(install).not.toContain('Assert-PrivateAcl (Get-Acl -LiteralPath (Split-Path -Parent $Path)) $true');
-    expect(install).toContain('$parentAcl.AreAccessRulesProtected');
-    expect(install).not.toMatch(/Write-(?:Host|Output).*PASSWORD/i);
+    expect(iss).not.toContain('CreateInputQueryPage');
+    expect(iss).not.toMatch(/Senha inicial|initial-admin\.pending|CredentialPage/i);
+    expect(install).not.toMatch(/CredentialFile|SAGE_INITIAL_ADMIN_(?:LOGIN|PASSWORD)/i);
+    expect(install).toContain("SAGE_ALLOW_FIRST_RUN_ONBOARDING = 'true'");
   });
 
   it('aplica schema antes de iniciar API e exige readiness', () => {

@@ -15,6 +15,64 @@ const campos = ['id', 'nome', 'numero_unidade', 'cnpj', 'login', 'senha', 'logra
 /** Campos permitidos para atualização da unidade (sem senha) */
 const camposAtualizaveis = campos.filter((c) => c !== 'senha' && c !== 'id');
 
+function isLoopbackRequest(req) {
+  const address = req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+const bootstrapStatus = async (_req, res) => {
+  try {
+    const [[row]] = await db.query('SELECT COUNT(*) AS total FROM UnidadeEscolar');
+    res.json({ required: Number(row.total) === 0 });
+  } catch (error) {
+    logger.error(`Erro ao consultar onboarding: ${error.message}`);
+    res.status(503).json({ message: 'Configuração inicial indisponível' });
+  }
+};
+
+const bootstrapInitialize = async (req, res) => {
+  if (!isLoopbackRequest(req)) {
+    return res.status(403).json({ message: 'A configuração inicial só pode ser feita neste computador' });
+  }
+  const nome = String(req.body?.nome || '').trim();
+  const loginInicial = String(req.body?.login || '').trim();
+  const senha = String(req.body?.senha || '');
+  if (nome.length < 3 || nome.length > 255 ||
+      !/^[A-Za-z0-9._-]{3,100}$/.test(loginInicial) || senha.length < 16) {
+    return res.status(400).json({ message: 'Informe unidade, login válido e senha com ao menos 16 caracteres' });
+  }
+
+  const connection = await db.getConnection();
+  let lockAcquired = false;
+  try {
+    const [[lock]] = await connection.query("SELECT GET_LOCK('sage_first_run_onboarding', 5) AS acquired");
+    lockAcquired = Number(lock.acquired) === 1;
+    if (!lockAcquired) return res.status(503).json({ message: 'Outra configuração está em andamento' });
+    await connection.beginTransaction();
+    const [[existing]] = await connection.query('SELECT COUNT(*) AS total FROM UnidadeEscolar');
+    if (Number(existing.total) !== 0) {
+      await connection.rollback();
+      return res.status(409).json({ message: 'O SAGE já foi configurado' });
+    }
+    const senhaHash = await hashSenha(senha);
+    await connection.query(
+      'INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)',
+      [nome, loginInicial, senhaHash]
+    );
+    await connection.commit();
+    return res.status(201).json({ initialized: true });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    logger.error(`Erro no onboarding inicial: ${error.message}`);
+    return res.status(500).json({ message: 'Não foi possível concluir a configuração inicial' });
+  } finally {
+    if (lockAcquired) {
+      await connection.query("SELECT RELEASE_LOCK('sage_first_run_onboarding')").catch(() => {});
+    }
+    connection.release();
+  }
+};
+
 const login = async (req, res) => {
   try {
     const unidade_id = req.params.id;
@@ -173,5 +231,7 @@ module.exports = {
   atualizarUnidadeAtual,
   trocarSenha,
   getConfig,
-  uploadLogo
+  uploadLogo,
+  bootstrapStatus,
+  bootstrapInitialize
 };

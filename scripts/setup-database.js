@@ -251,24 +251,31 @@ async function executarSeeds() {
       const login = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
       const senha = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
       const nome = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
+      const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
+        !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
+        !process.env.SAGE_INITIAL_SCHOOL_NAME;
 
-      if (login.length < 3 || login.length > 100) {
+      if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
         throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
       }
-      if (senha.length < 16) {
+      if (!onboardingLocal && senha.length < 16) {
         throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 16 caracteres');
       }
-      if (!nome) {
+      if (!onboardingLocal && !nome) {
         throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
       }
 
-      logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
-      const senhaHashed = await bcrypt.hash(senha, 10);
-      await connection.query(
-        `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
-        [nome, login, senhaHashed]
-      );
-      logger.info(' Unidade escolar inicial inserida com sucesso');
+      if (onboardingLocal) {
+        logger.info(' Schema preparado; cadastro inicial será concluído na tela local do SAGE');
+      } else {
+        logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
+        const senhaHashed = await bcrypt.hash(senha, 10);
+        await connection.query(
+          `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
+          [nome, login, senhaHashed]
+        );
+        logger.info(' Unidade escolar inicial inserida com sucesso');
+      }
     } else {
       logger.info('🏫 Unidade escolar já existe; credencial preservada');
     }

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$CredentialFile = '')
+param()
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -11,7 +11,6 @@ $targetVersion = $release.version
 $apiRoot = Join-Path $programRoot "releases\$targetVersion\api"
 $node = Join-Path $programRoot 'runtime\node\node.exe'
 $provision = Join-Path $serviceRoot 'provision-services.ps1'
-$expectedCredentialFile = Join-Path $dataRoot 'config\initial-admin.pending'
 $currentMarker = Join-Path $dataRoot 'current.json'
 $pendingMarker = Join-Path $dataRoot 'current.json.pending'
 $previousVersion = $null
@@ -24,75 +23,20 @@ if (Test-Path -LiteralPath $currentMarker -PathType Leaf) {
   $previousVersion = $current.version
 }
 
-function Assert-PrivateAcl {
-  param($Acl, [bool]$RequireProtected)
-  $allowed = @('S-1-5-18', 'S-1-5-32-544')
-  $seen = @{}
-  if ($RequireProtected -and -not $Acl.AreAccessRulesProtected) { throw 'ACL privada herdável' }
-  foreach ($rule in $Acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
-    $sid = $rule.IdentityReference.Value
-    if ($allowed -notcontains $sid -or
-        $rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
-        ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
-          [Security.AccessControl.FileSystemRights]::FullControl) {
-      throw 'ACL da credencial inicial não é privada'
-    }
-    $seen[$sid] = $true
-  }
-  foreach ($sid in $allowed) {
-    if (-not $seen.ContainsKey($sid)) { throw 'ACL privada incompleta' }
-  }
-}
-
-function Read-InitialCredential {
-  param([string]$Path)
-  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Credencial inicial ausente' }
-  $item = Get-Item -LiteralPath $Path -Force
-  if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Credencial inicial inválida' }
-  $parentAcl = Get-Acl -LiteralPath (Split-Path -Parent $Path)
-  if (-not $parentAcl.AreAccessRulesProtected) { throw 'Diretório da credencial inicial não é privado' }
-  Assert-PrivateAcl (Get-Acl -LiteralPath $Path) $false
-  $values = @{}
-  foreach ($line in [IO.File]::ReadAllLines($Path)) {
-    if ($line -notmatch '^([A-Z]+)=(.*)$' -or $values.ContainsKey($Matches[1])) {
-      throw 'Credencial inicial inválida'
-    }
-    $values[$Matches[1]] = $Matches[2]
-  }
-  if ($values.Keys.Count -ne 3 -or $values.LOGIN.Length -lt 3 -or
-      $values.PASSWORD.Length -lt 16 -or -not $values.SCHOOL) {
-    throw 'Credencial inicial incompleta'
-  }
-  return $values
-}
-
 & $provision -Version $targetVersion
 if (-not $?) { throw 'Provisionamento base falhou' }
 
-$credential = $null
 try {
   try {
-    if ($CredentialFile) {
-      if ([IO.Path]::GetFullPath($CredentialFile) -cne [IO.Path]::GetFullPath($expectedCredentialFile)) {
-        throw 'Caminho da credencial inicial inválido'
-      }
-      $credential = Read-InitialCredential $CredentialFile
-      $env:SAGE_INITIAL_ADMIN_LOGIN = $credential.LOGIN
-      $env:SAGE_INITIAL_ADMIN_PASSWORD = $credential.PASSWORD
-      $env:SAGE_INITIAL_SCHOOL_NAME = $credential.SCHOOL
-    }
     $env:SAGE_CONFIG_FILE = Join-Path $dataRoot 'config\maintenance.env'
+    $env:SAGE_ALLOW_FIRST_RUN_ONBOARDING = 'true'
     Push-Location -LiteralPath $apiRoot
     try {
       & $node 'scripts\setup-database.js'
       if ($LASTEXITCODE -ne 0) { throw "Setup do banco falhou com exit $LASTEXITCODE" }
     } finally { Pop-Location }
   } finally {
-    Remove-Item Env:SAGE_INITIAL_ADMIN_LOGIN, Env:SAGE_INITIAL_ADMIN_PASSWORD,
-      Env:SAGE_INITIAL_SCHOOL_NAME, Env:SAGE_CONFIG_FILE -ErrorAction SilentlyContinue
-    if ($CredentialFile -and (Test-Path -LiteralPath $CredentialFile)) {
-      [IO.File]::Delete($CredentialFile)
-    }
+    Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_ALLOW_FIRST_RUN_ONBOARDING -ErrorAction SilentlyContinue
   }
 
   & $provision -Version $targetVersion -StartApi

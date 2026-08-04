@@ -5,9 +5,21 @@ const recuperacaoSenhaController = require('../controllers/recuperacaoSenhaContr
 const autenticar = require('../middlewares/autenticar');
 const upload = require('../middlewares/uploadFoto');
 
-const router = gerarRotas(schoolController, 'escolas', { autenticarTodas: false });
+const router = gerarRotas(schoolController, 'escolas', {
+  autenticarTodas: false,
+  autenticarReqs: {
+    listar: false,
+    criar: true,
+    listarPorId: true,
+    editar: true,
+    deletar: true
+  }
+});
 
 const routerExtra = express.Router();
+
+routerExtra.get('/setup/status', schoolController.bootstrapStatus);
+routerExtra.post('/setup/initialize', schoolController.bootstrapInitialize);
 
 // Recuperação de senha (público)
 routerExtra.post('/escolas/esqueci-senha', recuperacaoSenhaController.solicitarRecuperacao);
