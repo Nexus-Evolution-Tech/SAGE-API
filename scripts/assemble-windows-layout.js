@@ -117,15 +117,20 @@ async function assembleWindowsLayout({
       await copyEntry(runtime, path.join(staging, 'runtime', id), { trustedArtifact: true });
     }
     await copyEntry(path.join(inputs.artifacts, artifact('winsw').fileName), path.join(staging, 'service', 'SAGE-API.exe'));
+    await copyEntry(path.join(inputs.artifacts, artifact('winsw').fileName), path.join(staging, 'service', 'SAGE-MySQL.exe'));
     const serviceTemplate = await fsp.readFile(
       path.join(inputs.api, 'installer', 'windows', 'SAGE-API.xml.template'), 'utf8'
     );
     const serviceXml = serviceTemplate.replaceAll('__SAGE_VERSION__', pkg.version);
     if (serviceXml.includes('__SAGE_VERSION__')) throw new Error('Template WinSW não foi resolvido');
     await fsp.writeFile(path.join(staging, 'service', 'SAGE-API.xml'), serviceXml);
+    await copyEntry(
+      path.join(inputs.api, 'installer', 'windows', 'SAGE-MySQL.xml.template'),
+      path.join(staging, 'service', 'SAGE-MySQL.xml')
+    );
     for (const script of [
       'initialize-state.ps1', 'initialize-mysql.ps1', 'configure-firewall.ps1',
-      'provision-services.ps1', 'uninstall-services.ps1'
+      'provision-services.ps1', 'uninstall-services.ps1', 'stop-mysql.ps1'
     ]) {
       await copyEntry(path.join(inputs.api, 'installer', 'windows', script), path.join(staging, 'service', script));
     }

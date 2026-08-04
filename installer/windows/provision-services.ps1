@@ -22,6 +22,8 @@ $mysqlIni = Join-Path $configRoot 'mysql.ini'
 $maintenanceClient = Join-Path $configRoot 'maintenance-client.cnf'
 $winsw = Join-Path $PSScriptRoot 'SAGE-API.exe'
 $winswXml = Join-Path $PSScriptRoot 'SAGE-API.xml'
+$mysqlWinsw = Join-Path $PSScriptRoot 'SAGE-MySQL.exe'
+$mysqlWinswXml = Join-Path $PSScriptRoot 'SAGE-MySQL.xml'
 $releaseFile = Join-Path $programRoot 'release.json'
 $sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
 
@@ -113,11 +115,12 @@ try {
 foreach ($directory in @($programRoot, $mysqlRoot, $PSScriptRoot)) {
   Assert-RegularPath $directory $false
 }
-foreach ($file in @($mysqld, $mysqladmin, $winsw, $winswXml, $releaseFile)) {
+foreach ($file in @($mysqld, $mysqladmin, $winsw, $winswXml, $mysqlWinsw, $mysqlWinswXml, $releaseFile)) {
   Assert-RegularPath $file $true
 }
 Assert-RegularPath $sc $true
 $xml = [xml][IO.File]::ReadAllText($winswXml)
+$mysqlXml = [xml][IO.File]::ReadAllText($mysqlWinswXml)
 $release = [IO.File]::ReadAllText($releaseFile) | ConvertFrom-Json
 $expectedArguments = '"%BASE%\..\releases\' + $release.version + '\api\scripts\start-with-setup.js"'
 $expectedWorkingDirectory = '%BASE%\..\releases\' + $release.version + '\api'
@@ -131,28 +134,52 @@ if ($xml.service.id -cne 'SAGEAPI' -or $xml.service.depend -cne 'SAGEMySQL' -or
     [IO.File]::ReadAllText($winswXml) -match '(?i)password|secret|token') {
   throw 'Configuração WinSW inválida ou contém segredo'
 }
+if ($mysqlXml.service.id -cne 'SAGEMySQL' -or
+    $mysqlXml.service.serviceaccount.user -cne 'LocalService' -or
+    $mysqlXml.service.executable -cne '%BASE%\..\runtime\mysql\bin\mysqld.exe' -or
+    $mysqlXml.service.stopexecutable -cne
+      '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe' -or
+    [IO.File]::ReadAllText($mysqlWinswXml) -match '(?i)password|secret|token') {
+  throw 'Configuração WinSW do MySQL inválida ou contém segredo'
+}
 
 $mysqlService = Get-ServiceRecord 'SAGEMySQL'
 $mysqlPathNames = @(
   "`"$mysqld`" --defaults-file=`"$mysqlIni`" SAGEMySQL",
   "`"$mysqld`" --defaults-file=$mysqlIni SAGEMySQL"
 )
-if ($null -ne $mysqlService) { Assert-ServiceRecord 'SAGEMySQL' $mysqlPathNames }
+if ($null -ne $mysqlService) {
+  Assert-ServiceRecord 'SAGEMySQL' (@($mysqlPathNames) + @("`"$mysqlWinsw`"", $mysqlWinsw))
+}
 $apiService = Get-ServiceRecord 'SAGEAPI'
 if ($null -ne $apiService) { Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw) }
+
+# Registrar primeiro torna os SIDs NT SERVICE traduzíveis ao validar um ProgramData preservado.
+if ($null -eq $mysqlService) {
+  Invoke-NativeChecked $mysqlWinsw @('install')
+  $mysqlService = Get-ServiceRecord 'SAGEMySQL'
+}
+if ($null -eq $apiService) {
+  Invoke-NativeChecked $winsw @('install')
+  $apiService = Get-ServiceRecord 'SAGEAPI'
+}
 
 & (Join-Path $PSScriptRoot 'initialize-state.ps1')
 if (-not $?) { throw 'Estado privado falhou' }
 foreach ($directory in @($dataRoot, $configRoot)) { Assert-RegularPath $directory $false }
 foreach ($file in @($mysqlIni, $maintenanceClient)) { Assert-RegularPath $file $true }
 
-if ($null -eq $mysqlService) {
-  Invoke-NativeChecked $mysqld @(
-    '--install-manual', 'SAGEMySQL', "--defaults-file=$mysqlIni", '--local-service'
-  )
+if ($null -ne $mysqlService -and $mysqlPathNames -contains $mysqlService.PathName.Trim()) {
+  if ((Get-Service SAGEMySQL).Status -ne 'Stopped') { Stop-Service SAGEMySQL }
+  Invoke-NativeChecked $mysqld @('--remove', 'SAGEMySQL')
+  for ($attempt = 0; $attempt -lt 40 -and (Get-ServiceRecord 'SAGEMySQL'); $attempt++) {
+    Start-Sleep -Milliseconds 250
+  }
+  if (Get-ServiceRecord 'SAGEMySQL') { throw 'Serviço MySQL nativo não foi removido' }
+  Invoke-NativeChecked $mysqlWinsw @('install')
+  $mysqlService = Get-ServiceRecord 'SAGEMySQL'
 }
-if ($null -eq $apiService) { Invoke-NativeChecked $winsw @('install') }
-Assert-ServiceRecord 'SAGEMySQL' $mysqlPathNames
+Assert-ServiceRecord 'SAGEMySQL' @("`"$mysqlWinsw`"", $mysqlWinsw)
 Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw)
 
 foreach ($name in @('SAGEMySQL', 'SAGEAPI')) {
@@ -186,6 +213,8 @@ foreach ($path in @('mysql\tmp', 'logs\mysql')) {
     ([Security.AccessControl.FileSystemRights]::Modify) $inheritAll
 }
 Grant-ServiceAccess $mysqlIni $mysqlSid ([Security.AccessControl.FileSystemRights]::Read) $none
+Grant-ServiceAccess (Join-Path $configRoot 'shutdown-client.cnf') $mysqlSid `
+  ([Security.AccessControl.FileSystemRights]::Read) $none
 Grant-ServiceAccess $configRoot $apiSid `
   ([Security.AccessControl.FileSystemRights]::ReadAndExecute) $none
 foreach ($path in @('logs\api', 'backups', 'uploads', 'exports')) {
@@ -203,6 +232,8 @@ if (Test-Path -LiteralPath $dataDirectory) {
     ([Security.AccessControl.FileSystemRights]::Modify) $inheritAll
 }
 $marker = Join-Path $configRoot 'mysql-accounts.ready'
+$null = Invoke-NativeChecked $sc @('config', 'SAGEMySQL', 'start=', 'auto')
+$null = Invoke-NativeChecked $sc @('config', 'SAGEAPI', 'start=', 'delayed-auto')
 $mysqlService = Get-Service SAGEMySQL
 if (Test-Path -LiteralPath $marker) {
   if ($mysqlService.Status -ne 'Running') { Start-Service SAGEMySQL }
@@ -218,9 +249,6 @@ Assert-ServiceAbsent $dataDirectory $apiSid
 Assert-ServiceAccess (Join-Path $configRoot 'sage.env') $apiSid `
   ([Security.AccessControl.FileSystemRights]::Read)
 Assert-ServiceAbsent (Join-Path $configRoot 'sage.env') $mysqlSid
-Invoke-NativeChecked $sc @('config', 'SAGEMySQL', 'start=', 'auto')
-Invoke-NativeChecked $sc @('config', 'SAGEAPI', 'start=', 'delayed-auto')
-
 $mysqlService = Get-Service SAGEMySQL
 if ($mysqlService.Status -ne 'Running') { Start-Service SAGEMySQL }
 for ($attempt = 0; $attempt -lt 60; $attempt++) {

@@ -429,8 +429,8 @@ jobs:
           $mysqlService = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
           if ($null -ne $mysqlService) {
             if ($mysqlService.Status -ne 'Stopped') { Stop-Service SAGEMySQL -Force }
-            $mysqld = Join-Path $program 'runtime\mysql\bin\mysqld.exe'
-            if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGEMySQL }
+            $mysqlWinsw = Join-Path $program 'service\SAGE-MySQL.exe'
+            if (Test-Path -LiteralPath $mysqlWinsw) { & $mysqlWinsw uninstall }
           }
           $programPrefix = $program.TrimEnd('\') + '\'
           $remaining = @(Get-CimInstance Win32_Process | Where-Object {

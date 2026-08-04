@@ -29,10 +29,12 @@ async function fixture() {
   await write(api, 'installer/windows/configure-firewall.ps1');
   await write(api, 'installer/windows/provision-services.ps1');
   await write(api, 'installer/windows/uninstall-services.ps1');
+  await write(api, 'installer/windows/stop-mysql.ps1');
   await write(api, 'installer/windows/SAGE-API.xml.template', [
     '<service>', '<id>SAGEAPI</id>', '<depend>SAGEMySQL</depend>',
     '<arguments>__SAGE_VERSION__</arguments>', '</service>'
   ].join('\n'));
+  await write(api, 'installer/windows/SAGE-MySQL.xml.template', '<service><id>SAGEMySQL</id></service>');
   await write(api, 'node_modules/.package-lock.json', '{}');
   await write(api, 'node_modules/bcrypt/index.js');
   const web = path.join(root, 'web');
@@ -107,6 +109,9 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('runtime/node/node_modules/npm/.npmrc');
     expect(files).toContain('runtime/mysql/bin/mysqld.exe');
     expect(files).toContain('service/SAGE-API.exe');
+    expect(files).toContain('service/SAGE-MySQL.exe');
+    expect(files).toContain('service/SAGE-MySQL.xml');
+    expect(files).toContain('service/stop-mysql.ps1');
     expect(files).toContain('service/SAGE-API.xml');
     expect(files).toContain('service/initialize-state.ps1');
     expect(files).toContain('service/initialize-mysql.ps1');

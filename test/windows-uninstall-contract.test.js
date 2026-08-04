@@ -32,6 +32,9 @@ describe('desinstalação segura dos serviços Windows', () => {
   it('remove os dois serviços e nunca força o encerramento do MySQL', () => {
     expect(script).toContain("Remove-ServiceRecord 'SAGEAPI'");
     expect(script).toContain("Remove-ServiceRecord 'SAGEMySQL'");
+    expect(script.indexOf('Stop-MySqlGracefully')).toBeLessThan(
+      script.indexOf("Remove-ServiceRecord 'SAGEAPI'")
+    );
     expect(script.indexOf("Disable-And-StopService 'SAGEMySQL'")).toBeLessThan(
       script.indexOf("Remove-ServiceRecord 'SAGEMySQL'")
     );
@@ -41,8 +44,11 @@ describe('desinstalação segura dos serviços Windows', () => {
     expect(script).toContain('Não foi possível desarmar recovery do MySQL');
     expect(script).toContain('Assert-RegularFile $mysqladmin');
     expect(script).toContain('Assert-RegularFile $shutdownClient');
-    expect(script).toContain('Assert-SystemAdminAcl $shutdownClient');
+    expect(script).toContain('Assert-ShutdownClientAcl $shutdownClient');
+    expect(script).toContain("NT SERVICE', 'SAGEMySQL'");
     expect(script).toContain('"--defaults-extra-file=$shutdownClient" shutdown');
+    expect(script).toContain("$record.PathName.Trim() -in @(\"`\"$mysqlWinsw`\"\", $mysqlWinsw)");
+    expect(script).toContain('Stop-Service SAGEMySQL');
     expect(script).toContain('MySQL recusou parada segura com exit');
     expect(script).not.toContain('Get-NetTCPConnection -State Listen -LocalPort 3307');
     expect(script).toContain('& $sc delete $Name');

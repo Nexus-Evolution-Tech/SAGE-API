@@ -1,0 +1,24 @@
+<service>
+  <id>SAGEMySQL</id>
+  <name>SAGE MySQL</name>
+  <description>Banco de dados privado do SAGE</description>
+  <executable>%BASE%\..\runtime\mysql\bin\mysqld.exe</executable>
+  <arguments>--defaults-file=%ProgramData%\SAGE\config\mysql.ini --console</arguments>
+  <stopexecutable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</stopexecutable>
+  <stoparguments>-NoProfile -ExecutionPolicy Bypass -File "%BASE%\stop-mysql.ps1"</stoparguments>
+  <startmode>Manual</startmode>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="120 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>120 sec</stoptimeout>
+  <logpath>%ProgramData%\SAGE\logs\mysql</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

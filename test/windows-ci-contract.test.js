@@ -66,6 +66,8 @@ describe('CI do layout Windows nativo', () => {
     expect(source).toContain("-NewName 'mysqld.exe.removed'");
     expect(source).toContain('Desinstalação não preservou regra de firewall divergente');
     expect(source).toContain('Descartar serviços do smoke');
+    expect(source).toContain("service\\SAGE-MySQL.exe'");
+    expect(source).toContain('& $mysqlWinsw uninstall');
     expect(source.match(/for \(\$attempt = 0; \$attempt -lt 20/g)).toHaveLength(3);
     expect(source).toContain('Processo residual do SAGE não encerrou');
     expect(source).toContain('Remove-Item -LiteralPath $program -Recurse -Force -ErrorAction Stop');

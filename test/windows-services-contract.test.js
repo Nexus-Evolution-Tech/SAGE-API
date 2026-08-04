@@ -4,7 +4,15 @@ const path = require('path');
 const root = path.join(__dirname, '..', 'installer', 'windows');
 const script = fs.readFileSync(path.join(root, 'provision-services.ps1'), 'utf8');
 const xml = fs.readFileSync(path.join(root, 'SAGE-API.xml.template'), 'utf8');
+const mysqlXml = fs.readFileSync(path.join(root, 'SAGE-MySQL.xml.template'), 'utf8');
 describe('serviços Windows privados do SAGE', () => {
+  it('supervisiona o engine MySQL real e usa shutdown gracioso', () => {
+    expect(mysqlXml).toContain('<id>SAGEMySQL</id>');
+    expect(mysqlXml).toContain('<executable>%BASE%\\..\\runtime\\mysql\\bin\\mysqld.exe</executable>');
+    expect(mysqlXml).toContain('<stopexecutable>%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</stopexecutable>');
+    expect(mysqlXml).toContain('-File "%BASE%\\stop-mysql.ps1"');
+    expect(mysqlXml).toContain('<onfailure action="restart" delay="5 sec"/>');
+  });
   it('separa IDs SCM compatíveis e encadeia API depois do MySQL', () => {
     expect(xml).toContain('<id>SAGEAPI</id>');
     expect(xml).toContain('<name>SAGE API</name>');
@@ -26,13 +34,13 @@ describe('serviços Windows privados do SAGE', () => {
     expect(script).toContain('TakeOwnership');
   });
   it('registra MySQL local, valida serviços preexistentes e não expõe segredo em argv', () => {
-    expect(script).toContain("'--install-manual', 'SAGEMySQL'");
-    expect(script).toContain("'--local-service'");
-    expect(script).toContain("Assert-ServiceRecord 'SAGEMySQL' $mysqlPathNames");
+    expect(script).toContain("Invoke-NativeChecked $mysqlWinsw @('install')");
+    expect(script).toContain("Assert-ServiceRecord 'SAGEMySQL' @(\"`\"$mysqlWinsw`\"\", $mysqlWinsw)");
     expect(script).toContain("Assert-ServiceRecord 'SAGEAPI' @(");
     expect(script).toContain('$AllowedPathNames -notcontains $record.PathName.Trim()');
     expect(script).toContain("$release.target -cne 'win32-x64'");
     expect(script).toContain('$xml.service.arguments -cne $expectedArguments');
+    expect(script).toContain("$mysqlXml.service.id -cne 'SAGEMySQL'");
     expect(script).toContain('"--defaults-extra-file=$maintenanceClient"');
     expect(script).not.toMatch(/--password|MYSQL_PWD|DB_PASSWORD|JWT_SECRET|CALLBACK_TOKEN/);
   });
@@ -54,7 +62,7 @@ describe('serviços Windows privados do SAGE', () => {
     expect(script).toContain('Assert-ServiceAccess $dataDirectory $mysqlSid');
     expect(script).toContain('Assert-ServiceAbsent $dataDirectory $apiSid');
     expect(script).toContain("Assert-ServiceAbsent (Join-Path $configRoot 'sage.env') $mysqlSid");
-    expect(script).not.toContain('shutdown-client.cnf');
+    expect(script).toContain("Grant-ServiceAccess (Join-Path $configRoot 'shutdown-client.cnf') $mysqlSid");
   });
   it('serializa mudanças no SCM e usa o controlador absoluto do Windows', () => {
     expect(script).toContain("'Global\\SAGE-Service-Lifecycle'");

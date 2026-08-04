@@ -19,6 +19,7 @@ $mysqladmin = Join-Path $programRoot 'runtime\mysql\bin\mysqladmin.exe'
 $mysqlIni = Join-Path $configRoot 'mysql.ini'
 $shutdownClient = Join-Path $configRoot 'shutdown-client.cnf'
 $winsw = Join-Path $programRoot 'service\SAGE-API.exe'
+$mysqlWinsw = Join-Path $programRoot 'service\SAGE-MySQL.exe'
 $node = Join-Path $programRoot 'runtime\node\node.exe'
 $sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
 $firewallName = 'SAGE-API-LAN'
@@ -66,18 +67,31 @@ function Assert-RegularFile {
   }
 }
 
-function Assert-SystemAdminAcl {
+function Assert-ShutdownClientAcl {
   param([string]$Path)
   $acl = Get-Acl -LiteralPath $Path
   $rules = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
-  $allowed = @('S-1-5-18', 'S-1-5-32-544')
+  $mysqlSid = [Security.Principal.NTAccount]::new('NT SERVICE', 'SAGEMySQL').Translate(
+    [Security.Principal.SecurityIdentifier]
+  ).Value
+  $allowed = @('S-1-5-18', 'S-1-5-32-544', $mysqlSid)
   $identities = @($rules.IdentityReference.Value | Sort-Object -Unique)
-  if (-not $acl.AreAccessRulesProtected -or $rules.Count -ne 2 -or $identities.Count -ne 2 -or
-      @($rules | Where-Object {
-        $allowed -notcontains $_.IdentityReference.Value -or $_.AccessControlType -ne 'Allow' -or
-        ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
-          [Security.AccessControl.FileSystemRights]::FullControl
-      }).Count -ne 0) { throw "ACL privada divergente: $Path" }
+  $invalidRules = @($rules | Where-Object {
+    if ($allowed -notcontains $_.IdentityReference.Value -or $_.AccessControlType -ne 'Allow') {
+      return $true
+    }
+    if ($_.IdentityReference.Value -eq $mysqlSid) {
+      $forbidden = [Security.AccessControl.FileSystemRights]::Write -bor
+        [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+        [Security.AccessControl.FileSystemRights]::TakeOwnership
+      return (($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::Read) -ne
+        [Security.AccessControl.FileSystemRights]::Read -or ($_.FileSystemRights -band $forbidden))
+    }
+    return ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+      [Security.AccessControl.FileSystemRights]::FullControl
+  })
+  if (-not $acl.AreAccessRulesProtected -or $rules.Count -ne 3 -or $identities.Count -ne 3 -or
+      $invalidRules.Count -ne 0) { throw "ACL privada divergente: $Path" }
 }
 
 function Disable-And-StopService {
@@ -91,7 +105,9 @@ function Disable-And-StopService {
       $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
     }
   } catch {
-    if (-not (Test-ServiceMarkedForDeletion $_)) { throw }
+    $current = Get-Service $Name -ErrorAction SilentlyContinue
+    if (($null -ne $current -and $current.Status -ne 'Stopped') -and
+        -not (Test-ServiceMarkedForDeletion $_)) { throw }
   }
 }
 
@@ -102,9 +118,23 @@ function Stop-MySqlGracefully {
   if ($LASTEXITCODE -ne 0) { throw "Não foi possível desarmar recovery do MySQL: $LASTEXITCODE" }
   try { Set-Service SAGEMySQL -StartupType Disabled }
   catch { if (-not (Test-ServiceMarkedForDeletion $_)) { throw } }
+  $record = Get-ServiceRecord 'SAGEMySQL'
+  if ($null -ne $record -and $record.PathName.Trim() -in @("`"$mysqlWinsw`"", $mysqlWinsw)) {
+    # O WinSW chama mysqladmin pelo stopexecutable e só reporta Stopped depois do engine sair.
+    try { Stop-Service SAGEMySQL -ErrorAction Stop }
+    catch {
+      $current = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+      if ($null -ne $current -and $current.Status -ne 'Stopped') { throw }
+    }
+    $current = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+    if ($null -ne $current -and $current.Status -ne 'Stopped') {
+      $current.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
+    }
+    return
+  }
   Assert-RegularFile $mysqladmin
   Assert-RegularFile $shutdownClient
-  Assert-SystemAdminAcl $shutdownClient
+  Assert-ShutdownClientAcl $shutdownClient
   & $mysqladmin "--defaults-extra-file=$shutdownClient" shutdown 2>$null | Out-Null
   $exitCode = $LASTEXITCODE
   $current = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
@@ -165,7 +195,8 @@ try {
 
 $mysqlPaths = @(
   "`"$mysqld`" --defaults-file=`"$mysqlIni`" SAGEMySQL",
-  "`"$mysqld`" --defaults-file=$mysqlIni SAGEMySQL"
+  "`"$mysqld`" --defaults-file=$mysqlIni SAGEMySQL",
+  "`"$mysqlWinsw`"", $mysqlWinsw
 )
 Assert-ServiceRecord 'SAGEMySQL' $mysqlPaths
 Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw)
@@ -175,10 +206,9 @@ if ($firewallRules.Count -gt 1) { throw "Mais de uma regra local usa o nome: $fi
 if ($firewallRules.Count -eq 1) { Assert-FirewallRuleOwned $firewallRules[0] }
 
 Disable-And-StopService 'SAGEAPI'
-Remove-ServiceRecord 'SAGEAPI'
-
 Stop-MySqlGracefully
 Disable-And-StopService 'SAGEMySQL'
+Remove-ServiceRecord 'SAGEAPI'
 Remove-ServiceRecord 'SAGEMySQL'
 
 $remaining = @(Get-SageProcesses)
