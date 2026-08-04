@@ -14,7 +14,7 @@ const RAIZ = path.join(__dirname, '..');
 const bancosCriados = new Set();
 
 function novoBanco(rotulo) {
-  const nome = `sage_test_bootstrap_${process.pid}_${rotulo}`;
+  const nome = `sage_verif_bootstrap_${process.pid}_${rotulo}`;
   bancosCriados.add(nome);
   return nome;
 }

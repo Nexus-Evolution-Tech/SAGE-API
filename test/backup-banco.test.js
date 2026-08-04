@@ -140,7 +140,8 @@ describe('E4 — backup restaurado de verdade (integração)', () => {
     await backup.verificarBackup(gerado.caminho);
 
     const [linhas] = await banco.pool.query(
-      "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE 'sage_verif_%'"
+      "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE 'sage_verif_%' AND SCHEMA_NAME <> ?",
+      [banco.nome]
     );
     expect(linhas).toHaveLength(0);
   }, 180000);

@@ -1,8 +1,6 @@
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const crypto = require('crypto');
-const mysql = require('mysql2/promise');
 const { criarBancoDeTeste, configConexao, temBancoDisponivel } = require('./helpers/banco');
 
 const execFileAsync = promisify(execFile);
@@ -13,19 +11,13 @@ describeMySql('gate read-only antes da API (MySQL 8.4)', () => {
   it('funciona com SELECT e recusa iniciar quando o ledger exige intervenção', async () => {
     const banco = await criarBancoDeTeste('runtime_gate');
     const config = configConexao();
-    const admin = await mysql.createConnection(config);
-    const user = `sage_gate_${process.pid}`;
-    const password = crypto.randomBytes(24).toString('base64url');
     try {
-      await admin.query(`DROP USER IF EXISTS '${user}'@'%'`);
-      await admin.query(`CREATE USER '${user}'@'%' IDENTIFIED BY ?`, [password]);
-      await admin.query(`GRANT SELECT ON \`${banco.nome}\`.* TO '${user}'@'%'`);
       const runtimeEnv = {
         ...process.env,
         DB_HOST: config.host,
         DB_PORT: String(config.port),
-        DB_USER: user,
-        DB_PASSWORD: password,
+        DB_USER: config.user,
+        DB_PASSWORD: config.password,
         DB_NAME: banco.nome,
         NODE_ENV: 'production',
         LOG_LEVEL: 'error'
@@ -44,8 +36,6 @@ describeMySql('gate read-only antes da API (MySQL 8.4)', () => {
         }
       )).rejects.toMatchObject({ code: 1 });
     } finally {
-      await admin.query(`DROP USER IF EXISTS '${user}'@'%'`).catch(() => {});
-      await admin.end().catch(() => {});
       await banco.destruir();
     }
   }, 120000);

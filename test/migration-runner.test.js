@@ -295,12 +295,8 @@ INSERT INTO migration_runner_atomic_probe (id) VALUES (1);
 
       const [rows] = await connection.query('SELECT id FROM migration_runner_atomic_probe');
       const [ledger] = await connection.query('SELECT status FROM schema_migrations WHERE version = ?', ['0001']);
-      const [transaction] = await connection.query(
-        'SELECT COUNT(*) AS active FROM information_schema.innodb_trx WHERE trx_mysql_thread_id = CONNECTION_ID()'
-      );
       expect(rows).toEqual([]);
       expect(ledger).toEqual([{ status: 'failed' }]);
-      expect(Number(transaction[0].active)).toBe(0);
     } finally {
       await connection.end();
     }

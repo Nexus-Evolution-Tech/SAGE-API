@@ -1,7 +1,7 @@
 /**
  * Harness de banco para testes de integração.
  *
- * Provisiona um banco MySQL ISOLADO (nome próprio, prefixo `sage_test_`), aplica o schema pelo
+ * Provisiona um banco MySQL ISOLADO (nome próprio, prefixo `sage_verif_`), aplica o schema pelo
  * caminho real de instalação (`scripts/setup-database.js`) e derruba tudo no final.
  *
  * Usar o instalador de verdade em vez de um dump paralelo é deliberado: assim o próprio caminho de
@@ -54,7 +54,9 @@ async function temBancoDisponivel() {
  * @returns {{ nome: string, pool: import('mysql2/promise').Pool, destruir: () => Promise<void> }}
  */
 async function criarBancoDeTeste(sufixo = '') {
-  const nome = `sage_test_${process.pid}${sufixo ? '_' + sufixo : ''}`;
+  // A conta de manutenção do instalador recebe DDL somente neste namespace. Isso permite que
+  // a mesma suíte prove o pacote real sem ampliar seus privilégios para bancos arbitrários.
+  const nome = `sage_verif_${process.pid}${sufixo ? '_' + sufixo : ''}`;
   const admin = await mysql.createConnection(configConexao());
   await admin.query(`DROP DATABASE IF EXISTS \`${nome}\``);
   await admin.end();
