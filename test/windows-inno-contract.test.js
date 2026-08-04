@@ -5,6 +5,7 @@ const root = path.join(__dirname, '..', 'installer', 'windows');
 const iss = fs.readFileSync(path.join(root, 'SAGE.iss'), 'utf8');
 const install = fs.readFileSync(path.join(root, 'complete-install.ps1'), 'utf8');
 const build = fs.readFileSync(path.join(root, 'build-installer.ps1'), 'utf8');
+const prepare = fs.readFileSync(path.join(root, 'prepare-install.ps1'), 'utf8');
 
 describe('instalador Inno interno do SAGE', () => {
   it('instala apenas em Windows x64 administrativo e nunca publica', () => {
@@ -30,6 +31,11 @@ describe('instalador Inno interno do SAGE', () => {
   });
 
   it('aplica schema antes de iniciar API e exige readiness', () => {
+    expect(iss).toContain('function PrepareToInstall');
+    expect(iss).toContain('prepare-install.ps1');
+    expect(iss).toContain('procedure DeinitializeSetup');
+    expect(prepare).toContain("@('SAGEAPI', 'SAGEMySQL')");
+    expect(prepare).toContain('Stop-Service -Name $name');
     expect(install).toContain("Join-Path $serviceRoot 'provision-services.ps1'");
     expect(install).toContain('scripts\\setup-database.js');
     expect(install.indexOf('scripts\\setup-database.js')).toBeLessThan(

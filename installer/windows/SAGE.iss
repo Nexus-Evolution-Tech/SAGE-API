@@ -30,6 +30,7 @@ SetupLogging=yes
 
 [Files]
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceRoot}\service\prepare-install.ps1"; Flags: dontcopy
 
 [Icons]
 Name: "{autoprograms}\SAGE"; Filename: "http://localhost:3000"
@@ -38,6 +39,22 @@ Name: "{autoprograms}\SAGE"; Filename: "http://localhost:3000"
 var
   CredentialPage: TInputQueryWizardPage;
   NeedsCredential: Boolean;
+  ServicesPrepared: Boolean;
+  InstallCompleted: Boolean;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var ResultCode: Integer;
+begin
+  Result := '';
+  ExtractTemporaryFile('prepare-install.ps1');
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\prepare-install.ps1') + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then begin
+    Result := 'Não foi possível parar os serviços do SAGE com segurança.';
+    exit;
+  end;
+  ServicesPrepared := True;
+end;
 
 procedure InitializeWizard;
 begin
@@ -91,6 +108,18 @@ begin
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args,
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
     RaiseException('A instalação segura do SAGE falhou. Consulte os logs locais.');
+  InstallCompleted := True;
+end;
+
+procedure DeinitializeSetup;
+var ResultCode: Integer;
+begin
+  if ServicesPrepared and not InstallCompleted and
+    FileExists(ExpandConstant('{app}\service\provision-services.ps1')) then
+    Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+      '-NoProfile -ExecutionPolicy Bypass -File "' +
+        ExpandConstant('{app}\service\provision-services.ps1') + '" -StartApi',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

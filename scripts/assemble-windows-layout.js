@@ -131,7 +131,7 @@ async function assembleWindowsLayout({
     for (const script of [
       'initialize-state.ps1', 'initialize-mysql.ps1', 'configure-firewall.ps1',
       'provision-services.ps1', 'uninstall-services.ps1', 'stop-mysql.ps1',
-      'complete-install.ps1'
+      'complete-install.ps1', 'prepare-install.ps1'
     ]) {
       await copyEntry(path.join(inputs.api, 'installer', 'windows', script), path.join(staging, 'service', script));
     }
