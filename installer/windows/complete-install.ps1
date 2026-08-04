@@ -49,7 +49,8 @@ function Read-InitialCredential {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Credencial inicial ausente' }
   $item = Get-Item -LiteralPath $Path -Force
   if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Credencial inicial inválida' }
-  Assert-PrivateAcl (Get-Acl -LiteralPath (Split-Path -Parent $Path)) $true
+  $parentAcl = Get-Acl -LiteralPath (Split-Path -Parent $Path)
+  if (-not $parentAcl.AreAccessRulesProtected) { throw 'Diretório da credencial inicial não é privado' }
   Assert-PrivateAcl (Get-Acl -LiteralPath $Path) $false
   $values = @{}
   foreach ($line in [IO.File]::ReadAllLines($Path)) {

@@ -27,6 +27,8 @@ describe('instalador Inno interno do SAGE', () => {
     expect(install).toContain("[IO.File]::Delete($CredentialFile)");
     expect(install).toContain("Get-Acl -LiteralPath (Split-Path -Parent $Path)");
     expect(install).toContain('[IO.FileAttributes]::ReparsePoint');
+    expect(install).not.toContain('Assert-PrivateAcl (Get-Acl -LiteralPath (Split-Path -Parent $Path)) $true');
+    expect(install).toContain('$parentAcl.AreAccessRulesProtected');
     expect(install).not.toMatch(/Write-(?:Host|Output).*PASSWORD/i);
   });
 
