@@ -258,8 +258,8 @@ async function executarSeeds() {
       if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
         throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
       }
-      if (!onboardingLocal && senha.length < 16) {
-        throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 16 caracteres');
+      if (!onboardingLocal && senha.length < 8) {
+        throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 8 caracteres');
       }
       if (!onboardingLocal && !nome) {
         throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
