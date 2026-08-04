@@ -30,6 +30,7 @@ async function fixture() {
   await write(api, 'installer/windows/provision-services.ps1');
   await write(api, 'installer/windows/uninstall-services.ps1');
   await write(api, 'installer/windows/stop-mysql.ps1');
+  await write(api, 'installer/windows/complete-install.ps1');
   await write(api, 'installer/windows/SAGE-API.xml.template', [
     '<service>', '<id>SAGEAPI</id>', '<depend>SAGEMySQL</depend>',
     '<arguments>__SAGE_VERSION__</arguments>', '</service>'
@@ -112,6 +113,7 @@ describe('layout reproduzível da release Windows', () => {
     expect(files).toContain('service/SAGE-MySQL.exe');
     expect(files).toContain('service/SAGE-MySQL.xml');
     expect(files).toContain('service/stop-mysql.ps1');
+    expect(files).toContain('service/complete-install.ps1');
     expect(files).toContain('service/SAGE-API.xml');
     expect(files).toContain('service/initialize-state.ps1');
     expect(files).toContain('service/initialize-mysql.ps1');
