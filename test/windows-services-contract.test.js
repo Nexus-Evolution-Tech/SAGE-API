@@ -51,7 +51,7 @@ describe('serviços Windows privados do SAGE', () => {
     expect(xml).toContain('<sizeThreshold>10240</sizeThreshold>');
     expect(xml).toContain('<keepFiles>8</keepFiles>');
     expect(script).toContain("Invoke-WebRequest 'http://127.0.0.1:3000/ready'");
-    expect(script).toContain("$body.version -ceq $release.version");
+    expect(script).toContain("$body.version -ceq $activeVersion");
     expect(script).toContain('Restart-Service SAGEAPI -Force');
     expect(script).toContain("throw 'SAGEAPI não atingiu readiness'");
   });

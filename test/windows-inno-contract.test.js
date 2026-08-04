@@ -39,7 +39,7 @@ describe('instalador Inno interno do SAGE', () => {
     expect(install).toContain("Join-Path $serviceRoot 'provision-services.ps1'");
     expect(install).toContain('scripts\\setup-database.js');
     expect(install.indexOf('scripts\\setup-database.js')).toBeLessThan(
-      install.indexOf('& $provision -StartApi')
+      install.indexOf('& $provision -Version $targetVersion -StartApi')
     );
     expect(install).toContain("Invoke-RestMethod 'http://127.0.0.1:3000/ready'");
   });

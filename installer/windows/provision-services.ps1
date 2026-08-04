@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$StartApi)
+param([switch]$StartApi, [string]$Version = '')
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -122,8 +122,17 @@ Assert-RegularPath $sc $true
 $xml = [xml][IO.File]::ReadAllText($winswXml)
 $mysqlXml = [xml][IO.File]::ReadAllText($mysqlWinswXml)
 $release = [IO.File]::ReadAllText($releaseFile) | ConvertFrom-Json
-$expectedArguments = '"%BASE%\..\releases\' + $release.version + '\api\scripts\start-with-setup.js"'
-$expectedWorkingDirectory = '%BASE%\..\releases\' + $release.version + '\api'
+$activeVersion = if ($Version) { $Version } else { $release.version }
+if ($activeVersion -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+  throw 'Versão ativa inválida'
+}
+$activeApiRoot = Join-Path $programRoot "releases\$activeVersion\api"
+Assert-RegularPath $activeApiRoot $false
+$expectedArguments = '"%BASE%\..\releases\' + $activeVersion + '\api\scripts\start-with-setup.js"'
+$expectedWorkingDirectory = '%BASE%\..\releases\' + $activeVersion + '\api'
+$xml.service.arguments = $expectedArguments
+$xml.service.workingdirectory = $expectedWorkingDirectory
+$xml.Save($winswXml)
 if ($xml.service.id -cne 'SAGEAPI' -or $xml.service.depend -cne 'SAGEMySQL' -or
     $xml.service.serviceaccount.user -cne 'LocalService' -or
     $xml.service.executable -cne '%BASE%\..\runtime\node\node.exe' -or
@@ -270,7 +279,7 @@ if ($StartApi) {
       $response = Invoke-WebRequest 'http://127.0.0.1:3000/ready' -UseBasicParsing -TimeoutSec 2
       $body = $response.Content | ConvertFrom-Json
       if ($response.StatusCode -eq 200 -and $body.status -ceq 'ready' -and
-          $body.version -ceq $release.version) { $ready = $true; break }
+          $body.version -ceq $activeVersion) { $ready = $true; break }
     } catch { Start-Sleep -Milliseconds 500 }
   }
   if (-not $ready) { throw 'SAGEAPI não atingiu readiness' }
