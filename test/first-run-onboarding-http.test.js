@@ -13,7 +13,7 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const app = require('../src/app');
 
-function request(port, method, requestPath, body) {
+function request(port, method, requestPath, body, token) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const payload = body === undefined ? null : Buffer.from(JSON.stringify(body));
@@ -21,6 +21,7 @@ function request(port, method, requestPath, body) {
       hostname: '127.0.0.1', port, method, path: requestPath,
       headers: {
         Origin: 'http://localhost:3000', Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {})
       }
     }, (res) => {
@@ -93,9 +94,52 @@ describeDatabase('fluxo HTTP completo do primeiro acesso', () => {
       usuario: 'admin.teste', senha: 'senha123'
     });
     expect(login.status).toBe(200);
-    expect(JSON.parse(login.body).token).toBeTruthy();
+    const token = JSON.parse(login.body).token;
+    expect(token).toBeTruthy();
 
-    for (const response of [statusBefore, initialized, statusAfter, duplicate, schools, login]) {
+    const course = await request(port, 'POST', '/cursos', { nome: 'Informática', duracao: 1200 }, token);
+    expect(course.status).toBe(201);
+    const testDb = await mysql.createConnection({ ...configConexao(), database });
+    const [[createdCourse]] = await testDb.query('SELECT id FROM Curso WHERE nome = ?', ['Informática']);
+    const coursePatch = await request(port, 'PATCH', `/cursos/${createdCourse.id}`, { duracao: 1400 }, token);
+    expect(coursePatch.status).toBe(200);
+
+    const schoolId = school.id;
+    const group = await request(port, 'POST', '/turmas', {
+      nome: '1º Módulo', turno: 'MATUTINO', curso_id: createdCourse.id, unidade_id: schoolId
+    }, token);
+    expect(group.status).toBe(201);
+    const [[createdGroup]] = await testDb.query('SELECT id FROM Turma WHERE nome = ?', ['1º Módulo']);
+    const groupPatch = await request(port, 'PATCH', `/turmas/${createdGroup.id}`, { turno: 'VESPERTINO' }, token);
+    expect(groupPatch.status).toBe(200);
+
+    const room = await request(port, 'POST', '/sala', {
+      nome: 'Laboratório 1', numero: `LAB-${process.pid}`, capacidade: 30,
+      tipo: 'LABORATORIO', unidade_id: schoolId
+    }, token);
+    expect(room.status).toBe(201);
+    const [[createdRoom]] = await testDb.query('SELECT id FROM Sala WHERE numero = ?', [`LAB-${process.pid}`]);
+    const roomPatch = await request(port, 'PATCH', `/sala/${createdRoom.id}`, { capacidade: 32 }, token);
+    expect(roomPatch.status).toBe(200);
+
+    const listed = await Promise.all([
+      request(port, 'GET', '/cursos?limit=1000', undefined, token),
+      request(port, 'GET', '/turmas?limit=1000', undefined, token),
+      request(port, 'GET', '/sala?limit=1000', undefined, token)
+    ]);
+    expect(listed.every((response) => response.status === 200)).toBe(true);
+
+    const removed = await Promise.all([
+      request(port, 'DELETE', `/sala/${createdRoom.id}`, undefined, token),
+      request(port, 'DELETE', `/turmas/${createdGroup.id}`, undefined, token)
+    ]);
+    expect(removed.every((response) => response.status === 200)).toBe(true);
+    const courseDelete = await request(port, 'DELETE', `/cursos/${createdCourse.id}`, undefined, token);
+    expect(courseDelete.status).toBe(200);
+    await testDb.end();
+
+    for (const response of [statusBefore, initialized, statusAfter, duplicate, schools, login,
+      course, coursePatch, group, groupPatch, room, roomPatch, ...listed, ...removed, courseDelete]) {
       expect(response.latencyMs).toBeLessThan(2000);
     }
   }, 30000);
