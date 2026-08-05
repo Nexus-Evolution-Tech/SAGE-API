@@ -39,13 +39,18 @@ app.use(compression());
 // Configuração de CORS dinâmica
 const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim());
 const allowAllOrigins = allowedOrigins.includes('*') || process.env.CORS_ALLOW_ALL === 'true';
+const localSageOrigins = new Set([
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://[::1]:3000'
+]);
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Permitir requisições sem origin (Postman, curl, etc.)
     if (!origin) return callback(null, true);
 
-    if (allowAllOrigins || allowedOrigins.includes(origin)) {
+    if (allowAllOrigins || allowedOrigins.includes(origin) || localSageOrigins.has(origin)) {
       callback(null, true);
     } else {
       logger.warn(`CORS bloqueado: ${origin}`);

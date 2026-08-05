@@ -37,9 +37,14 @@ const bootstrapInitialize = async (req, res) => {
   const nome = String(req.body?.nome || '').trim();
   const loginInicial = String(req.body?.login || '').trim();
   const senha = String(req.body?.senha || '');
-  if (nome.length < 3 || nome.length > 255 ||
-      !/^[A-Za-z0-9._-]{3,100}$/.test(loginInicial) || senha.length < 8) {
-    return res.status(400).json({ message: 'Informe unidade, login válido e senha com ao menos 8 caracteres' });
+  if (nome.length < 3 || nome.length > 255) {
+    return res.status(400).json({ field: 'nome', message: 'O nome da unidade deve ter entre 3 e 255 caracteres' });
+  }
+  if (!/^[A-Za-z0-9._-]{3,100}$/.test(loginInicial)) {
+    return res.status(400).json({ field: 'login', message: 'O login deve ter entre 3 e 100 caracteres e usar apenas letras, números, ponto, hífen ou sublinhado' });
+  }
+  if (senha.length < 8) {
+    return res.status(400).json({ field: 'senha', message: 'A senha deve ter ao menos 8 caracteres' });
   }
 
   const connection = await db.getConnection();
