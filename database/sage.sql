@@ -29,10 +29,6 @@ CREATE TABLE IF NOT EXISTS UnidadeEscolar (
     telefone_contato VARCHAR(11),
     CONSTRAINT chk_telefone_contato CHECK (REGEXP_LIKE(telefone_contato, '^[0-9]{10,11}$')),
     email VARCHAR(255) NULL COMMENT 'Email de contato da unidade',
-    recuperacao_chave_hash CHAR(64) NULL COMMENT 'Hash SHA-256 da chave local de recuperação',
-    recuperacao_falhas INT NOT NULL DEFAULT 0,
-    recuperacao_bloqueada_ate DATETIME NULL,
-    recuperacao_gerada_em DATETIME NULL,
     logo VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -317,64 +313,3 @@ CREATE TABLE IF NOT EXISTS ConfigSistema (
 
 -- Inicializa promoção: 0 = "nunca executou" (primeira execução rodará ao detectar ano novo)
 INSERT IGNORE INTO ConfigSistema (chave, valor) VALUES ('ultimo_ano_promocao', '0');
-
-DELIMITER $$
-
-CREATE PROCEDURE atualizar_turmas_e_status()
-BEGIN
-    DECLARE v_atualizados INT DEFAULT 0;
-    DECLARE v_desligados INT DEFAULT 0;
-
-    -- Primeiro UPDATE: Desligamento (Soft Delete)
-    UPDATE Aluno a
-    JOIN Pessoa p ON a.id = p.id
-    SET a.status = 'CANCELADO', 
-        p.updated_at = NOW(), 
-        p.visivel = FALSE  -- Removido o segundo SET e adicionada a vírgula
-    WHERE p.tipo = 'ALUNO'
-      AND a.status = 'EM CURSO'
-      AND YEAR(p.updated_at) < YEAR(CURDATE())
-      AND a.turma_id IN (5, 6, 8, 9);
-
-    SET v_desligados = ROW_COUNT();
-
-    -- Segundo UPDATE: Promoção de Turmas
-    UPDATE Aluno a
-    JOIN Pessoa p ON a.id = p.id
-    SET 
-        a.turma_id = CASE
-                        WHEN a.turma_id = 1 THEN 3
-                        WHEN a.turma_id = 2 THEN 4
-                        WHEN a.turma_id = 3 THEN 5
-                        WHEN a.turma_id = 4 THEN 6
-                        WHEN a.turma_id = 7 THEN 9
-                        ELSE a.turma_id
-                    END,
-        p.updated_at = NOW()
-    WHERE p.tipo = 'ALUNO'
-      AND a.status = 'EM CURSO'
-      AND YEAR(p.updated_at) < YEAR(CURDATE())
-      AND a.turma_id IN (1, 2, 3, 4, 7);
-
-    SET v_atualizados = ROW_COUNT();
-END $$
-
-DELIMITER ;
-
--- ════════════════════════════════════════════════════════════════════════════════
-
-CREATE EVENT atualizar_ou_desligar_alunos
--- ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 MINUTE
-ON SCHEDULE
-    EVERY 1 YEAR
-    STARTS TIMESTAMP(CONCAT(YEAR(CURDATE()) + 1, '-01-01 00:00:00'))
-DO
-BEGIN
-    CALL atualizar_turmas_e_status();
-    
-    -- Exibe o número de alunos atualizados e desligados
-    SELECT CONCAT('Alunos atualizados: ', v_atualizados) AS Atualizados,
-           CONCAT('Alunos desligados: ', v_desligados) AS Desligados;
-END$$
-
-DELIMITER ;
