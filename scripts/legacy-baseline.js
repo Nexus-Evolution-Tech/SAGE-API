@@ -13,7 +13,7 @@ const BASELINE_REQUIRED_TABLES = Object.freeze([
   'UnidadeEscolar', 'UnidadeFoto', 'Area', 'Dispositivo', 'Curso', 'Turma', 'Pessoa', 'Presenca',
   'Responsavel', 'Aluno', 'Funcionario', 'Professor', 'Materia', 'Administrador', 'Sala', 'Empresa',
   'Terceirizado', 'Aula', 'HorarioAula', 'Acesso', 'SolicitacaoAcesso', 'sync_pendente',
-  'RecuperacaoSenha', 'ConfigSistema', 'FuncionarioHorario'
+  'ConfigSistema', 'FuncionarioHorario'
 ]);
 const BASELINE_FILE = path.join(
   __dirname,

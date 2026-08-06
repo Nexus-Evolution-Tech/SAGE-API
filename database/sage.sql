@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS UnidadeEscolar (
     telefone_contato VARCHAR(11),
     CONSTRAINT chk_telefone_contato CHECK (REGEXP_LIKE(telefone_contato, '^[0-9]{10,11}$')),
     email VARCHAR(255) NULL COMMENT 'Email de contato da unidade',
+    recuperacao_chave_hash CHAR(64) NULL COMMENT 'Hash SHA-256 da chave local de recuperação',
+    recuperacao_falhas INT NOT NULL DEFAULT 0,
+    recuperacao_bloqueada_ate DATETIME NULL,
+    recuperacao_gerada_em DATETIME NULL,
     logo VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -303,18 +307,6 @@ CREATE TABLE IF NOT EXISTS sync_pendente (
   FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id),
   FOREIGN KEY (dispositivo_id) REFERENCES Dispositivo(id)
 );
-
-CREATE TABLE IF NOT EXISTS RecuperacaoSenha (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  unidade_id INT NOT NULL,
-  token_hash VARCHAR(64) NOT NULL COMMENT 'Hash SHA-256 do token enviado por email',
-  expires_at DATETIME NOT NULL,
-  used_at DATETIME NULL DEFAULT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE CASCADE,
-  INDEX idx_token_hash (token_hash),
-  INDEX idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Configurações do sistema (promoção automática de alunos, etc.)
 CREATE TABLE IF NOT EXISTS ConfigSistema (

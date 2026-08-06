@@ -157,18 +157,6 @@ CREATE TABLE IF NOT EXISTS FuncionarioHorario (
 ALTER TABLE Professor ADD COLUMN usar_horario_fixo BOOLEAN DEFAULT FALSE;
 
 -- Recuperação de senha (esqueci a senha) — token único por solicitação
-CREATE TABLE IF NOT EXISTS RecuperacaoSenha (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  unidade_id INT NOT NULL,
-  token_hash VARCHAR(64) NOT NULL COMMENT 'Hash SHA-256 do token enviado por email',
-  expires_at DATETIME NOT NULL,
-  used_at DATETIME NULL DEFAULT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (unidade_id) REFERENCES UnidadeEscolar(id) ON DELETE CASCADE,
-  INDEX idx_token_hash (token_hash),
-  INDEX idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Configurações do sistema (promoção automática de alunos)
 CREATE TABLE IF NOT EXISTS ConfigSistema (
   chave VARCHAR(100) PRIMARY KEY,

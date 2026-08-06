@@ -14,7 +14,7 @@ const indexFile = path.join(webDir, 'index.html');
 // Espelha as rotas declaradas em SAGE/src/App.js. Rotas não listadas continuam sendo da API.
 const spaRoutePatterns = Object.freeze([
   /^\/$/,
-  /^\/(?:login|cadastro|esqueci-senha|redefinir-senha|pessoas|inicio|departamentos|dispositivos|monitoramento|turmas|regras|horarios|relatorios|configuracoes|aulas|areas|dados|monitoring)\/?$/,
+  /^\/(?:login|cadastro|esqueci-senha|pessoas|inicio|departamentos|dispositivos|monitoramento|turmas|regras|horarios|relatorios|configuracoes|aulas|areas|dados|monitoring)\/?$/,
   /^\/tabelas\/[^/]+(?:\/[^/]+)?\/?$/,
   /^\/formulario\/[^/]+\/[^/]+\/?$/,
   /^\/adicionar\/[^/]+\/?$/,

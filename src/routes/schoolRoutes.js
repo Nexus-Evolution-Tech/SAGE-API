@@ -1,7 +1,6 @@
 const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const schoolController = require('../controllers/schoolController');
-const recuperacaoSenhaController = require('../controllers/recuperacaoSenhaController');
 const autenticar = require('../middlewares/autenticar');
 const upload = require('../middlewares/uploadFoto');
 
@@ -22,8 +21,7 @@ routerExtra.get('/setup/status', schoolController.bootstrapStatus);
 routerExtra.post('/setup/initialize', schoolController.bootstrapInitialize);
 
 // Recuperação de senha (público)
-routerExtra.post('/escolas/esqueci-senha', recuperacaoSenhaController.solicitarRecuperacao);
-routerExtra.post('/escolas/redefinir-senha', recuperacaoSenhaController.redefinirSenha);
+routerExtra.post('/escolas/recuperar-acesso', schoolController.recuperarAcesso);
 
 // Configuração do sistema (modo Monitor vs Polling) — para Ferramentas na interface
 routerExtra.get('/config', autenticar, schoolController.getConfig);

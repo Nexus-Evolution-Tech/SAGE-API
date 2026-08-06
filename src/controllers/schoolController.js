@@ -8,12 +8,21 @@ const crud = require('../utils/generic-db-utils');
 const logger = require('../config/logger');
 const { emitNotification, emitNotificationToUser } = require('../services/notificationService');
 const { paths } = require('../config/paths');
+const crypto = require('crypto');
 
 const tabela = 'UnidadeEscolar';
 const campos = ['id', 'nome', 'numero_unidade', 'cnpj', 'login', 'senha', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'telefone_contato', 'email', 'logo'];
 
 /** Campos permitidos para atualização da unidade (sem senha) */
 const camposAtualizaveis = campos.filter((c) => c !== 'senha' && c !== 'id');
+
+function gerarChaveRecuperacao() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function hashChaveRecuperacao(chave) {
+  return crypto.createHash('sha256').update(String(chave), 'utf8').digest('hex');
+}
 
 function isLoopbackRequest(req) {
   const address = req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || '';
@@ -60,12 +69,15 @@ const bootstrapInitialize = async (req, res) => {
       return res.status(409).json({ message: 'O SAGE já foi configurado' });
     }
     const senhaHash = await hashSenha(senha);
+    const chaveRecuperacao = gerarChaveRecuperacao();
     await connection.query(
-      'INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)',
-      [nome, loginInicial, senhaHash]
+      `INSERT INTO UnidadeEscolar
+       (nome, login, senha, recuperacao_chave_hash, recuperacao_falhas, recuperacao_gerada_em)
+       VALUES (?, ?, ?, ?, 0, NOW())`,
+      [nome, loginInicial, senhaHash, hashChaveRecuperacao(chaveRecuperacao)]
     );
     await connection.commit();
-    return res.status(201).json({ initialized: true });
+    return res.status(201).json({ initialized: true, recoveryKey: chaveRecuperacao });
   } catch (error) {
     await connection.rollback().catch(() => {});
     logger.error(`Erro no onboarding inicial: ${error.message}`);
@@ -74,6 +86,58 @@ const bootstrapInitialize = async (req, res) => {
     if (lockAcquired) {
       await connection.query("SELECT RELEASE_LOCK('sage_first_run_onboarding')").catch(() => {});
     }
+    connection.release();
+  }
+};
+
+/** Recuperação exclusivamente local por chave; a chave nunca é armazenada em texto puro. */
+const recuperarAcesso = async (req, res) => {
+  if (!isLoopbackRequest(req)) return res.status(403).json({ message: 'A recuperação só pode ser feita neste computador.' });
+  const login = String(req.body?.login || '').trim();
+  const chave = String(req.body?.chave_recuperacao || '').trim();
+  const novaSenha = String(req.body?.nova_senha || '');
+  const confirmacao = String(req.body?.confirmacao_nova_senha || '');
+  if (!login || !chave) return res.status(400).json({ message: 'Informe o login e a chave de recuperação.' });
+  if (novaSenha.length < 8) return res.status(400).json({ message: 'A nova senha deve ter ao menos 8 caracteres.' });
+  if (novaSenha !== confirmacao) return res.status(400).json({ message: 'A confirmação da nova senha não confere.' });
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[unidade]] = await connection.query(
+      `SELECT id, recuperacao_chave_hash, recuperacao_falhas, recuperacao_bloqueada_ate
+       FROM UnidadeEscolar WHERE login = ? LIMIT 1 FOR UPDATE`, [login]
+    );
+    const bloqueada = unidade?.recuperacao_bloqueada_ate && new Date(unidade.recuperacao_bloqueada_ate).getTime() > Date.now();
+    if (!unidade || bloqueada) {
+      await connection.rollback();
+      return res.status(429).json({ message: 'Chave inválida ou temporariamente bloqueada. Tente novamente mais tarde.' });
+    }
+    const esperado = Buffer.from(unidade.recuperacao_chave_hash || '', 'hex');
+    const recebido = Buffer.from(hashChaveRecuperacao(chave), 'hex');
+    const correta = esperado.length === recebido.length && crypto.timingSafeEqual(esperado, recebido);
+    if (!correta) {
+      const falhas = Number(unidade.recuperacao_falhas || 0) + 1;
+      await connection.query(
+        'UPDATE UnidadeEscolar SET recuperacao_falhas = ?, recuperacao_bloqueada_ate = ? WHERE id = ?',
+        [falhas, falhas >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null, unidade.id]
+      );
+      await connection.commit();
+      return res.status(falhas >= 5 ? 429 : 401).json({ message: 'Chave inválida.' });
+    }
+    const senhaHash = await hashSenha(novaSenha);
+    const novaChave = gerarChaveRecuperacao();
+    await connection.query(
+      `UPDATE UnidadeEscolar SET senha = ?, recuperacao_chave_hash = ?, recuperacao_falhas = 0,
+       recuperacao_bloqueada_ate = NULL, recuperacao_gerada_em = NOW() WHERE id = ?`,
+      [senhaHash, hashChaveRecuperacao(novaChave), unidade.id]
+    );
+    await connection.commit();
+    return res.json({ message: 'Senha alterada com sucesso.', recoveryKey: novaChave });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    logger.error(`Erro na recuperação local: ${error.message}`);
+    return res.status(500).json({ message: 'Não foi possível recuperar o acesso.' });
+  } finally {
     connection.release();
   }
 };
@@ -238,5 +302,6 @@ module.exports = {
   getConfig,
   uploadLogo,
   bootstrapStatus,
-  bootstrapInitialize
+  bootstrapInitialize,
+  recuperarAcesso
 };
