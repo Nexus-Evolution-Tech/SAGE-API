@@ -32,9 +32,12 @@ jobs:
       DB_PORT: 3306
       DB_USER: root
       DB_PASSWORD: senha_de_ci
+      DB_NAME: sage_ci_teste
       JWT_SECRET: chave_de_ci_com_mais_de_32_caracteres_aleatorios
       NODE_ENV: test
       LOG_LEVEL: error
+      REQUIRE_TEST_DB: 'true'
+      SAGE_DATA_DIR: ${{ runner.temp }}/sage-ci-data
 
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +47,8 @@ jobs:
           node-version: '24'
           cache: npm
 
-      # --ignore-scripts: o postinstall cria .env e é interativo por natureza; no CI as
-      # variáveis já vêm do ambiente.
       - name: Instalar dependências
-        run: npm ci --ignore-scripts
+        run: npm ci
 
       - name: Verificar sintaxe de todos os arquivos JS
         run: |
@@ -57,22 +58,25 @@ jobs:
           done
           exit $falhou
 
+      - name: Preparar banco descartável
+        run: npm run test:db:setup
+
       - name: Testes
-        run: npx vitest run
+        run: npm test
 
       # Guarda específica contra o achado A-2 (docs/ACHADOS-INSTALADOR.md): o instalador já
       # reportou sucesso enquanto criava ZERO tabelas. Aqui provamos que uma instalação limpa
       # realmente provisiona o banco — e que o processo falha alto quando não provisiona.
       - name: Instalador provisiona o banco de verdade
         env:
-          DB_NAME: sage_ci_instalacao
+          DB_NAME: sage_ci_instalacao_teste
         run: |
           export SAGE_INITIAL_ADMIN_LOGIN="ci-${GITHUB_RUN_ID}"
           export SAGE_INITIAL_ADMIN_PASSWORD="$(node -e "process.stdout.write(require('crypto').randomBytes(24).toString('base64url'))")"
           export SAGE_INITIAL_SCHOOL_NAME="Unidade CI"
           node scripts/setup-database.js
           total=$(mysql -h 127.0.0.1 -u root -psenha_de_ci -N -e \
-            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sage_ci_instalacao'")
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sage_ci_instalacao_teste'")
           echo "tabelas criadas: $total"
           if [ "$total" -lt 20 ]; then
             echo "FALHA: instalacao criou apenas $total tabelas"
@@ -81,7 +85,7 @@ jobs:
 
       - name: Instalador falha alto quando uma migration quebra
         env:
-          DB_NAME: sage_ci_falha
+          DB_NAME: sage_ci_falha_teste
         run: |
           bad=database/migration_zzz_ci_falha_proposital.sql
           echo "ALTER TABLE TabelaQueNaoExiste ADD COLUMN x INT;" > "$bad"

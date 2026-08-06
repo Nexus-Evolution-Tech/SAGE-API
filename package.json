@@ -12,6 +12,7 @@
     "dev": "nodemon index.js",
     "prod": "NODE_ENV=production node index.js",
     "setup:db": "node scripts/setup-database.js",
+    "test:db:setup": "node scripts/setup-test-database.js",
     "test": "vitest run",
     "test:unit": "vitest run test",
     "test:watch": "vitest"

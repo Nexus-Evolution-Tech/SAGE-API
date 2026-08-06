@@ -1,7 +1,7 @@
 /**
  * Harness de banco para testes de integração.
  *
- * Provisiona um banco MySQL ISOLADO (nome próprio, prefixo `sage_verif_`), aplica o schema pelo
+ * Provisiona um banco MySQL ISOLADO (nome próprio, sufixo `_teste`), aplica o schema pelo
  * caminho real de instalação (`scripts/setup-database.js`) e derruba tudo no final.
  *
  * Usar o instalador de verdade em vez de um dump paralelo é deliberado: assim o próprio caminho de
@@ -11,8 +11,9 @@
  * NOTA: isto só funciona porque o achado A-1 foi corrigido. Antes, `sage.sql` tinha
  * `USE sage` fixo e ignorava DB_NAME — era impossível isolar banco de teste.
  *
- * Se não houver MySQL acessível, os testes que dependem disto devem ser PULADOS, não falhados:
- * use `descrebeSeTemBanco` para isso. Credenciais vêm do ambiente (ou do .env), nunca do código.
+ * No CI, `REQUIRE_TEST_DB=true` transforma indisponibilidade em falha da suíte. Fora do CI,
+ * `temBancoDisponivel` ainda permite executar apenas os testes unitários. Credenciais vêm do
+ * ambiente (ou do .env), nunca do código.
  */
 const mysql = require('mysql2/promise');
 const path = require('path');
@@ -20,6 +21,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
+const { assertTestDatabaseName } = require('../../scripts/setup-test-database');
 
 const RAIZ = path.join(__dirname, '..', '..');
 
@@ -35,7 +37,7 @@ function configConexao() {
   };
 }
 
-/** Testa se há MySQL acessível. Retorna true/false, nunca lança. */
+/** Testa se há MySQL acessível; falha quando o laboratório declarou o banco obrigatório. */
 async function temBancoDisponivel() {
   let conexao;
   try {
@@ -43,6 +45,9 @@ async function temBancoDisponivel() {
     await conexao.query('SELECT 1');
     return true;
   } catch {
+    if (process.env.REQUIRE_TEST_DB === 'true') {
+      throw new Error('MySQL de teste obrigatorio esta indisponivel');
+    }
     return false;
   } finally {
     if (conexao) await conexao.end().catch(() => {});
@@ -56,7 +61,10 @@ async function temBancoDisponivel() {
 async function criarBancoDeTeste(sufixo = '') {
   // A conta de manutenção do instalador recebe DDL somente neste namespace. Isso permite que
   // a mesma suíte prove o pacote real sem ampliar seus privilégios para bancos arbitrários.
-  const nome = `sage_verif_${process.pid}${sufixo ? '_' + sufixo : ''}`;
+  const parte = String(sufixo).replace(/[^a-z0-9_]/gi, '_');
+  const nome = assertTestDatabaseName(
+    `sage_verif_${process.pid}${parte ? '_' + parte : ''}_teste`
+  );
   const admin = await mysql.createConnection(configConexao());
   await admin.query(`DROP DATABASE IF EXISTS \`${nome}\``);
   await admin.end();
@@ -106,6 +114,7 @@ async function criarBancoDeTeste(sufixo = '') {
     nome,
     pool,
     async destruir() {
+      assertTestDatabaseName(nome);
       await pool.end().catch(() => {});
       const adm = await mysql.createConnection(configConexao());
       await adm.query(`DROP DATABASE IF EXISTS \`${nome}\``);
@@ -114,4 +123,9 @@ async function criarBancoDeTeste(sufixo = '') {
   };
 }
 
-module.exports = { temBancoDisponivel, criarBancoDeTeste, configConexao };
+module.exports = {
+  temBancoDisponivel,
+  criarBancoDeTeste,
+  configConexao,
+  assertBancoDeTeste: assertTestDatabaseName
+};

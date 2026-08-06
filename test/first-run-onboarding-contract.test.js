@@ -11,7 +11,7 @@ describe('onboarding inicial do SAGE', () => {
     expect(routes).toContain('criar: true');
     expect(controller).toContain("SELECT GET_LOCK('sage_first_run_onboarding'");
     expect(controller).toContain('SELECT COUNT(*) AS total FROM UnidadeEscolar');
-    expect(controller).toContain('INSERT INTO UnidadeEscolar (nome, login, senha)');
+    expect(controller).toMatch(/INSERT INTO UnidadeEscolar\s+\(nome, login, senha,/);
   });
 
   it('restringe inicialização à própria máquina e nunca devolve hash', () => {
