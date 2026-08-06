@@ -1,60 +1,32 @@
-const winston = require('winston');
+const fs = require('fs');
 const path = require('path');
+const winston = require('winston');
+const { paths } = require('./paths');
 
-// Níveis de log customizados
-const levels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
+const MAXSIZE = 10 * 1024 * 1024;
+const MAXFILES = 8;
+const LIMITE_TOTAL_BYTES = MAXSIZE * MAXFILES * 2; // app + WinSW
+const levels = { error: 0, warn: 1, info: 2, http: 3, debug: 4 };
 
-// Cores para cada nível (console)
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'white',
-};
+winston.addColors({ error: 'red', warn: 'yellow', info: 'green', http: 'magenta', debug: 'white' });
 
-winston.addColors(colors);
+function avisarFalhaTransporte(erro) {
+  const codigo = erro?.code === 'ENOSPC' ? 'SAGE-LOG-ENOSPC' : 'SAGE-LOG-TRANSPORT-ERRO';
+  process.stderr.write(`[${codigo}] O registro em arquivo falhou; libere espaço em disco.\n`);
+}
 
-// Formato customizado
-const format = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
-);
+function criarLogger({ diretorio = paths.apiLogs, maxsize = MAXSIZE, maxFiles = MAXFILES } = {}) {
+  fs.mkdirSync(diretorio, { recursive: true });
+  const arquivo = new winston.transports.File({ filename: path.join(diretorio, 'api.log'), maxsize, maxFiles, tailable: true, format: winston.format.combine(winston.format.timestamp(), winston.format.json()) });
+  arquivo.on('error', avisarFalhaTransporte);
+  const logger = winston.createLogger({ level: process.env.LOG_LEVEL || 'info', levels, transports: [
+    new winston.transports.Console({ format: winston.format.combine(winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }), winston.format.colorize({ all: true }), winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)) }),
+    arquivo
+  ] });
+  logger.http = (message, meta = {}) => logger.log('http', message, meta);
+  logger.errorWithStack = (message, error, meta = {}) => logger.error(message, { ...meta, stack: error?.stack });
+  return logger;
+}
 
-// Transports - apenas console
-const transports = [
-  new winston.transports.Console({
-    format,
-  }),
-];
-
-// Criar logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  levels,
-  transports,
-});
-
-// Helper para logging de requisições HTTP
-logger.http = (message, meta = {}) => {
-  logger.log('http', message, meta);
-};
-
-// Helper para logging de erros com stack trace
-logger.errorWithStack = (message, error) => {
-  logger.error(`${message}: ${error.message}`, {
-    stack: error.stack,
-    ...error,
-  });
-};
-
-module.exports = logger;
+const logger = criarLogger();
+module.exports = Object.assign(logger, { criarLogger, avisarFalhaTransporte, MAXSIZE, MAXFILES, LIMITE_TOTAL_BYTES });
