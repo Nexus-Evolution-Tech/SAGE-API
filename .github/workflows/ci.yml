@@ -37,7 +37,7 @@ jobs:
       NODE_ENV: test
       LOG_LEVEL: error
       REQUIRE_TEST_DB: 'true'
-      SAGE_DATA_DIR: ${{ runner.temp }}/sage-ci-data
+      SAGE_DATA_DIR: /tmp/sage-ci-data
 
     steps:
       - uses: actions/checkout@v4
