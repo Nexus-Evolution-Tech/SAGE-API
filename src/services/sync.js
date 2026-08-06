@@ -85,6 +85,7 @@ const registrarSyncPendente = async (pessoaId, operation) => {
     }
   } catch (err) {
     logger.errorWithStack('Erro ao registrar sync pendente', err);
+    throw err;
   }
 };
 

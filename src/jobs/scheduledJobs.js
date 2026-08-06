@@ -103,7 +103,7 @@ const verificarSyncPendentesJob = () => {
 
     try {
       const [pendentesResult] = await db.query(
-        'SELECT * FROM sync_pendente ORDER BY data_tentativa ASC LIMIT ?',
+        'SELECT * FROM sync_pendente ORDER BY last_attempt ASC, id ASC LIMIT ?',
         [config.jobs.syncBatchSize]
       );
       const pendentes = pendentesResult;
@@ -163,22 +163,31 @@ const verificarSyncPendentesJob = () => {
             continue;
           }
 
-          const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [registro.pessoa_id]);
-          const pessoa = pessoaResult?.[0];
-          if (!pessoa) {
-            await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
-            continue;
+          let resultadosRemotos;
+          if (registro.operation === 'DELETE') {
+            resultadosRemotos = await controlIdService.deletarPessoaDasCatracas(
+              registro.pessoa_id, { dispositivoId: registro.dispositivo_id }
+            );
+          } else {
+            const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [registro.pessoa_id]);
+            const pessoa = pessoaResult?.[0];
+            if (!pessoa) {
+              await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
+              continue;
+            }
+
+            if (registro.operation === 'CREATE') {
+              resultadosRemotos = await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
+            } else if (registro.operation === 'UPDATE') {
+              resultadosRemotos = await controlIdService.editarPessoaNasCatracas(
+                pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qr_code,
+                { dispositivoId: registro.dispositivo_id }
+              );
+            }
           }
 
-          if (registro.operation === 'CREATE') {
-            await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
-          } else if (registro.operation === 'UPDATE') {
-            await controlIdService.editarPessoaNasCatracas(
-              pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qr_code,
-              { dispositivoId: registro.dispositivo_id }
-            );
-          } else if (registro.operation === 'DELETE') {
-            await controlIdService.deletarPessoaDasCatracas(pessoa.id, { dispositivoId: registro.dispositivo_id });
+          if (!Array.isArray(resultadosRemotos) || resultadosRemotos.some((resultado) => !resultado?.sucesso)) {
+            throw new Error('Operação remota sem confirmação válida');
           }
 
           await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
