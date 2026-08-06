@@ -6,17 +6,17 @@ ALTER TABLE UnidadeEscolar ADD COLUMN email VARCHAR(255) NULL COMMENT 'Email de 
 
 -- Adicionar coluna de status e last_health_check na tabela Dispositivo (ignorar se já existir)
 ALTER TABLE Dispositivo 
-ADD COLUMN status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO' AFTER senha,
-ADD COLUMN last_health_check DATETIME NULL AFTER status;
+ADD COLUMN status ENUM('ONLINE', 'OFFLINE', 'DESCONHECIDO') DEFAULT 'DESCONHECIDO' AFTER senha;
+ALTER TABLE Dispositivo ADD COLUMN last_health_check DATETIME NULL AFTER status;
 
 -- Índice (ignorar se já existir)
 CREATE INDEX idx_dispositivo_status ON Dispositivo(status);
 
 -- Adicionar colunas na tabela sync_pendente
 ALTER TABLE sync_pendente
-ADD COLUMN error_message TEXT NULL AFTER operation,
-ADD COLUMN retry_count INT DEFAULT 0 AFTER error_message,
-ADD COLUMN last_attempt DATETIME NULL AFTER retry_count;
+ADD COLUMN error_message TEXT NULL AFTER operation;
+ALTER TABLE sync_pendente ADD COLUMN retry_count INT DEFAULT 0 AFTER error_message;
+ALTER TABLE sync_pendente ADD COLUMN last_attempt DATETIME NULL AFTER retry_count;
 
 -- Adicionar índices para melhorar performance
 CREATE INDEX idx_sync_pessoa_dispositivo ON sync_pendente(pessoa_id, dispositivo_id);
@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS session_cache (
 -- Criar tabela Sala (caso ainda não exista)
 CREATE TABLE IF NOT EXISTS Sala (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    unidade_id INT NULL,
     numero VARCHAR(50) NOT NULL COMMENT 'Número ou identificador da sala',
     nome VARCHAR(100) NULL COMMENT 'Nome descritivo da sala',
     capacidade INT NULL COMMENT 'Capacidade de alunos',
@@ -78,6 +79,7 @@ CREATE TABLE IF NOT EXISTS Sala (
     INDEX idx_sala_ativo (ativo),
     INDEX idx_sala_tipo (tipo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE Sala ADD COLUMN unidade_id INT NULL AFTER id;
 
 -- (Removido) Inserção de salas de exemplo — não inserir dados iniciais
 
@@ -94,8 +96,9 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
   id INT AUTO_INCREMENT PRIMARY KEY,
   turma_id INT NOT NULL,
   aula_id INT NOT NULL,
+  divisao ENUM('INT', 'DIV A', 'DIV B') NOT NULL DEFAULT 'INT',
   dia_semana ENUM ('SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA') NOT NULL,
-  horario TIME NOT NULL,
+  horario VARCHAR(11) NOT NULL,
   sala_id INT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -103,6 +106,8 @@ CREATE TABLE IF NOT EXISTS HorarioAula (
   FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
   FOREIGN KEY (sala_id) REFERENCES Sala(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE HorarioAula ADD COLUMN divisao ENUM('INT', 'DIV A', 'DIV B') NOT NULL DEFAULT 'INT' AFTER aula_id;
+ALTER TABLE HorarioAula MODIFY COLUMN horario VARCHAR(11) NOT NULL;
 
 -- Adicionar FK para sala_padrao_id em Aula (se não existir)
 -- Nota: Esta linha pode falhar em MySQL antigo que não suporta ADD CONSTRAINT IF NOT EXISTS
@@ -137,6 +142,7 @@ CREATE TABLE IF NOT EXISTS Presenca (
     atrasado BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (pessoa_id) REFERENCES Pessoa(id) ON DELETE CASCADE
 );
+ALTER TABLE Presenca ADD COLUMN horario_previsto TIME NULL AFTER aulas_perdidas;
 
 -- Índice para relatórios de acesso (Presenca por data e pessoa)
 CREATE INDEX idx_presenca_data_pessoa ON Presenca(data, pessoa_id);

@@ -58,6 +58,9 @@ jobs:
           done
           exit $falhou
 
+      - name: Bloquear DDL destrutivo fora do ledger
+        run: node scripts/check-expand-only-migrations.js
+
       - name: Preparar banco descartável
         run: npm run test:db:setup
 
