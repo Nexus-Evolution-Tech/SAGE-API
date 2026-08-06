@@ -18,10 +18,21 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const mysql = require('mysql2/promise');
 const logger = require('../config/logger');
 const { paths } = require('../config/paths');
+
+function hashArquivo(caminho) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fsSync.createReadStream(caminho);
+    stream.on('data', (parte) => hash.update(parte));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
 
 function privateFile(file, label) {
   if (!path.isAbsolute(file)) throw new Error(`${label} deve ser absoluto`);
@@ -158,9 +169,16 @@ async function listarBackups() {
   for (const nome of nomes) {
     if (!nome.startsWith('sage-backup-') || !nome.endsWith('.sql')) continue;
     const st = await fs.stat(path.join(cfg.diretorio, nome));
-    arquivos.push({ nome, caminho: path.join(cfg.diretorio, nome), bytes: st.size, modificadoEm: st.mtime });
+    let verificado = false;
+    try { const prova = JSON.parse(await fs.readFile(`${path.join(cfg.diretorio, nome)}.verified.json`, 'utf8')); const hash = await hashArquivo(path.join(cfg.diretorio, nome)); verificado = prova.bytes === st.size && prova.modificadoEm === st.mtime.toISOString() && prova.hash === hash; } catch (_) {}
+    arquivos.push({ nome, caminho: path.join(cfg.diretorio, nome), bytes: st.size, modificadoEm: st.mtime, verificado });
   }
   return arquivos.sort((a, b) => b.modificadoEm - a.modificadoEm);
+}
+
+async function invalidarProva(caminhoArquivo) {
+  try { await fs.unlink(`${caminhoArquivo}.verified.json`); }
+  catch (erro) { if (erro.code !== 'ENOENT') throw erro; }
 }
 
 /** Gera o dump. Lança em caso de falha — nunca devolve "ok" sem arquivo (RNF-4). */
@@ -212,6 +230,7 @@ async function gerarBackup() {
  * pode terminar com sucesso e estar truncado, ou conter só a estrutura sem os dados.
  */
 async function verificarBackup(caminhoArquivo) {
+  await invalidarProva(caminhoArquivo);
   const cfg = config();
   const bancoTemp = `sage_verif_${process.pid}_${Date.now()}`;
   const conexaoAdmin = { host: cfg.host, port: cfg.port, user: cfg.user, password: cfg.password };
@@ -279,6 +298,7 @@ async function verificarBackup(caminhoArquivo) {
   }
 
   const ok = problemas.length === 0;
+  if (ok) { const st = await fs.stat(caminhoArquivo); const hash = await hashArquivo(caminhoArquivo); await fs.writeFile(`${caminhoArquivo}.verified.json`, JSON.stringify({ bytes: st.size, modificadoEm: st.mtime.toISOString(), hash })); }
   if (ok) logger.info(`[BACKUP] Restauração verificada com sucesso: ${path.basename(caminhoArquivo)}`);
   else logger.error(`[BACKUP] VERIFICAÇÃO FALHOU em ${path.basename(caminhoArquivo)}: ${problemas.join('; ')}`);
 
@@ -290,9 +310,9 @@ async function aplicarRetencao() {
   const arquivos = await listarBackups();
   const remover = selecionarParaRemover(arquivos, cfg);
   for (const nome of remover) {
-    await fs.unlink(path.join(cfg.diretorio, nome)).catch((e) =>
-      logger.error(`[BACKUP] Falha ao remover ${nome}: ${e.message}`)
-    );
+    const caminho = path.join(cfg.diretorio, nome);
+    await fs.unlink(caminho);
+    await invalidarProva(caminho);
   }
   if (remover.length) logger.info(`[BACKUP] Retenção: ${remover.length} arquivo(s) antigo(s) removido(s)`);
   return remover;
@@ -308,5 +328,7 @@ module.exports = {
   TABELAS_ESSENCIAIS,
   config,
   clientArgs,
-  subprocessEnvironment
+  subprocessEnvironment,
+  invalidarProva,
+  hashArquivo
 };

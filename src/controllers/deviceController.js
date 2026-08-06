@@ -14,6 +14,7 @@ const globalState = require('../state/globalState');
 const catracaImportService = require('../services/catracaImportService');
 const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
 const { paths, isInside } = require('../config/paths');
+const backupBanco = require('../services/backupBanco');
 
 const tabela = 'Dispositivo';
 
@@ -525,39 +526,48 @@ async function comecarDoZero(req, res) {
     if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
-    const { apagarAcessosNoSistema, apagarAreasNoSistema, apagarPessoasNoSistema } = req.body || {};
-
-    const result = await deviceService.zerarTudoNaCatraca(dispositivo);
-    if (!result.ok) return res.status(502).json({ message: result.message, summary: result.summary, erros: result.erros });
+    const { apagarAcessosNoSistema, apagarAreasNoSistema, apagarPessoasNoSistema, confirmacao } = req.body || {};
+    if (confirmacao !== 'APAGAR TUDO' || !req.user?.id) return res.status(403).json({ message: 'Confirmação e autoria são obrigatórias.' });
+    const backup = await backupBanco.gerarBackup();
+    const prova = await backupBanco.verificarBackup(backup.caminho);
+    if (!prova.ok) return res.status(502).json({ message: 'Backup não foi restaurado com sucesso. Operação cancelada.' });
+    const backupCatraca = await deviceService.gerarBackupCompletoCatraca(dispositivo);
 
     const sageRemovidos = { acessos: 0, areas: 0, pessoas: 0 };
-    await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+    let conexao;
+    let result;
+    try {
+      result = await deviceService.zerarTudoNaCatraca(dispositivo);
+      if (!result.ok) throw new Error('Zeragem remota parcial');
+      conexao = await db.getConnection();
+      await conexao.beginTransaction();
+      await conexao.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
 
-    if (apagarAcessosNoSistema) {
-      const [r] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
-      sageRemovidos.acessos = r.affectedRows;
-    }
+      if (apagarAcessosNoSistema) {
+        const [r] = await conexao.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
+        sageRemovidos.acessos = r.affectedRows;
+      }
     if (apagarAreasNoSistema) {
-      await db.query('UPDATE Dispositivo SET area_id = NULL');
-      const [r] = await db.query('DELETE FROM Area');
+      await conexao.query('UPDATE Dispositivo SET area_id = NULL');
+      const [r] = await conexao.query('DELETE FROM Area');
       sageRemovidos.areas = r.affectedRows;
     }
     if (apagarPessoasNoSistema) {
-      await db.query('DELETE FROM Presenca');
-      await db.query('DELETE FROM SolicitacaoAcesso');
-      await db.query('DELETE FROM HorarioAula');
-      await db.query('DELETE FROM Aula');
-      await db.query('DELETE FROM Professor');
-      await db.query('DELETE FROM Administrador');
-      await db.query('DELETE FROM Terceirizado');
-      await db.query('DELETE FROM Funcionario');
-      await db.query('DELETE FROM Aluno');
-      await db.query('DELETE FROM Responsavel');
-      await db.query('DELETE FROM Acesso');
-      try { await db.query('DELETE FROM sync_pendente'); } catch (_) {}
-      const [r] = await db.query('DELETE FROM Pessoa');
+      for (const tabelaRemover of ['Presenca', 'SolicitacaoAcesso', 'HorarioAula', 'Aula', 'Professor', 'Administrador', 'Terceirizado', 'Funcionario', 'Aluno', 'Responsavel', 'Acesso', 'sync_pendente']) await conexao.query(`DELETE FROM ${tabelaRemover}`);
+      const [r] = await conexao.query('DELETE FROM Pessoa');
       sageRemovidos.pessoas = r.affectedRows;
     }
+      await conexao.commit();
+      logger.info(`[COMECAR DO ZERO] operador_id=${req.user.id} dispositivo_id=${id}`);
+    } catch (erro) {
+      if (conexao) {
+        try { await conexao.rollback(); }
+        catch (_) { logger.error(`[COMECAR DO ZERO] rollback falhou codigo=DB_ROLLBACK_FALHOU dispositivo_id=${id}`); }
+      }
+      try { await deviceService.restaurarBackupCompletoCatraca(dispositivo, backupCatraca.filePath); }
+      catch (_) { logger.error(`[COMECAR DO ZERO] compensação falhou codigo=CATRACA_RESTORE_FALHOU dispositivo_id=${id}`); }
+      throw erro;
+    } finally { conexao?.release(); }
 
     return res.json({
       message: 'Catraca zerada e, no SAGE, os dados selecionados foram apagados. Cadastre do zero.',
