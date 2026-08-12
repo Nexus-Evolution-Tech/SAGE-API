@@ -1,8 +1,5 @@
-console.log('[BOOT-DB] carregando mysql2...');
 const mysql = require('mysql2');
-console.log('[BOOT-DB] mysql2 carregado');
 const logger = require('./logger');
-console.log('[BOOT-DB] logger carregado');
 
 // Validações de pool
 const connectionLimit = parseInt(process.env.DB_CONNECTION_LIMIT || '10');
@@ -12,7 +9,6 @@ if (connectionLimit < 5) {
   logger.warn('DB_CONNECTION_LIMIT está baixo (<5), recomenda-se pelo menos 10');
 }
 
-console.log('[BOOT-DB] criando pool...');
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306'),
@@ -26,11 +22,9 @@ const pool = mysql.createPool({
   enableKeepAlive: true,
   connectTimeout: 2000
 });
-console.log('[BOOT-DB] pool criado');
 
 // Usar pool.promise() para trabalhar com Promises
 const promisePool = pool.promise();
-console.log('[BOOT-DB] pool.promise pronto');
 
 // Adicionar método de health check
 promisePool.healthCheck = async () => {

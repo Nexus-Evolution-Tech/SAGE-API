@@ -48,7 +48,7 @@ const criar = async (req, res) => {
         try {
             const [rows] = await db.query('SELECT nome FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
             pessoa_nome = rows?.[0]?.nome ?? null;
-        } catch (_) { /* ignorar */ }
+        } catch (_) { logger.warn('[ACESSO] codigo=NOME_PESSOA_NAO_CARREGADO'); }
         emitToRoom('acessos', 'acesso:novo', {
             pessoa_id,
             dispositivo_id,

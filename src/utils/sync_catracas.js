@@ -1,5 +1,6 @@
 const db = require('../config/database');
-const { criarNovaPessoaNasCatracas, editarPessoaNasCatracas, deletarPessoaDasCatracas } = require('../services/controlIdService'); // DEPENDÊNCIA CIRCULAR?
+const logger = require('../config/logger');
+const controlIdService = require('../services/controlIdService'); // DEPENDÊNCIA CIRCULAR?
 
 async function sincronizarTodasPessoasNasCatracas() {
   try {
@@ -8,13 +9,16 @@ async function sincronizarTodasPessoasNasCatracas() {
 
     for (const pessoa of pessoas) {
       try {
-        await criarNovaPessoaNasCatracas(pessoa);
+        await controlIdService.criarNovaPessoaNasCatracas(pessoa);
       } catch (erroPessoa) {
-        // Ignora erros de sincronização individual
+        logger.error('[SYNC-CATRACA] codigo=SYNC_PESSOA_FALHOU');
+        throw erroPessoa;
       }
     }
 
   } catch (erroGeral) {
+    logger.error('[SYNC-CATRACA] codigo=SYNC_GERAL_FALHOU');
+    throw erroGeral;
   }
 }
 
@@ -39,19 +43,23 @@ async function verificarSyncPendentes(dispositivo) {
         
         // Checar a ação (CREATE, UPDATE, DELETE)
         if (registro.operation === 'CREATE') {
-          await criarNovaPessoaNasCatracas(pessoa, { dispositivoId: dispositivo.id });
+          await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: dispositivo.id });
         } else if (registro.operation === 'UPDATE') {
-          await editarPessoaNasCatracas(pessoa.id, pessoa.nome, pessoa.cartao_rfid, { dispositivoId: dispositivo.id });
+          await controlIdService.editarPessoaNasCatracas(pessoa.id, pessoa.nome, pessoa.cartao_rfid, { dispositivoId: dispositivo.id });
         } else if (registro.operation === 'DELETE') {
-          await deletarPessoaDasCatracas(pessoa.id, { dispositivoId: dispositivo.id });
+          await controlIdService.deletarPessoaDasCatracas(pessoa.id, { dispositivoId: dispositivo.id });
         }
 
         // Após a sincronização bem-sucedida, removemos da tabela de pendentes
         await global.db('sync_pendente').where('id', registro.id).del();
       } catch (erro) {
+        logger.error('[SYNC-CATRACA] codigo=SYNC_PENDENTE_FALHOU');
+        throw erro;
       }
     }
   } catch (error) {
+    logger.error('[SYNC-CATRACA] codigo=SYNC_PENDENTES_FALHOU');
+    throw error;
   }
 }
 

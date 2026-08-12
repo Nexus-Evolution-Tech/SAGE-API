@@ -170,7 +170,8 @@ async function listarBackups() {
     if (!nome.startsWith('sage-backup-') || !nome.endsWith('.sql')) continue;
     const st = await fs.stat(path.join(cfg.diretorio, nome));
     let verificado = false;
-    try { const prova = JSON.parse(await fs.readFile(`${path.join(cfg.diretorio, nome)}.verified.json`, 'utf8')); const hash = await hashArquivo(path.join(cfg.diretorio, nome)); verificado = prova.bytes === st.size && prova.modificadoEm === st.mtime.toISOString() && prova.hash === hash; } catch (_) {}
+    try { const prova = JSON.parse(await fs.readFile(`${path.join(cfg.diretorio, nome)}.verified.json`, 'utf8')); const hash = await hashArquivo(path.join(cfg.diretorio, nome)); verificado = prova.bytes === st.size && prova.modificadoEm === st.mtime.toISOString() && prova.hash === hash; }
+    catch (erro) { if (erro.code !== 'ENOENT') logger.warn('[BACKUP] codigo=PROVA_BACKUP_LER_FALHOU'); }
     arquivos.push({ nome, caminho: path.join(cfg.diretorio, nome), bytes: st.size, modificadoEm: st.mtime, verificado });
   }
   return arquivos.sort((a, b) => b.modificadoEm - a.modificadoEm);
@@ -215,7 +216,7 @@ async function gerarBackup() {
 
   const st = await fs.stat(destino);
   if (st.size === 0) {
-    await fs.unlink(destino).catch(() => {});
+    await fs.unlink(destino).catch(() => logger.warn('[BACKUP] codigo=ARQUIVO_VAZIO_NAO_REMOVIDO'));
     throw new Error('Backup gerado com 0 bytes — arquivo descartado');
   }
 
@@ -282,8 +283,8 @@ async function verificarBackup(caminhoArquivo) {
         }
       }
     } finally {
-      await restaurado.end().catch(() => {});
-      await origem.end().catch(() => {});
+      await restaurado.end().catch(() => logger.warn('[BACKUP] codigo=CONEXAO_RESTAURADA_FECHAR_FALHOU'));
+      await origem.end().catch(() => logger.warn('[BACKUP] codigo=CONEXAO_ORIGEM_FECHAR_FALHOU'));
     }
   } catch (erro) {
     problemas.push(erro.message);

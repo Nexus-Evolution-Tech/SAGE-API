@@ -1,8 +1,5 @@
-console.log('[BOOT-GRF] require start');
 const express = require('express');
-console.log('[BOOT-GRF] express ok');
 const autenticar = require('../middlewares/autenticar');
-console.log('[BOOT-GRF] middleware ok');
 
 function gerarRotas(controller, prefixo, {
   listar = true,

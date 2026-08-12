@@ -218,6 +218,8 @@ const deletarCartao = async (id, link, session, dispositivo, tipo) => {
       headers: { "Content-Type": "application/json" }
       });
   } catch (err) {
+    logger.warn('[CATRACA] codigo=CATRACA_CARTAO_EXCLUIR_FALHOU');
+    throw err;
   }
 }
 
@@ -250,6 +252,8 @@ const deletarGrupo = async (id, link, session, dispositivo) => {
         headers: { "Content-Type": "application/json" }
         });
     } catch (err) {
+      logger.warn('[CATRACA] codigo=CATRACA_GRUPO_EXCLUIR_FALHOU');
+      throw err;
     }
 }
 
@@ -266,7 +270,7 @@ const criarImagemUser = async (id, link, session, dispositivo, resultados) => {
 
     await axios.post(`http://${link}/user_set_image_list.fcgi?session=${session}`, imagePayload, { headers: { "Content-Type": "application/json" } });
   } catch (err) {
-    // Ignora erros - arquivo não encontrado ou falha no upload
+    logger.warn('[CATRACA] codigo=CATRACA_FOTO_INDISPONIVEL');
   }
 }
 
@@ -282,6 +286,8 @@ const deletarImagemUser = async (id, link, session, dispositivo, resultados) => 
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
+    logger.warn('[CATRACA] codigo=CATRACA_IMAGEM_EXCLUIR_FALHOU');
+    throw err;
   }
 }
 
