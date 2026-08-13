@@ -9,6 +9,7 @@ const logger = require('../config/logger');
 const { emitNotification, emitNotificationToUser } = require('../services/notificationService');
 const { paths } = require('../config/paths');
 const crypto = require('crypto');
+const usuarioController = require('./usuarioController');
 
 const tabela = 'UnidadeEscolar';
 const campos = ['id', 'nome', 'numero_unidade', 'cnpj', 'login', 'senha', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'telefone_contato', 'email', 'logo'];
@@ -76,6 +77,11 @@ const bootstrapInitialize = async (req, res) => {
        VALUES (?, ?, ?, ?, 0, NOW())`,
       [nome, loginInicial, senhaHash, hashChaveRecuperacao(chaveRecuperacao)]
     );
+    await connection.query(
+      `INSERT INTO Usuario (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
+       VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
+      [loginInicial, senhaHash, nome]
+    );
     await connection.commit();
     return res.status(201).json({ initialized: true, recoveryKey: chaveRecuperacao });
   } catch (error) {
@@ -131,6 +137,10 @@ const recuperarAcesso = async (req, res) => {
        recuperacao_bloqueada_ate = NULL, recuperacao_gerada_em = NOW() WHERE id = ?`,
       [senhaHash, hashChaveRecuperacao(novaChave), unidade.id]
     );
+    await connection.query(
+      'UPDATE Usuario SET senha_hash = ?, precisa_trocar_senha = TRUE, falhas_login = 0, bloqueado_ate = NULL WHERE login = ?',
+      [senhaHash, login]
+    );
     await connection.commit();
     return res.json({ message: 'Senha alterada com sucesso.', recoveryKey: novaChave });
   } catch (error) {
@@ -144,38 +154,29 @@ const recuperarAcesso = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const unidade_id = req.params.id;
     const { usuario, senha } = req.body;
+    const resultado = await usuarioController.autenticar(String(usuario || '').trim(), senha);
+    if (!resultado.ok) return res.status(resultado.bloqueado ? 429 : 401).json({ message: 'Credenciais inválidas' });
+    const { usuario: conta } = resultado;
+    const token = gerarToken({ usuario_id: conta.id, papel: conta.papel, emitido_em: new Date().toISOString() });
 
-    const query = `SELECT * FROM UnidadeEscolar WHERE id = ?`;
-    const [rows] = await db.query(query, [unidade_id]);
-    const unidade = rows[0];
-
-    if (!unidade) return res.status(401).json({ message: 'Usuário não encontrado' });
-
-    const senhaCorreta = await compararHash(senha, unidade.senha);
-    if (!senhaCorreta || unidade.login !== usuario)
-      return res.status(401).json({ message: 'Credenciais inválidas' });
-
-    // gera o token válido por 1h
-    const token = gerarToken({ id: unidade.id, nome: unidade.nome });
-
-    emitNotificationToUser(unidade.id, {
+    emitNotificationToUser(conta.id, {
       title: 'Novo login na sua conta',
       message: 'Sua conta foi acessada em outro dispositivo ou aba. Se não foi você, altere sua senha.',
       type: 'info',
     });
 
-    res.status(200).json({ message: 'Logado com sucesso', token });
+    res.status(200).json({ message: 'Logado com sucesso', token, precisa_trocar_senha: Boolean(conta.precisa_trocar_senha) });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno', error: error.message });
+    logger.error('[AUTH] codigo=LOGIN_FALHOU');
+    res.status(500).json({ message: 'Erro interno' });
   }
 };
 
 /** GET /unidade — retorna a unidade do usuário logado (sem senha) */
 const obterUnidadeAtual = async (req, res) => {
   try {
-    const id = req.user?.id;
+    const id = req.user?.usuario_id;
     if (!id) return res.status(401).json({ message: 'Não autorizado' });
     const camposSemSenha = campos.filter((c) => c !== 'senha');
     const [registros] = await crud.buscarPorId(id, tabela, camposSemSenha);
@@ -219,18 +220,18 @@ const trocarSenha = async (req, res) => {
     if (!senha_atual || !nova_senha) {
       return res.status(400).json({ message: 'Informe a senha atual e a nova senha' });
     }
-    if (nova_senha.length < 6) {
-      return res.status(400).json({ message: 'A nova senha deve ter no mínimo 6 caracteres' });
+    if (nova_senha.length < 8) {
+      return res.status(400).json({ message: 'A nova senha deve ter no mínimo 8 caracteres' });
     }
-    const [rows] = await db.query('SELECT senha FROM UnidadeEscolar WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT senha_hash FROM Usuario WHERE id = ?', [id]);
     const unidade = rows[0];
     if (!unidade) return res.status(404).json({ message: 'Unidade não encontrada' });
-    const senhaCorreta = await compararHash(senha_atual, unidade.senha);
+    const senhaCorreta = await compararHash(senha_atual, unidade.senha_hash);
     if (!senhaCorreta) {
       return res.status(401).json({ message: 'Senha atual incorreta' });
     }
     const senhaHash = await hashSenha(nova_senha);
-    await db.query('UPDATE UnidadeEscolar SET senha = ? WHERE id = ?', [senhaHash, id]);
+    await db.query('UPDATE Usuario SET senha_hash = ?, precisa_trocar_senha = FALSE, falhas_login = 0, bloqueado_ate = NULL WHERE id = ?', [senhaHash, id]);
     emitNotificationToUser(id, {
       title: 'Alteração de senha',
       message: 'Sua senha foi alterada com sucesso.',

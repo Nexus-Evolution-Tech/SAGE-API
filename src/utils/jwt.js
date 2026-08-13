@@ -10,8 +10,16 @@ if (!SECRET) {
 }
 
 function gerarToken(payload) {
+  const chaves = Object.keys(payload || {}).sort();
+  if (chaves.join(',') !== 'emitido_em,papel,usuario_id'
+    || !Number.isInteger(payload.usuario_id)
+    || !['ADMINISTRADOR', 'SECRETARIA'].includes(payload.papel)
+    || typeof payload.emitido_em !== 'string'
+    || Number.isNaN(Date.parse(payload.emitido_em))) {
+    throw new TypeError('Claims de sessão inválidos');
+  }
   try {
-    return jwt.sign(payload, SECRET, { expiresIn: EXPIRES_IN });
+    return jwt.sign(payload, SECRET, { expiresIn: EXPIRES_IN, noTimestamp: true });
   } catch (error) {
     logger.errorWithStack('Erro ao gerar token JWT', error);
     throw error;
@@ -20,7 +28,14 @@ function gerarToken(payload) {
 
 function verificarToken(token) {
   try {
-    return jwt.verify(token, SECRET);
+    const payload = jwt.verify(token, SECRET);
+    const chaves = Object.keys(payload).sort();
+    if (chaves.join(',') !== 'emitido_em,exp,papel,usuario_id'
+      || !Number.isInteger(payload.usuario_id)
+      || !['ADMINISTRADOR', 'SECRETARIA'].includes(payload.papel)
+      || typeof payload.emitido_em !== 'string'
+      || Number.isNaN(Date.parse(payload.emitido_em))) return null;
+    return payload;
   } catch (err) {
     logger.debug(`Token inválido: ${err.message}`);
     return null; // token inválido ou expirado
