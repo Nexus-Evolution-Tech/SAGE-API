@@ -236,7 +236,7 @@ const criarGrupo = async (id, link, session, dispositivo, resultados) => {
     } catch (err) {
       throw new Error(
         `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
-          JSON.stringify(error.response?.data || error.message)
+          JSON.stringify(err.response?.data || err.message)
         }`
       );
     }

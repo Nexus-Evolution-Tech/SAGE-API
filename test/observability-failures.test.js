@@ -3,7 +3,7 @@ const logger = require('../src/config/logger');
 const controlId = require('../src/services/controlIdService');
 const axios = require('axios');
 const { sincronizarTodasPessoasNasCatracas } = require('../src/utils/sync_catracas');
-const { criarImagemUser, deletarCartao } = require('../src/utils/controlId-utils');
+const { criarImagemUser, deletarCartao, criarGrupo } = require('../src/utils/controlId-utils');
 describe('falhas observáveis', () => {
   beforeEach(() => vi.restoreAllMocks());
   it('propaga falha essencial de sincronização', async () => {
@@ -24,5 +24,9 @@ describe('falhas observáveis', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     await expect(deletarCartao(1, 'host', 'sessao', {}, 'QRCODE')).rejects.toThrow('falha');
     expect(warn).toHaveBeenCalledWith('[CATRACA] codigo=CATRACA_CARTAO_EXCLUIR_FALHOU');
+  });
+  it('preserva a causa ao falhar ao criar grupo', async () => {
+    vi.spyOn(axios, 'post').mockRejectedValueOnce(new Error('grupo indisponível'));
+    await expect(criarGrupo(1, 'host', 'sessao', {}, [])).rejects.toThrow('grupo indisponível');
   });
 });
