@@ -9,6 +9,27 @@ on:
   pull_request:
 
 jobs:
+  caminhos:
+    runs-on: ubuntu-latest
+    outputs:
+      instalador: ${{ steps.filtro.outputs.instalador || steps.push_main.outputs.instalador }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - id: filtro
+        uses: dorny/paths-filter@v3
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            instalador:
+              - 'installer/**'
+              - '.github/workflows/**'
+      - id: push_main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo "instalador=true" >> "$GITHUB_OUTPUT"
+
   teste:
     runs-on: ubuntu-latest
 
@@ -102,3 +123,59 @@ jobs:
             exit 1
           fi
           echo "ok: instalador terminou com $rc"
+
+  instalador:
+    needs: caminhos
+    if: needs.caminhos.outputs.instalador == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@v4
+        with:
+          path: api
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: Nexus-Evolution-Tech/SAGE
+          ref: wip/recuperacao-local-pre-auditoria
+          path: web
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Instalar Inno Setup 6.7.3
+        shell: powershell
+        run: choco install innosetup --version=6.7.3 --no-progress --yes
+
+      - name: Montar layout interno
+        shell: powershell
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'api'
+          $web = Join-Path $env:GITHUB_WORKSPACE 'web'
+          $work = Join-Path $env:RUNNER_TEMP 'sage-build'
+          $layout = Join-Path $env:RUNNER_TEMP 'sage-layout'
+          & (Join-Path $api 'installer\windows\build-release.ps1') `
+            -ApiRepository $api -WebRepository $web `
+            -WorkDirectory $work -OutputDirectory $layout
+          if ($LASTEXITCODE -ne 0) { throw 'build-release.ps1 falhou' }
+
+      - name: Compilar instalador Inno Setup
+        shell: powershell
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'api'
+          $layout = Join-Path $env:RUNNER_TEMP 'sage-layout'
+          $output = Join-Path $env:RUNNER_TEMP 'sage-installer'
+          & (Join-Path $api 'installer\windows\build-installer.ps1') `
+            -LayoutDirectory $layout -OutputDirectory $output
+          if ($LASTEXITCODE -ne 0) { throw 'build-installer.ps1 falhou' }
+          if (-not (Get-ChildItem -LiteralPath $output -Filter '*.exe' -File)) {
+            throw 'Nenhum instalador .exe foi produzido'
+          }
