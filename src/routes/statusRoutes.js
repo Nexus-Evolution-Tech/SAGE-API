@@ -90,7 +90,7 @@ router.get('/status', async (req, res) => {
         bytes: recente.bytes,
         horasAtras: Math.round(horas)
       };
-      if (horas > 48) {
+      if (!recente.verificado || horas > 48) {
         problemas.push(
           `O último backup do banco tem ${Math.round(horas / 24)} dia(s). ` +
             'Verifique se o computador fica ligado no horário do backup automático.'

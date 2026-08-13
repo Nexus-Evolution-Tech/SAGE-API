@@ -38,6 +38,12 @@ function mysqldumpCmd() {
   return `mysqldump -h "${DB_HOST}" -P ${DB_PORT} -u "${DB_USER}" --single-transaction --routines --triggers "${DB_NAME}"`;
 }
 
+function compararContagens(origem, destino) {
+  const chaves = Object.keys(origem).sort();
+  if (chaves.join(',') !== Object.keys(destino).sort().join(',')) return false;
+  return chaves.every((tabela) => Number(origem[tabela]) === Number(destino[tabela]));
+}
+
 async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  Renomear BD atual para', DB_ANTIGO);
@@ -59,6 +65,12 @@ async function main() {
 
     console.log('3. Importando no banco', DB_ANTIGO, '...');
     run(`${mysqlCmd(DB_ANTIGO)} < ${dumpQuoted}`);
+
+    console.log('3.1 Validando cópia restaurada...');
+    const listarTabelas = (banco) => execSync(`${mysqlCmd()} -N -e "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='${banco}';"`, { shell: true, env: { ...process.env, MYSQL_PWD: DB_PASSWORD } }).toString().trim().split(/\r?\n/).filter(Boolean);
+    const contar = (banco, tabelas) => Object.fromEntries(tabelas.map((tabela) => { const segura = tabela.replace(/`/g, '``'); return [tabela, execSync(`${mysqlCmd(banco)} -N -e "SELECT COUNT(*) FROM \`${segura}\`;"`, { shell: true, env: { ...process.env, MYSQL_PWD: DB_PASSWORD } }).toString().trim()]; }));
+    const origem = listarTabelas(DB_NAME), destino = listarTabelas(DB_ANTIGO);
+    if (!compararContagens(contar(DB_NAME, origem), contar(DB_ANTIGO, destino))) throw new Error('Cópia restaurada não confere com o banco original');
 
     console.log('4. Removendo banco', DB_NAME, '...');
     run(`${mysqlCmd()} -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`;"`);
@@ -82,4 +94,5 @@ async function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+module.exports = { compararContagens };

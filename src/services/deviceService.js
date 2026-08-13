@@ -17,6 +17,7 @@ const OBJETOS_CATRACA_BACKUP = [
   'user_roles', 'scheduled_unlocks', 'actions'
 ];
 const OBJETOS_CATRACA_LISTAVEIS = [...OBJETOS_CATRACA_BACKUP];
+const ORDEM_RESTAURAR_CATRACA = ['areas', 'groups', 'portals', 'access_rules', 'time_zones', 'time_spans', 'users', 'user_groups', 'cards', 'qrcodes', 'group_access_rules', 'user_access_rules', 'portal_access_rules', 'user_roles', 'scheduled_unlocks', 'actions'];
 
 /** Lista única de tipos para ferramentas (backup/zerar por tipo): backup + access_logs + ordem zerar. */
 const OBJETOS_CATRACA_FERRAMENTAS = [...new Set([...OBJETOS_CATRACA_BACKUP, 'access_logs', ...ORDEM_ZERAR_CATRACA])].sort();
@@ -396,9 +397,29 @@ async function gerarBackupCompletoCatraca(dispositivo) {
     }
   }
 
+  if (result.erros) throw new Error('Backup completo incompleto; nenhuma cópia foi aceita');
   fs.writeFileSync(filePath, JSON.stringify(result, null, 2), 'utf8');
   logger.info(`[BACKUP COMPLETO] ${dispositivo.nome}: ${filename}`, summary);
   return { filePath, filename, summary };
+}
+
+async function restaurarBackupCompletoCatraca(dispositivo, filePath) {
+  const backup = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  if (!backup?.dados || OBJETOS_CATRACA_BACKUP.some((tipo) => !Array.isArray(backup.dados[tipo]))) throw new Error('Backup completo inválido');
+  const link = linkCatraca(dispositivo); const session = await obterSessao(link, dispositivo);
+  if (!session) throw new Error('Sessão não obtida na catraca');
+  for (const object of ORDEM_RESTAURAR_CATRACA) {
+    const values = backup.dados[object];
+    if (values.length) {
+      const resposta = await axiosInstance.post(`http://${link}/create_or_update_objects.fcgi?session=${session}`, { object, values }, { timeout: 60000 });
+      if (resposta.data?.error) throw new Error(`Restauração recusada para ${object}`);
+    }
+    const releitura = await axiosInstance.post(`http://${link}/load_objects.fcgi?session=${session}`, { object }, { timeout: 60000 });
+    const relidos = releitura.data?.[object] || [];
+    const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    if (relidos.length !== values.length || !values.every((valor) => relidos.some((item) => Object.entries(valor).every(([campo, dado]) => igual(item[campo], dado))))) throw new Error(`Restauração incompleta para ${object}`);
+  }
+  return { ok: true };
 }
 
 /**
@@ -725,6 +746,7 @@ module.exports = {
   obterQuantidadeOuAmostraLogsCatraca,
   loadObjectsFromCatraca,
   gerarBackupCompletoCatraca,
+  restaurarBackupCompletoCatraca,
   destroyObjectsOnCatraca,
   zerarTudoNaCatraca,
   gerarBackupLogsCatraca,
@@ -734,6 +756,7 @@ module.exports = {
   getMonitorCallbackAddress,
   OBJETOS_CATRACA_LISTAVEIS,
   OBJETOS_CATRACA_FERRAMENTAS,
+  ORDEM_RESTAURAR_CATRACA,
   backupPorTipo,
   zerarPorTipo
 };

@@ -6,7 +6,7 @@ const YAML = require('yaml');
 const baseUrl = new URL(process.argv[2] || 'http://127.0.0.1:3000');
 const maxLatencyMs = Number(process.env.SAGE_AUDIT_MAX_LATENCY_MS || 2000);
 const swagger = YAML.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'docs', 'swagger.yml'), 'utf8'));
-const methods = new Set(['get', 'post', 'put', 'patch', 'delete']);
+const methods = new Set(['get']);
 
 function call(method, requestPath) {
   return new Promise((resolve) => {

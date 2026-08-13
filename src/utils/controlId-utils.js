@@ -305,55 +305,6 @@ const deletarImagemUser = async (id, link, session, dispositivo, resultados) => 
 //   }
 // }
 
-const limparUsuariosPorPrefixo11 = async () => {
-    try {
-        const todosDispositivos = await listarTodos();
-        const dispositivos = (todosDispositivos || []).filter((d) => isSyncEnabled(d?.sync_enabled));
-
-        logger.info(`Iniciando limpeza em ${dispositivos.length} catracas.`);
-
-        for (const dispositivo of dispositivos) {
-            const link = linkCatraca(dispositivo);
-            const session = await obterSessao(link, dispositivo);
-
-            if (!session) {
-                logger.error(`Pulei ${dispositivo.nome}: Sem sessão.`);
-                continue;
-            }
-
-            const response = await axios.post(
-                `http://${link}/load_objects.fcgi?session=${session}`,
-                { object: "users", columns: ["id"] },
-                { headers: { "Content-Type": "application/json" } }
-            );
-
-            const users = response.data?.users ?? [];
-            const idsParaDeletar = users
-                .map((u) => u.id)
-                .filter((id) => String(id).startsWith("11"));
-
-            if (idsParaDeletar.length === 0) {
-                logger.info(`Catraca ${dispositivo.nome}: Nada para deletar.`);
-                continue;
-            }
-
-            for (const id of idsParaDeletar) {
-                await axios.post(
-                    `http://${link}/destroy_objects.fcgi?session=${session}`,
-                    { object: "users", where: { users: { id } } },
-                    { headers: { "Content-Type": "application/json" } }
-                );
-            }
-
-            logger.info(`Catraca ${dispositivo.nome}: ${idsParaDeletar.length} usuários removidos.`);
-        }
-
-        logger.info("Limpeza concluída em todas as catracas.");
-    } catch (error) {
-        logger.error(`Erro crítico: ${error.message}`);
-    }
-};
-
 module.exports = {
   criarUsuario,
   editarUsuario,
@@ -367,6 +318,5 @@ module.exports = {
   deletarImagemUser,
   obterSessaoAdmin,
   obterCartaoPorTipo,
-  limparUsuariosPorPrefixo11
   // criarQrCode
 }
