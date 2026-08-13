@@ -31,7 +31,7 @@ describeMySql('R1-01A: migration de Usuario (MySQL real)', () => {
       { COLUMN_NAME: 'login', DATA_TYPE: 'varchar', COLUMN_TYPE: 'varchar(100)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: 100 },
       { COLUMN_NAME: 'senha_hash', DATA_TYPE: 'varchar', COLUMN_TYPE: 'varchar(255)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: 255 },
       { COLUMN_NAME: 'nome_exibicao', DATA_TYPE: 'varchar', COLUMN_TYPE: 'varchar(100)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: 100 },
-      { COLUMN_NAME: 'papel', DATA_TYPE: 'enum', COLUMN_TYPE: "enum('ADMINISTRADOR','SECRETARIA')", IS_NULLABLE: 'NO', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: null },
+      { COLUMN_NAME: 'papel', DATA_TYPE: 'enum', COLUMN_TYPE: "enum('ADMINISTRADOR','SECRETARIA')", IS_NULLABLE: 'NO', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: 13 },
       { COLUMN_NAME: 'ativo', DATA_TYPE: 'tinyint', COLUMN_TYPE: 'tinyint(1)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: '1', CHARACTER_MAXIMUM_LENGTH: null },
       { COLUMN_NAME: 'pessoa_id', DATA_TYPE: 'int', COLUMN_TYPE: 'int', IS_NULLABLE: 'YES', COLUMN_DEFAULT: null, CHARACTER_MAXIMUM_LENGTH: null },
       { COLUMN_NAME: 'precisa_trocar_senha', DATA_TYPE: 'tinyint', COLUMN_TYPE: 'tinyint(1)', IS_NULLABLE: 'NO', COLUMN_DEFAULT: '0', CHARACTER_MAXIMUM_LENGTH: null },
