@@ -403,14 +403,14 @@ async function sincronizarAcessos(dispositivo, options = {}) {
       });
       emitToRoom('stats', 'stats:update', globalState.getStats());
     } catch (e) {
-      // não falhar a sync por causa de WebSocket
+      logger.warn('[SYNC] codigo=WEBSOCKET_EMISSAO_FALHOU');
     }
 
     logger.debug(`[SYNC] Acesso registrado: ${pessoa.nome} (pessoa_id=${pessoa_id}) em ${dispositivo.nome}`);
     // Invalidar cache logo após inserir para F5 na tela de monitoramento mostrar o novo acesso
     try {
       await invalidateMultiple([CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=CACHE_INVALIDACAO_FALHOU'); }
   }
 
   logger.info(
@@ -442,7 +442,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   if (acessosSincronizados > 0) {
     try {
       await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=CACHE_INVALIDACAO_FALHOU'); }
     logger.info(`[SYNC] ${dispositivo.nome}: ${acessosSincronizados} novo(s) acesso(s) inserido(s)`);
     try {
       emitNotification({
@@ -450,7 +450,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
         message: `${acessosSincronizados} acesso(s) sincronizado(s) para ${dispositivo.nome}.`,
         type: 'info',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=NOTIFICACAO_EMISSAO_FALHOU'); }
   }
 
   return {
@@ -740,7 +740,7 @@ async function processarNotificacaoMonitorDao(payload) {
         message: `${result.processados} acesso(s) registrado(s) via Monitor (catraca).`,
         type: 'info',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[MONITOR] codigo=POS_PROCESSAMENTO_FALHOU'); }
   }
   if (tentativasNegadas > 0) {
     try {
@@ -749,7 +749,7 @@ async function processarNotificacaoMonitorDao(payload) {
         message: `${tentativasNegadas} tentativa(s) de acesso com identificação não cadastrada.`,
         type: 'warning',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[MONITOR] codigo=NOTIFICACAO_EMISSAO_FALHOU'); }
   }
 
   return result;

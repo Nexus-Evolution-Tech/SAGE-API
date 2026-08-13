@@ -69,7 +69,7 @@ async function uploadFoto(req, res) {
     try {
       const arquivoTemp = path.join(baseUploads, req.file.filename);
       if (fs.existsSync(arquivoTemp)) fs.unlinkSync(arquivoTemp);
-    } catch (e) { /* ignore */ }
+    } catch (e) { logger.warn('[AREA-FOTO] codigo=ARQUIVO_TEMPORARIO_NAO_REMOVIDO'); }
     res.status(500).json({ message: 'Erro ao salvar a foto da área', error: error.message });
   }
 }

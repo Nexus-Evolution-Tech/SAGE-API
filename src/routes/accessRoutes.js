@@ -1,18 +1,11 @@
-console.log('[BOOT-ACCESS] require start');
 const express = require('express');
-console.log('[BOOT-ACCESS] express ok');
 const gerarRotas = require('./genericRoutesFactory');
-console.log('[BOOT-ACCESS] factory ok');
 const accessController = require('../controllers/accessController');
-console.log('[BOOT-ACCESS] controller ok');
 const { sincronizarAcessos, sincronizarTodosAcessos } = require('../services/accessService');
-console.log('[BOOT-ACCESS] service ok');
 const autenticar = require('../middlewares/autenticar');
-console.log('[BOOT-ACCESS] middleware ok');
 
 const router = gerarRotas(accessController, 'acessos');
 const routerExtra = express.Router();
-console.log('[BOOT-ACCESS] routers criados');
 
 routerExtra.post('/acessos', autenticar, accessController.criar);
 router.post('/acessos/sincronizar/:dispositivo_id', autenticar, async (req, res) => {

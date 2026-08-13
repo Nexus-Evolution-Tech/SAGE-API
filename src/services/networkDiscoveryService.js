@@ -1,6 +1,7 @@
 const os = require('os');
 const axios = require('axios');
 const pLimit = require('p-limit');
+const logger = require('../config/logger');
 
 function ipToInt(ip) {
   return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>> 0;
@@ -70,7 +71,7 @@ async function isControlId(ip, port, timeoutMs) {
       return true;
     }
   } catch (e) {
-    // ignore
+    logger.debug('[DESCOBERTA] codigo=SONDA_LOGIN_INDISPONIVEL');
   }
   try {
     const resRoot = await client.get(base);
@@ -79,7 +80,7 @@ async function isControlId(ip, port, timeoutMs) {
       return true;
     }
   } catch (e) {
-    // ignore
+    logger.debug('[DESCOBERTA] codigo=SONDA_RAIZ_INDISPONIVEL');
   }
   return false;
 }

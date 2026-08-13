@@ -84,6 +84,9 @@ jobs:
           done
           exit $falhou
 
+      - name: Bloquear consoles e catches vazios em src
+        run: npm run lint:src
+
       - name: Bloquear DDL destrutivo fora do ledger
         run: node scripts/check-expand-only-migrations.js
 

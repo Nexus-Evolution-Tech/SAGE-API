@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const logger = require('../config/logger');
 
 // Converte "HH:mm" para minutos
 function horaParaMinutos(horaStr) {
@@ -101,7 +102,7 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso, executor = 
     try {
       const [profRow] = await executor.query('SELECT usar_horario_fixo FROM Professor WHERE id = ?', [pessoa.id]);
       usarHorarioFixo = !!(profRow && profRow[0] && profRow[0].usar_horario_fixo);
-    } catch (e) { /* coluna pode não existir */ }
+    } catch (e) { logger.debug('[PRESENCA] codigo=CAMPO_HORARIO_FIXO_INDISPONIVEL'); }
 
     if (usarHorarioFixo) {
       try {

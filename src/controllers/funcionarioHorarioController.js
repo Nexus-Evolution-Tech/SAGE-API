@@ -41,7 +41,7 @@ async function listar(req, res) {
     try {
       const [prof] = await db.query('SELECT usar_horario_fixo FROM Professor WHERE id = ?', [funcionarioId]);
       usar_horario_fixo = !!(prof && prof[0] && prof[0].usar_horario_fixo);
-    } catch (e) { /* coluna pode não existir */ }
+    } catch (e) { logger.debug('[FUNCIONARIO-HORARIO] codigo=CAMPO_HORARIO_FIXO_INDISPONIVEL'); }
 
     res.json({ horarios, usar_horario_fixo });
   } catch (err) {

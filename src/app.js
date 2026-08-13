@@ -98,7 +98,6 @@ app.use((req, res, next) => {
 const monitoringRoutes = require('./routes/monitoringRoutes');
 app.use('/monitoring', monitoringRoutes);
 logger.info("Monitoramento disponível em: /monitoring/*");
-console.log('[BOOT-APP] monitoring routes pronta');
 
 // Diagnóstico de acessos (catraca vs banco) — sem auth em desenvolvimento para poder abrir no navegador
 const dispositivosController = require('./controllers/deviceController');
@@ -165,7 +164,7 @@ app.use((err, req, res, next) => {
     }
   } catch (e) {
     // Último recurso: fechar com 500
-    try { res.status(500).end(); } catch {}
+    try { res.status(500).end(); } catch { logger.error('[HTTP] codigo=RESPOSTA_ERRO_NAO_ENVIADA'); }
   }
 });
 

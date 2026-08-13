@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const { randomUUID } = require('crypto');
+const logger = require('../config/logger');
 
 const REQUIRED_COLUMNS = Object.freeze([
   'UnidadeEscolar.login',
@@ -59,8 +60,8 @@ async function canWriteDirectory(directory) {
   } catch {
     return false;
   } finally {
-    if (handle) await handle.close().catch(() => {});
-    await fs.unlink(probe).catch(() => {});
+    if (handle) await handle.close().catch(() => logger.warn('[READINESS] codigo=PROBE_HANDLE_FECHAR_FALHOU'));
+    await fs.unlink(probe).catch(() => logger.warn('[READINESS] codigo=PROBE_ARQUIVO_REMOVER_FALHOU'));
   }
 }
 
