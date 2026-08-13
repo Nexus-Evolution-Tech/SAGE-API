@@ -7,7 +7,7 @@ const { promisify } = require('util');
 const { configConexao, temBancoDisponivel } = require('./helpers/banco');
 
 const execFileAsync = promisify(execFile);
-const database = `sage_verif_onboarding_http_${process.pid}`;
+const database = `sage_verif_onboarding_http_${process.pid}_teste`;
 process.env.DB_NAME = database;
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');

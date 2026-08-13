@@ -6,6 +6,7 @@ module.exports = defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.js'],
+    setupFiles: ['test/setup.js'],
     // Os testes do simulador sobem servidores HTTP em porta efêmera; nada de banco ainda.
     testTimeout: 20000,
     hookTimeout: 20000,
