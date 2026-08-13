@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const logger = require('../config/logger');
 
 // ==============================
 // Normalização de dia da semana
@@ -117,8 +118,6 @@ const horarioAulaController = {
     try {
       const { turmaId, diaSemana, divisao } = req.query;
 
-      console.log('📋 GET /horarios-aulas - Query params:', { turmaId, diaSemana, divisao });
-
       let sql = `
         SELECT
           ha.id,
@@ -168,11 +167,6 @@ const horarioAulaController = {
 
       const [rows] = await db.query(sql, params);
 
-      console.log('📋 Total de horários retornados:', rows.length);
-      if (rows.length > 0) {
-        console.log('📋 Primeiro horário (RAW do DB):', rows[0]);
-      }
-
       const response = rows.map(r => {
         return {
           id: r.id,
@@ -187,15 +181,10 @@ const horarioAulaController = {
         };
       });
 
-      console.log('📋 Resposta transformada:', response.length, 'itens');
-      if (response.length > 0) {
-        console.log('📋 Primeiro após transformação:', response[0]);
-      }
-
       res.json(response);
 
     } catch (err) {
-      console.error('Erro ao listar horários:', err);
+      logger.error('[HORARIO] codigo=HORARIO_LISTAR_FALHOU');
       res.status(500).json({ message: 'Erro ao listar horários' });
     }
   },
@@ -206,15 +195,6 @@ const horarioAulaController = {
   async criar(req, res) {
     try {
       const { turmaId, aulaId, diaSemana, horario, divisao, salaId } = req.body;
-
-      console.log('📝 POST /horarios-aulas - Payload recebido:', {
-        turmaId,
-        aulaId,
-        diaSemana,
-        horario,
-        divisao,
-        salaId
-      });
 
       // Validações básicas
       if (!turmaId || !aulaId || !diaSemana || !horario) {
@@ -254,7 +234,6 @@ const horarioAulaController = {
       // Validar duplicata (mesma turma, dia, horário, divisão)
       const ehDuplicada = await validarDuplicadaTurma(turmaId, diaDb, horario, divNorm);
       if (ehDuplicada) {
-        console.log('❌ ERRO 409: Duplicata encontrada', { turmaId, diaDb, horario, divNorm });
         return res.status(409).json({
           message: 'Já existe aula neste horário e divisão para esta turma'
         });
@@ -276,7 +255,6 @@ const horarioAulaController = {
             turmaConflito: c.turma_nome || `Turma ${c.turma_id}`
           }
         }));
-        console.log('❌ ERRO 409: Conflito de professor', { professorId, diaDb, horario });
         return res.status(409).json({
           message: 'Professor já possui aula neste horário e dia',
           conflicts
@@ -291,7 +269,6 @@ const horarioAulaController = {
         divNorm
       );
       if (temConflitSala) {
-        console.log('❌ ERRO 409: Conflito de sala', { salaFinal, diaDb, horario, divNorm });
         return res.status(409).json({
           message: 'Conflito: sala já está em uso neste horário e divisão'
         });
@@ -308,20 +285,11 @@ const horarioAulaController = {
       );
 
       if (!result || !result.insertId) {
-        console.error('❌ INSERT falhou:', { affectedRows: result?.affectedRows, insertId: result?.insertId });
+        logger.error('[HORARIO] codigo=HORARIO_CRIAR_SEM_ID');
         return res.status(500).json({
           message: 'Erro ao inserir horário no banco de dados'
         });
       }
-
-      console.log('✅ Horário criado com sucesso:', { 
-        id: result.insertId, 
-        turmaId, 
-        aulaId, 
-        dia: diaDb, 
-        horario, 
-        divisao: divNorm 
-      });
 
       res.status(201).json({
         id: result.insertId,
@@ -329,9 +297,8 @@ const horarioAulaController = {
       });
 
     } catch (err) {
-      console.error('❌ ERRO ao criar horário:', err.message);
-      console.error('Stack:', err.stack);
-      res.status(500).json({ message: 'Erro ao criar horário: ' + err.message });
+      logger.error('[HORARIO] codigo=HORARIO_CRIAR_FALHOU');
+      res.status(500).json({ message: 'Erro ao criar horário' });
     }
   },
 
@@ -454,7 +421,7 @@ const horarioAulaController = {
       res.json({ message: 'Horário atualizado com sucesso' });
 
     } catch (err) {
-      console.error('Erro ao editar horário:', err);
+      logger.error('[HORARIO] codigo=HORARIO_EDITAR_FALHOU');
       res.status(500).json({ message: 'Erro ao editar horário' });
     }
   },
@@ -530,7 +497,7 @@ const horarioAulaController = {
 
       res.json({ valid: true });
     } catch (err) {
-      console.error('Erro ao validar horário:', err);
+      logger.error('[HORARIO] codigo=HORARIO_VALIDAR_FALHOU');
       res.status(500).json({ message: 'Erro ao validar horário' });
     }
   },
@@ -555,7 +522,7 @@ const horarioAulaController = {
       res.status(204).send();
 
     } catch (err) {
-      console.error('Erro ao deletar horário:', err);
+      logger.error('[HORARIO] codigo=HORARIO_DELETAR_FALHOU');
       res.status(500).json({ message: 'Erro ao deletar horário' });
     }
   }

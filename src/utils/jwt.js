@@ -1,8 +1,5 @@
-console.log('[BOOT-JWT] require start');
 const jwt = require('jsonwebtoken');
-console.log('[BOOT-JWT] jsonwebtoken loaded');
 const logger = require('../config/logger');
-console.log('[BOOT-JWT] logger loaded');
 
 const SECRET = process.env.JWT_SECRET;
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
@@ -11,7 +8,6 @@ if (!SECRET) {
   logger.error('JWT_SECRET não configurado no .env!');
   throw new Error('JWT_SECRET é obrigatório');
 }
-console.log('[BOOT-JWT] secret ok');
 
 function gerarToken(payload) {
   try {

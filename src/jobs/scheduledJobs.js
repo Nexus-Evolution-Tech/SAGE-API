@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { config } = require('../config/env');
 const logger = require('../config/logger');
 const deviceService = require('../services/deviceService');
 const promocaoAlunosService = require('../services/promocaoAlunosService');
@@ -11,7 +12,7 @@ const listarTodos = async () => {
   return result;
 };
 
-const CATRACA_SYNC_ENABLED = (process.env.CATRACA_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
+const CATRACA_SYNC_ENABLED = config.jobs.catracaSyncEnabled;
 
 // Job de sincronização de acessos (a cada 10 min — backup)
 const sincronizarAcessosJob = () => {
@@ -36,7 +37,7 @@ const sincronizarAcessosJob = () => {
 
 // Polling de acessos para monitoramento em tempo quase real (igual ao software oficial Control iD)
 // O servidor consulta as catracas periodicamente; não precisa da catraca enviar POST nem abrir firewall.
-const MONITOR_POLLING_INTERVAL_MS = parseInt(process.env.MONITOR_POLLING_INTERVAL_MS || '20000', 10); // 20 s
+const MONITOR_POLLING_INTERVAL_MS = config.jobs.monitorPollingIntervalMs;
 
 // Polling leve: só últimos N logs por dispositivo (não puxa histórico pesado). Monitoramento continua para todos.
 const pollingMonitoramentoJob = () => {
@@ -55,7 +56,7 @@ const pollingMonitoramentoJob = () => {
 // Job de health check das catracas
 const healthCheckCatracasJob = () => {
   if (!CATRACA_SYNC_ENABLED) return null;
-  const intervalMs = parseInt(process.env.HEALTH_CHECK_INTERVAL || '60000'); // 1 min
+  const intervalMs = config.jobs.healthCheckIntervalMs;
 
   return setInterval(async () => {
     try {
@@ -94,7 +95,7 @@ const healthCheckCatracasJob = () => {
 // Job de sincronizações pendentes
 const verificarSyncPendentesJob = () => {
   if (!CATRACA_SYNC_ENABLED) return null;
-  const cronExpression = process.env.SYNC_CHECK_INTERVAL || '*/1 * * * *';
+  const cronExpression = config.jobs.syncCheckInterval;
 
   return cron.schedule(cronExpression, async () => {
     if (!CATRACA_SYNC_ENABLED) return;
@@ -102,8 +103,8 @@ const verificarSyncPendentesJob = () => {
 
     try {
       const [pendentesResult] = await db.query(
-        'SELECT * FROM sync_pendente ORDER BY data_tentativa ASC LIMIT ?',
-        [parseInt(process.env.SYNC_BATCH_SIZE || '50')]
+        'SELECT * FROM sync_pendente ORDER BY last_attempt ASC, id ASC LIMIT ?',
+        [config.jobs.syncBatchSize]
       );
       const pendentes = pendentesResult;
 
@@ -162,22 +163,31 @@ const verificarSyncPendentesJob = () => {
             continue;
           }
 
-          const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [registro.pessoa_id]);
-          const pessoa = pessoaResult?.[0];
-          if (!pessoa) {
-            await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
-            continue;
+          let resultadosRemotos;
+          if (registro.operation === 'DELETE') {
+            resultadosRemotos = await controlIdService.deletarPessoaDasCatracas(
+              registro.pessoa_id, { dispositivoId: registro.dispositivo_id }
+            );
+          } else {
+            const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [registro.pessoa_id]);
+            const pessoa = pessoaResult?.[0];
+            if (!pessoa) {
+              await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
+              continue;
+            }
+
+            if (registro.operation === 'CREATE') {
+              resultadosRemotos = await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
+            } else if (registro.operation === 'UPDATE') {
+              resultadosRemotos = await controlIdService.editarPessoaNasCatracas(
+                pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qr_code,
+                { dispositivoId: registro.dispositivo_id }
+              );
+            }
           }
 
-          if (registro.operation === 'CREATE') {
-            await controlIdService.criarNovaPessoaNasCatracas(pessoa, { dispositivoId: registro.dispositivo_id });
-          } else if (registro.operation === 'UPDATE') {
-            await controlIdService.editarPessoaNasCatracas(
-              pessoa.id, pessoa.nome, pessoa.cartao_rfid, pessoa.qr_code,
-              { dispositivoId: registro.dispositivo_id }
-            );
-          } else if (registro.operation === 'DELETE') {
-            await controlIdService.deletarPessoaDasCatracas(pessoa.id, { dispositivoId: registro.dispositivo_id });
+          if (!Array.isArray(resultadosRemotos) || resultadosRemotos.some((resultado) => !resultado?.sucesso)) {
+            throw new Error('Operação remota sem confirmação válida');
           }
 
           await db.query('DELETE FROM sync_pendente WHERE id = ?', [registro.id]);
@@ -202,9 +212,9 @@ const verificarSyncPendentesJob = () => {
 // Verifica se o ano mudou desde a última execução; se sim, roda a promoção.
 // Não depende de estar ligado em 1º de janeiro: ao subir em qualquer dia, executa se necessário.
 // Usa RM (ano matrícula) ou created_at para elegibilidade: anos_na_escola >= 1
-// Padrão: 08:10 (PC desligado à meia-noite). PROMOCAO_CRON= ou false = desabilita o job
+// Opt-in: PROMOCAO_CRON recebe uma expressão; ausente, vazio ou false desabilita o job.
 const promocaoAlunosJob = () => {
-  const cronVal = (process.env.PROMOCAO_CRON || '').trim();
+  const cronVal = config.jobs.promocaoCron;
   if (!cronVal || cronVal === 'false' || cronVal === '0') {
     return null;
   }
@@ -246,7 +256,7 @@ const promocaoAlunosJob = () => {
 // Cron puro perderia silenciosamente todo dia em que a máquina estivesse off.
 // ─────────────────────────────────────────────────────────────────────────────
 const backupBancoJob = () => {
-  const cronVal = (process.env.BACKUP_CRON || '0 3 * * *').trim();
+  const cronVal = config.jobs.backupCron;
   if (!cronVal || cronVal.toLowerCase() === 'false') {
     logger.warn('[BACKUP] Job desabilitado (BACKUP_CRON vazio ou false)');
     return null;
@@ -305,7 +315,7 @@ const iniciarJobs = () => {
     logger.info(`[MONITOR] Polling de acessos a cada ${MONITOR_POLLING_INTERVAL_MS / 1000}s (tempo quase real)`);
   }
   if (jobs.promocaoAlunos) {
-    logger.info(`[PROMOÇÃO] Verificação diária em: ${process.env.PROMOCAO_CRON || '10 8 * * *'} (PROMOCAO_CRON no .env)`);
+    logger.info(`[PROMOÇÃO] Verificação diária em: ${config.jobs.promocaoCron} (PROMOCAO_CRON no .env)`);
   }
   return jobs;
 };

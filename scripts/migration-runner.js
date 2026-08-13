@@ -65,6 +65,31 @@ function lockNameForSchema(schemaName) {
   return `${LOCK_PREFIX}${digest}`;
 }
 
+async function executableMigrationSql(connection, sql) {
+  const optionalColumns = [...sql.matchAll(
+    /ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+`?([a-z0-9_]+)`?/gi
+  )];
+  if (!optionalColumns.length) return sql;
+  const table = /ALTER\s+TABLE\s+`?([a-z0-9_]+)`?/i.exec(sql)?.[1];
+  if (!table) return sql.replace(/ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/gi, 'ADD COLUMN');
+  const existingRows = rowsOf(await connection.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [table]
+  )) || [];
+  const existing = new Set(existingRows.map(({ COLUMN_NAME }) => COLUMN_NAME.toLowerCase()));
+  const prefix = sql.match(/^\s*ALTER\s+TABLE\s+`?[a-z0-9_]+`?/i)?.[0];
+  const body = sql.slice(prefix.length).replace(/;\s*$/, '');
+  const clauses = body.split(/,\s*(?=ADD\s+COLUMN)/i).filter((clause) => {
+    const column = /ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+`?([a-z0-9_]+)`?/i.exec(clause)?.[1];
+    return !column || !existing.has(column.toLowerCase());
+  });
+  if (!clauses.length) return 'DO 0';
+  return `${prefix}\n${clauses.join(',\n')};`.replace(
+    /ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/gi, 'ADD COLUMN'
+  );
+}
+
 async function runMigrations({ connection, appVersion, migrationsDir }) {
   if (!connection || typeof connection.query !== 'function') {
     throw new TypeError('connection deve ser uma conexão mysql2 aberta');
@@ -144,7 +169,10 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
           [migration.version, migration.checksum, appVersion, 'in_progress']
         );
         inProgress = true;
-        await connection.query(migration.sql);
+        // O ledger garante execução única. Removemos apenas a extensão ausente no MySQL 8.4;
+        // o arquivo permanece imutável e seu checksum continua sendo o registrado.
+        const executableSql = await executableMigrationSql(connection, migration.sql);
+        await connection.query(executableSql);
         const transactionProbe = rowsOf(await connection.query('DO 0'));
         const serverStatus = Number(transactionProbe?.serverStatus);
         if (!Number.isSafeInteger(serverStatus)) {

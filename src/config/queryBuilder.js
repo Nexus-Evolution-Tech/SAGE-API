@@ -3,11 +3,8 @@
  * Oferece interface similar ao Knex mas usa mysql2 por baixo
  */
 
-console.log('[BOOT-QB] carregando database...');
 const db = require('./database');
-console.log('[BOOT-QB] database carregado');
 const logger = require('./logger');
-console.log('[BOOT-QB] logger carregado');
 
 class QueryBuilder {
   constructor(table = null) {

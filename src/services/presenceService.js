@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const logger = require('../config/logger');
 
 // Converte "HH:mm" para minutos
 function horaParaMinutos(horaStr) {
@@ -48,10 +49,10 @@ function dataEDiaBrasil(date) {
   return { dataStr: str, diaSemana: diasSemanaEnum[diaLocal] };
 }
 
-async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
+async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso, executor = db) {
   if (!pessoa_id || !dataHoraAcesso) return;
 
-  const [pessoas] = await db.query('SELECT id, tipo FROM Pessoa WHERE id = ?', [pessoa_id]);
+  const [pessoas] = await executor.query('SELECT id, tipo FROM Pessoa WHERE id = ?', [pessoa_id]);
   const pessoa = pessoas[0];
   if (!pessoa) return;
 
@@ -65,7 +66,7 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
   // BUSCA AULAS/HORÁRIO DO DIA
   if (['ADMINISTRADOR', 'TERCEIRIZADO'].includes(pessoa.tipo)) {
     try {
-      const [horarios] = await db.query(
+      const [horarios] = await executor.query(
         `SELECT dia_semana, hora_entrada, hora_saida FROM FuncionarioHorario WHERE funcionario_id = ? AND dia_semana = ?`,
         [pessoa.id, diaSemana]
       );
@@ -80,11 +81,11 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
       if (!e.message || !e.message.includes("doesn't exist")) throw e;
     }
   } else if (pessoa.tipo === 'ALUNO') {
-    const [alunos] = await db.query('SELECT turma_id, divisao FROM Aluno WHERE id = ?', [pessoa.id]);
+    const [alunos] = await executor.query('SELECT turma_id, divisao FROM Aluno WHERE id = ?', [pessoa.id]);
     const aluno = alunos[0];
     if (!aluno || !aluno.turma_id) return;
 
-    const [horarios] = await db.query(`
+    const [horarios] = await executor.query(`
       SELECT ha.horario
       FROM HorarioAula ha
       JOIN Aula a ON ha.aula_id = a.id
@@ -99,13 +100,13 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
   } else if (['PROFESSOR','PROFADM'].includes(pessoa.tipo)) {
     let usarHorarioFixo = false;
     try {
-      const [profRow] = await db.query('SELECT usar_horario_fixo FROM Professor WHERE id = ?', [pessoa.id]);
+      const [profRow] = await executor.query('SELECT usar_horario_fixo FROM Professor WHERE id = ?', [pessoa.id]);
       usarHorarioFixo = !!(profRow && profRow[0] && profRow[0].usar_horario_fixo);
-    } catch (e) { /* coluna pode não existir */ }
+    } catch (e) { logger.debug('[PRESENCA] codigo=CAMPO_HORARIO_FIXO_INDISPONIVEL'); }
 
     if (usarHorarioFixo) {
       try {
-        const [horarios] = await db.query(
+        const [horarios] = await executor.query(
           `SELECT hora_entrada, hora_saida FROM FuncionarioHorario WHERE funcionario_id = ? AND dia_semana = ?`,
           [pessoa.id, diaSemana]
         );
@@ -120,7 +121,7 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
         if (!e.message || !e.message.includes("doesn't exist")) throw e;
       }
     } else {
-      const [horarios] = await db.query(`
+      const [horarios] = await executor.query(`
         SELECT ha.horario
         FROM HorarioAula ha
         JOIN Aula a ON ha.aula_id = a.id
@@ -149,11 +150,11 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
   const horarioPrevistoSql = entradaPrevista ? formatarHoraParaSQL(entradaPrevista) : null;
   const horarioChegadaSql = formatarHoraParaSQL(horarioChegada);
 
-  const [registros] = await db.query('SELECT id FROM Presenca WHERE pessoa_id = ? AND data = ?', [pessoa_id, dataAcesso]);
+  const [registros] = await executor.query('SELECT id FROM Presenca WHERE pessoa_id = ? AND data = ?', [pessoa_id, dataAcesso]);
   const registroExistente = registros[0];
 
   if (!registroExistente) {
-    await db.query(`
+    await executor.query(`
       INSERT INTO Presenca
       (pessoa_id, data, dia_semana, aulas_perdidas, horario_previsto, horario_chegada, atrasado)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -167,7 +168,7 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso) {
       atrasado
     ]);
   } else {
-    await db.query(`
+    await executor.query(`
       UPDATE Presenca
       SET dia_semana = ?, aulas_perdidas = ?, horario_previsto = ?, horario_chegada = ?, atrasado = ?
       WHERE id = ?

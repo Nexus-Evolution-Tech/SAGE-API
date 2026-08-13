@@ -79,12 +79,12 @@ const bootstrapInitialize = async (req, res) => {
     await connection.commit();
     return res.status(201).json({ initialized: true, recoveryKey: chaveRecuperacao });
   } catch (error) {
-    await connection.rollback().catch(() => {});
-    logger.error(`Erro no onboarding inicial: ${error.message}`);
+    await connection.rollback().catch(() => logger.warn('[ONBOARDING] codigo=ROLLBACK_FALHOU'));
+    logger.error('[ONBOARDING] codigo=ONBOARDING_INICIAL_FALHOU');
     return res.status(500).json({ message: 'Não foi possível concluir a configuração inicial' });
   } finally {
     if (lockAcquired) {
-      await connection.query("SELECT RELEASE_LOCK('sage_first_run_onboarding')").catch(() => {});
+      await connection.query("SELECT RELEASE_LOCK('sage_first_run_onboarding')").catch(() => logger.warn('[ONBOARDING] codigo=LOCK_RELEASE_FALHOU'));
     }
     connection.release();
   }
@@ -134,8 +134,8 @@ const recuperarAcesso = async (req, res) => {
     await connection.commit();
     return res.json({ message: 'Senha alterada com sucesso.', recoveryKey: novaChave });
   } catch (error) {
-    await connection.rollback().catch(() => {});
-    logger.error(`Erro na recuperação local: ${error.message}`);
+    await connection.rollback().catch(() => logger.warn('[RECUPERACAO] codigo=ROLLBACK_FALHOU'));
+    logger.error('[RECUPERACAO] codigo=RECUPERACAO_LOCAL_FALHOU');
     return res.status(500).json({ message: 'Não foi possível recuperar o acesso.' });
   } finally {
     connection.release();

@@ -149,18 +149,23 @@ describe('PR #3 — ingestão idempotente pelo id do log da catraca', () => {
       device_id: 9001
     };
     definirLogs([logMonitor]);
-    const queryAntesDaCorrida = db.query;
+    const getConnectionAntesDaCorrida = db.getConnection;
     let insertsAguardando = 0;
     let liberarInserts;
     const barreira = new Promise((resolve) => { liberarInserts = resolve; });
     const timeoutBarreira = setTimeout(liberarInserts, 2000);
-    db.query = function (sql, ...args) {
-      if (String(sql).includes('INSERT INTO Acesso') && String(sql).includes('catraca_log_id')) {
-        insertsAguardando++;
-        if (insertsAguardando === 2) liberarInserts();
-        return barreira.then(() => queryAntesDaCorrida.call(db, sql, ...args));
-      }
-      return queryAntesDaCorrida.call(db, sql, ...args);
+    db.getConnection = async function () {
+      const conexao = await getConnectionAntesDaCorrida.call(db);
+      const queryAntesDaCorrida = conexao.query.bind(conexao);
+      conexao.query = function (sql, ...args) {
+        if (String(sql).includes('INSERT INTO Acesso') && String(sql).includes('catraca_log_id')) {
+          insertsAguardando++;
+          if (insertsAguardando === 2) liberarInserts();
+          return barreira.then(() => queryAntesDaCorrida(sql, ...args));
+        }
+        return queryAntesDaCorrida(sql, ...args);
+      };
+      return conexao;
     };
     let viaMonitor;
     let viaPolling;
@@ -174,7 +179,7 @@ describe('PR #3 — ingestão idempotente pelo id do log da catraca', () => {
       ]);
     } finally {
       clearTimeout(timeoutBarreira);
-      db.query = queryAntesDaCorrida;
+      db.getConnection = getConnectionAntesDaCorrida;
     }
     expect(insertsAguardando).toBe(2);
     expect(viaMonitor.erros).toEqual([]);

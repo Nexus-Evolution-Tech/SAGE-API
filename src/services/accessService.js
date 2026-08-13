@@ -89,9 +89,10 @@ async function inserirAcessoDaCatraca({
   status,
   permitido,
   metodo_auth,
-  data_hora
+  data_hora,
+  executor = db
 }) {
-  const [resultado] = await db.query(
+  const [resultado] = await executor.query(
     `INSERT INTO Acesso
        (pessoa_id, dispositivo_id, catraca_log_id, status, permitido, metodo_auth, data_hora, updated_at)
      SELECT ?, ?, ?, ?, ?, ?, ?, ?
@@ -116,6 +117,22 @@ async function inserirAcessoDaCatraca({
   );
 
   return resultado.insertId > 0;
+}
+
+async function inserirAcessoComPresenca(dados, dataHoraAcesso) {
+  const conexao = await db.getConnection();
+  try {
+    await conexao.beginTransaction();
+    const inserido = await inserirAcessoDaCatraca({ ...dados, executor: conexao });
+    if (inserido) await verificarEAtribuirPresenca(dados.pessoa_id, dataHoraAcesso, conexao);
+    await conexao.commit();
+    return inserido;
+  } catch (erro) {
+    await conexao.rollback().catch((rollbackErro) => logger.error(`[ACCESS] Falha no rollback: ${rollbackErro.message}`));
+    throw erro;
+  } finally {
+    conexao.release();
+  }
 }
 
 // Calcula idade
@@ -340,7 +357,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
     const metodo_auth = mapearMetodo(log.card_value);
     const permitido = true;
 
-    const inserido = await inserirAcessoDaCatraca({
+    const inserido = await inserirAcessoComPresenca({
       pessoa_id,
       dispositivo_id,
       catraca_log_id: catracaLogId,
@@ -348,7 +365,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
       permitido,
       metodo_auth,
       data_hora: data_hora_utc
-    });
+    }, data_hora);
     if (!inserido) {
       ignoradosDuplicata++;
       continue;
@@ -386,15 +403,14 @@ async function sincronizarAcessos(dispositivo, options = {}) {
       });
       emitToRoom('stats', 'stats:update', globalState.getStats());
     } catch (e) {
-      // não falhar a sync por causa de WebSocket
+      logger.warn('[SYNC] codigo=WEBSOCKET_EMISSAO_FALHOU');
     }
 
-    await verificarEAtribuirPresenca(pessoa_id, data_hora);
     logger.debug(`[SYNC] Acesso registrado: ${pessoa.nome} (pessoa_id=${pessoa_id}) em ${dispositivo.nome}`);
     // Invalidar cache logo após inserir para F5 na tela de monitoramento mostrar o novo acesso
     try {
       await invalidateMultiple([CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=CACHE_INVALIDACAO_FALHOU'); }
   }
 
   logger.info(
@@ -426,7 +442,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
   if (acessosSincronizados > 0) {
     try {
       await cacheMutation(() => {}, [CACHE_KEYS.INVALIDATE_ACESSOS, CACHE_KEYS.ACESSOS_HOJE]);
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=CACHE_INVALIDACAO_FALHOU'); }
     logger.info(`[SYNC] ${dispositivo.nome}: ${acessosSincronizados} novo(s) acesso(s) inserido(s)`);
     try {
       emitNotification({
@@ -434,7 +450,7 @@ async function sincronizarAcessos(dispositivo, options = {}) {
         message: `${acessosSincronizados} acesso(s) sincronizado(s) para ${dispositivo.nome}.`,
         type: 'info',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[SYNC] codigo=NOTIFICACAO_EMISSAO_FALHOU'); }
   }
 
   return {
@@ -520,17 +536,25 @@ async function criarAcesso(dados) {
   permitido = true;
   let mensagem = `Acesso autorizado para ${pessoa.nome}`;
 
-  // Insere acesso
-  await db.query(
-    `INSERT INTO Acesso (pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [pessoa_id, dispositivo_id, status, permitido, metodo_auth, new Date(), new Date()]
-  );
-
-  const [acessoResult] = await db.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
-  const acesso = acessoResult[0];
-
-  return { message: mensagem, acesso };
+  const conexao = await db.getConnection();
+  try {
+    const agora = new Date();
+    await conexao.beginTransaction();
+    await conexao.query(
+      `INSERT INTO Acesso (pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [pessoa_id, dispositivo_id, status, permitido, metodo_auth, agora, agora]
+    );
+    const [acessoResult] = await conexao.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
+    await verificarEAtribuirPresenca(pessoa_id, agora, conexao);
+    await conexao.commit();
+    return { message: mensagem, acesso: acessoResult[0] };
+  } catch (erro) {
+    await conexao.rollback().catch((rollbackErro) => logger.error(`[ACCESS] Falha no rollback: ${rollbackErro.message}`));
+    throw erro;
+  } finally {
+    conexao.release();
+  }
 }
 
 /**
@@ -674,7 +698,7 @@ async function processarNotificacaoMonitorDao(payload) {
     }
 
     try {
-      const inserido = await inserirAcessoDaCatraca({
+      const inserido = await inserirAcessoComPresenca({
         pessoa_id: log.pessoa_id,
         dispositivo_id,
         catraca_log_id: log.catracaLogId,
@@ -682,7 +706,7 @@ async function processarNotificacaoMonitorDao(payload) {
         permitido: log.permitido,
         metodo_auth: log.metodo_auth,
         data_hora: log.data_hora_utc
-      });
+      }, log.data_hora);
       if (!inserido) {
         result.ignorados++;
         continue;
@@ -701,7 +725,6 @@ async function processarNotificacaoMonitorDao(payload) {
       });
       emitToRoom('stats', 'stats:update', globalState.getStats());
 
-      await verificarEAtribuirPresenca(log.pessoa_id, log.data_hora);
       logger.debug(`[MONITOR DAO] Acesso registrado: pessoa ${log.pessoa_id}, dispositivo ${dispositivo_id}`);
     } catch (err) {
       logger.error(`[MONITOR DAO] Erro ao inserir acesso: ${err.message}`);
@@ -717,7 +740,7 @@ async function processarNotificacaoMonitorDao(payload) {
         message: `${result.processados} acesso(s) registrado(s) via Monitor (catraca).`,
         type: 'info',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[MONITOR] codigo=POS_PROCESSAMENTO_FALHOU'); }
   }
   if (tentativasNegadas > 0) {
     try {
@@ -726,7 +749,7 @@ async function processarNotificacaoMonitorDao(payload) {
         message: `${tentativasNegadas} tentativa(s) de acesso com identificação não cadastrada.`,
         type: 'warning',
       });
-    } catch (e) { /* ignorar */ }
+    } catch (e) { logger.warn('[MONITOR] codigo=NOTIFICACAO_EMISSAO_FALHOU'); }
   }
 
   return result;

@@ -8,7 +8,33 @@ on:
     branches: [main, integration, 'f*/**']
   pull_request:
 
+env:
+  # Trocar para main quando a branch temporária do frontend for integrada.
+  FRONTEND_REF: wip/recuperacao-local-pre-auditoria
+
 jobs:
+  caminhos:
+    runs-on: ubuntu-latest
+    outputs:
+      instalador: ${{ steps.filtro.outputs.instalador || steps.push_main.outputs.instalador }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - id: filtro
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "$GITHUB_SHA" |
+            grep -Eq '^(installer/|\.github/workflows/)'; then
+            echo "instalador=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "instalador=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: push_main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo "instalador=true" >> "$GITHUB_OUTPUT"
+
   teste:
     runs-on: ubuntu-latest
 
@@ -58,6 +84,12 @@ jobs:
           done
           exit $falhou
 
+      - name: Bloquear consoles e catches vazios em src
+        run: npm run lint:src
+
+      - name: Bloquear DDL destrutivo fora do ledger
+        run: node scripts/check-expand-only-migrations.js
+
       - name: Preparar banco descartável
         run: npm run test:db:setup
 
@@ -99,3 +131,67 @@ jobs:
             exit 1
           fi
           echo "ok: instalador terminou com $rc"
+
+  instalador:
+    needs: caminhos
+    if: needs.caminhos.outputs.instalador == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@v4
+        with:
+          path: api
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: Nexus-Evolution-Tech/SAGE
+          ref: ${{ env.FRONTEND_REF }}
+          path: web
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Baixar e verificar Inno Setup 6.7.3
+        shell: powershell
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $esperado = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $arquivo = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $url -OutFile $arquivo
+          $obtido = (Get-FileHash -LiteralPath $arquivo -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($obtido -ne $esperado) { throw "SHA-256 do Inno Setup diverge: $obtido" }
+          $processo = Start-Process -FilePath $arquivo -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -PassThru
+          if ($processo.ExitCode -ne 0) { throw "Instalador do Inno Setup falhou com exit $($processo.ExitCode)" }
+
+      - name: Montar layout interno
+        shell: powershell
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'api'
+          $web = Join-Path $env:GITHUB_WORKSPACE 'web'
+          $work = Join-Path $env:RUNNER_TEMP 'sage-build'
+          $layout = Join-Path $env:RUNNER_TEMP 'sage-layout'
+          & (Join-Path $api 'installer\windows\build-release.ps1') `
+            -ApiRepository $api -WebRepository $web `
+            -WorkDirectory $work -OutputDirectory $layout
+          if ($LASTEXITCODE -ne 0) { throw 'build-release.ps1 falhou' }
+
+      - name: Compilar instalador Inno Setup
+        shell: powershell
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'api'
+          $layout = Join-Path $env:RUNNER_TEMP 'sage-layout'
+          $output = Join-Path $env:RUNNER_TEMP 'sage-installer'
+          & (Join-Path $api 'installer\windows\build-installer.ps1') `
+            -LayoutDirectory $layout -OutputDirectory $output
+          if ($LASTEXITCODE -ne 0) { throw 'build-installer.ps1 falhou' }
+          if (-not (Get-ChildItem -LiteralPath $output -Filter '*.exe' -File)) {
+            throw 'Nenhum instalador .exe foi produzido'
+          }

@@ -319,6 +319,16 @@ async function createCatracaSimulator(opcoes = {}) {
         case '/create_objects.fcgi':
           tratarCreateObjects(corpo, alvo);
           break;
+        case '/create_or_update_objects.fcgi': {
+          const valores = Array.isArray(corpo.values) ? corpo.values : [];
+          for (const valor of valores) {
+            if (valor.id != null && store.existeId(corpo.object, valor.id)) {
+              store.modificar(corpo.object, { [corpo.object]: { id: valor.id } }, valor);
+            } else store.inserir(corpo.object, valor);
+          }
+          jsonBody(alvo, 200, { changes: valores.length });
+          break;
+        }
         case '/modify_objects.fcgi':
           tratarModifyObjects(corpo, alvo);
           break;

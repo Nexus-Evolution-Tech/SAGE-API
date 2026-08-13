@@ -17,6 +17,7 @@ const {
 } = require('../utils/people-db-utils');
 const { hashSenha } = require('../utils/criptografia');
 const db = require('../config/database');
+const logger = require('../config/logger');
 const path = require('path');
 const fs = require('fs');
 const { paths } = require('../config/paths');
@@ -65,7 +66,6 @@ async function criarPessoaCompleta(dados) {
   });
 
   if (idExistente) {
-    console.log(`Pessoa encontrada (ID: ${idExistente}). Atualizando dados...`);
     
     // Chamamos sua função de atualização enviando todos os dados recebidos
     await atualizarPessoaCompleta(idExistente, {
@@ -223,6 +223,7 @@ async function uploadFotoPessoa(req, res) {
         fs.unlinkSync(arquivoTemp);
       }
     } catch (cleanupError) {
+      logger.warn('[PESSOA-FOTO] codigo=ARQUIVO_TEMPORARIO_NAO_REMOVIDO');
     }
     
     res.status(500).json({ message: 'Erro ao salvar a foto da pessoa' });
