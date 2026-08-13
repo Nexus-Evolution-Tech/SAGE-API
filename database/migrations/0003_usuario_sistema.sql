@@ -19,7 +19,11 @@ INSERT INTO Usuario
   (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
 SELECT u.login, u.senha, LEFT(COALESCE(NULLIF(u.nome, ''), u.login), 100),
        'ADMINISTRADOR', TRUE, TRUE
-  FROM UnidadeEscolar u
+ FROM UnidadeEscolar u
  WHERE u.login IS NOT NULL
    AND u.senha IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM Usuario novo WHERE novo.login = u.login);
+   AND NOT EXISTS (
+     SELECT 1
+       FROM Usuario novo
+      WHERE novo.login COLLATE utf8mb4_unicode_ci = u.login COLLATE utf8mb4_unicode_ci
+   );
