@@ -7,6 +7,7 @@ const { compararContagens } = require('../scripts/renomear-bd-para-antigo');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const raiz = path.join(__dirname, '..');
 
 async function comFakes(fakes, executar) {
   const anteriores = fakes.map(([nome, exports]) => { const r = require.resolve(nome); const a = require.cache[r]; require.cache[r] = { id: r, filename: r, loaded: true, exports }; return [r, a]; });
@@ -89,5 +90,11 @@ describe('R0-05 — backup e destruição', () => {
       device.zerarTudoNaCatraca = async () => ({ ok: true }); db.getConnection = async () => { throw new Error('conexão falhou'); }; res = resposta(); await controller.comecarDoZero({ params: { id: '1' }, body: { confirmacao: 'APAGAR TUDO' }, user: { id: 7 } }, res); expect(restores).toBe(3);
       const boa = { ...conexao, query: async () => [{ affectedRows: 0 }] }; db.getConnection = async () => boa; device.zerarTudoNaCatraca = async () => ({ ok: true, summary: { users: 1 } }); res = resposta(); await controller.comecarDoZero({ params: { id: '1' }, body: { confirmacao: 'APAGAR TUDO' }, user: { id: 7 } }, res); expect(commits).toBe(1); expect(rollbacks).toBe(1); expect(restores).toBe(3); expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ catraca: { users: 1 } }));
     });
+  });
+
+  it('SEV1: não expõe destruição global sem dispositivo explícito', () => {
+    const rotas = fs.readFileSync(path.join(raiz, 'src/routes/deviceRoutes.js'), 'utf8');
+    expect(rotas).not.toMatch(/delete\(['"]\/dispositivos['"]\)/);
+    expect(fs.readFileSync(path.join(raiz, 'src/controllers/deviceController.js'), 'utf8')).not.toContain('limparUsuariosPorPrefixo11');
   });
 });

@@ -9,7 +9,6 @@ const { cacheMutation } = require('../cache/helpers');
 const logger = require('../config/logger');
 const { emitNotification } = require('../services/notificationService');
 const { isSyncEnabled } = require('../utils/syncFlags');
-const { limparUsuariosPorPrefixo11 } = require('../utils/controlId-utils');
 const globalState = require('../state/globalState');
 const catracaImportService = require('../services/catracaImportService');
 const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
@@ -739,18 +738,6 @@ async function criar(req, res) {
   }
 }
 
-async function limparUsuarios(req, res){
-  try {
-    await limparUsuariosPorPrefixo11();
-    res.status(204).json({
-      message: 'Usuários removidos com sucesso',
-    });
-  } catch (error) {
-    logger.error(`Erro ao remover usuários: ${error.message}`);
-    res.status(500).json({ message: 'Erro ao remover usuários', error: error.message });
-  }
-}
-
 module.exports = {
   ...controllerGenerico,
   criar,
@@ -771,7 +758,6 @@ module.exports = {
   configurarMonitor,
   toggleSync,
   diagnosticoAcessos,
-  limparUsuarios,
   async discover(req, res) {
     try {
       const { cidr, ports, timeout, concurrency } = req.query;
