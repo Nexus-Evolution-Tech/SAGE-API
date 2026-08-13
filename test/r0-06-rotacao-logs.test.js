@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-async function esperar(condicao, limiteMs = 1000) {
+async function esperar(condicao, limiteMs = 5000) {
   const fim = Date.now() + limiteMs;
   while (Date.now() < fim) {
     if (condicao()) return;
