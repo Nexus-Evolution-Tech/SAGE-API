@@ -20,17 +20,19 @@ router.post('/api/notifications/dao', monitorCallbackAuth, async (req, res) => {
     const accessLogs = changes.filter((c) => c.object === 'access_logs' && c.type === 'inserted');
     logger.info(`[MONITOR DAO] POST recebido: device_id=${deviceId}, ${accessLogs.length} acesso(s) em object_changes`);
     const resultado = await processarNotificacaoMonitorDao(payload);
+    if (resultado.erros.length > 0) {
+      logger.warn(`[MONITOR DAO] Processamento incompleto: ${resultado.erros.length} erro(s)`);
+      return res.status(502).json({ ok: false, ...resultado });
+    }
     if (resultado.processados > 0) {
       logger.info(`[MONITOR DAO] ${resultado.processados} acesso(s) registrado(s), ${resultado.ignorados} ignorado(s)`);
-    } else if (resultado.erros.length > 0) {
-      logger.warn(`[MONITOR DAO] Nenhum acesso registrado: ${resultado.erros.join('; ')}`);
     } else {
       logger.debug(`[MONITOR DAO] Processados: ${resultado.processados}, ignorados: ${resultado.ignorados}`);
     }
-    res.status(200).json({ ok: true, ...resultado });
+    return res.status(200).json({ ok: true, ...resultado });
   } catch (error) {
     logger.error(`[MONITOR DAO] Erro ao processar notificação: ${error.message}`);
-    res.status(200).json({ ok: false, error: error.message });
+    return res.status(500).json({ ok: false, error: 'Falha ao processar notificação' });
   }
 });
 

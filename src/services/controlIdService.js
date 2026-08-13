@@ -176,11 +176,11 @@ const processarEdicaoDispositivo = async (dispositivo, id, nome, cartao_rfid, qr
       `Update parcial em ${dispositivo.nome}: ${error.message}`
     );
 
-    // UPDATE aplicado parcialmente = sucesso
+    // Sem confirmação de todas as etapas, a outbox precisa reter a operação para retry.
     return {
       dispositivo: dispositivo.nome,
-      sucesso: true,
-      aviso: 'Update parcial'
+      sucesso: false,
+      erro: error.message
     };
   }
 };
@@ -238,7 +238,10 @@ const processarDelecaoDispositivo = async (dispositivo, id, catracaUserId) => {
     const resultados = [];
 
     // Deletar usuário (cartões e grupos são deletados automaticamente)
-    await controlId.deletarUsuario(catracaUserId, link, session, dispositivo, resultados);
+    const usuarioDeletado = await controlId.deletarUsuario(catracaUserId, link, session, dispositivo, resultados);
+    if (usuarioDeletado !== true) {
+      throw new Error('Remoção remota não confirmada');
+    }
 
     logger.info(` Pessoa ${id} deletada de ${dispositivo.nome}`);
     return { dispositivo: dispositivo.nome, sucesso: true };

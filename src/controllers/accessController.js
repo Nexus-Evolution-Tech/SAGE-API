@@ -1,6 +1,5 @@
 const gerarController = require('./genericControllerFactory');
 const { criarAcesso } = require('../services/accessService');
-const verificarEAtribuirPresenca = require('../services/presenceService');
 const { emitToRoom } = require('../websocket/wsServer');
 const globalState = require('../state/globalState');
 const { cacheMutation, cacheQuery, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
@@ -61,9 +60,6 @@ const criar = async (req, res) => {
 
         // Emitir atualização de estatísticas
         emitToRoom('stats', 'stats:update', globalState.getStats());
-
-        // ✅ Computa presença e atraso imediatamente
-        await verificarEAtribuirPresenca(pessoa_id, data_hora instanceof Date ? data_hora : new Date(data_hora));
 
         logger.debug(`[ACCESS] Novo acesso registrado: pessoa ${pessoa_id}, dispositivo ${dispositivo_id}`);
         res.status(201).json(acesso);
