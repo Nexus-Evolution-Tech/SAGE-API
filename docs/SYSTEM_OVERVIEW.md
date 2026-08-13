@@ -73,3 +73,7 @@
 - Sincronizações externas são assíncronas + fila `sync_pendente`
 - Startup reprocessa pendências automaticamente
 - O instalador aplica migrations antes de ativar o release; o runtime apenas valida o ledger
+
+## Logs locais
+
+Os logs da API ficam em `SAGE_DATA_DIR/logs/api` (ou no diretório de dados configurado). A aplicação mantém até 8 arquivos de 10 MiB (80 MiB); o WinSW mantém stdout/stderr no mesmo limite (outros 80 MiB). O teto combinado é 160 MiB. Se o transporte local falhar por disco cheio, o stderr mostra `SAGE-LOG-ENOSPC`: libere espaço e preserve os arquivos para diagnóstico. O contexto entregue ao logger já deve estar sanitizado; a redação central e qualquer telemetria pertencem à R3 e não são habilitadas aqui.
