@@ -30,13 +30,25 @@ try {
   try {
     $env:SAGE_CONFIG_FILE = Join-Path $dataRoot 'config\maintenance.env'
     $env:SAGE_ALLOW_FIRST_RUN_ONBOARDING = 'true'
+    $env:SAGE_MAINTENANCE_CONFIG_FILE = Join-Path $dataRoot 'config\maintenance.env'
+    $env:MYSQL_DEFAULTS_EXTRA_FILE = Join-Path $dataRoot 'config\maintenance-client.cnf'
+    $env:MYSQLDUMP_PATH = Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe'
+    $env:MYSQL_PATH = Join-Path $programRoot 'runtime\mysql\bin\mysql.exe'
+    $env:SAGE_REQUIRE_MAINTENANCE_DB = 'true'
     Push-Location -LiteralPath $apiRoot
     try {
+      if ($previousVersion) {
+        $backupCheck = "const b=require('./src/services/backupBanco');(async()=>{const x=await b.gerarBackup();const v=await b.verificarBackup(x.caminho);if(!v.ok)throw new Error('backup reprovado')})().catch(()=>process.exit(1))"
+        & $node -e $backupCheck
+        if ($LASTEXITCODE -ne 0) { throw 'Backup verificado antes da migration falhou' }
+      }
       & $node 'scripts\setup-database.js'
       if ($LASTEXITCODE -ne 0) { throw "Setup do banco falhou com exit $LASTEXITCODE" }
     } finally { Pop-Location }
   } finally {
-    Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_ALLOW_FIRST_RUN_ONBOARDING -ErrorAction SilentlyContinue
+    Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_ALLOW_FIRST_RUN_ONBOARDING,
+      Env:SAGE_MAINTENANCE_CONFIG_FILE, Env:MYSQL_DEFAULTS_EXTRA_FILE,
+      Env:MYSQLDUMP_PATH, Env:MYSQL_PATH, Env:SAGE_REQUIRE_MAINTENANCE_DB -ErrorAction SilentlyContinue
   }
 
   & $provision -Version $targetVersion -StartApi

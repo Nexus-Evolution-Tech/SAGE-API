@@ -12,7 +12,10 @@ const REQUIRED_COLUMNS = Object.freeze([
   'Dispositivo.ultimo_log_id_sincronizado',
   'Acesso.catraca_log_id',
   'Turma.id',
+  'Sala.unidade_id',
+  'HorarioAula.divisao',
   'HorarioAula.horario',
+  'Presenca.horario_previsto',
   'ConfigSistema.chave',
   'sync_pendente.id'
 ]);

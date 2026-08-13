@@ -40,6 +40,17 @@ describe('instalador Inno interno do SAGE', () => {
     expect(install).toContain("Invoke-RestMethod 'http://127.0.0.1:3000/ready'");
   });
 
+  it('verifica backup restaurável antes de migration em upgrade', () => {
+    expect(install).toContain('if ($previousVersion)');
+    expect(install).toContain('gerarBackup');
+    expect(install).toContain('verificarBackup');
+    expect(install).toContain('SAGE_MAINTENANCE_CONFIG_FILE');
+    expect(install).toContain('MYSQL_DEFAULTS_EXTRA_FILE');
+    expect(install.indexOf('verificarBackup')).toBeLessThan(
+      install.indexOf('scripts\\setup-database.js')
+    );
+  });
+
   it('preserva ProgramData e falha alto se o uninstall seguro falhar', () => {
     expect(iss).toContain('uninstall-services.ps1');
     expect(iss).toContain('RaiseException');
