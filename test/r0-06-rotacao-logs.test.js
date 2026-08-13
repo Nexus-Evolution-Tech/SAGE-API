@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-async function esperar(condicao, limiteMs = 30000) {
+async function esperar(condicao, limiteMs = 5000) {
   const fim = Date.now() + limiteMs;
   while (Date.now() < fim) {
     if (condicao()) return;
@@ -15,13 +15,18 @@ describe('R0-06 — rotação de logs', () => {
   beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sage-log-')); ({ criarLogger } = require('../src/config/logger')); });
   afterEach(() => { logger?.close(); fs.rmSync(dir, { recursive: true, force: true }); });
 
-  it('configura teto de 10 MiB × 8 e roda rotação real', { timeout: 40000 }, async () => {
-    logger = criarLogger({ diretorio: dir, maxsize: 80, maxFiles: 2 });
-    logger.info('a'.repeat(100)); logger.info('b'.repeat(100)); logger.info('c'.repeat(100));
+  it('rotaciona com teto pequeno e descarta o arquivo mais velho', async () => {
+    logger = criarLogger({ diretorio: dir, maxsize: 80, maxFiles: 3 });
+    logger.transports[0].silent = true;
+    const bloco = 'x'.repeat(100);
+    for (let i = 0; i < 6; i += 1) {
+      logger.error(bloco);
+      await new Promise((ok) => setTimeout(ok, 10));
+    }
     const arquivos = () => fs.readdirSync(dir).filter((n) => /^api\d*\.log$/.test(n));
-    await esperar(() => arquivos().length >= 2); logger.close(); logger = null;
-    expect(arquivos().length).toBeGreaterThanOrEqual(2); expect(arquivos().length).toBeLessThanOrEqual(2);
-    expect(require('../src/config/logger').LIMITE_TOTAL_BYTES).toBe(160 * 1024 * 1024);
+    await esperar(() => arquivos().length >= 3); logger.close(); logger = null;
+    expect(arquivos()).toHaveLength(3);
+    expect(arquivos()).not.toContain('api3.log');
   });
 
   it('preserva metadata e stack no JSON de arquivo', async () => {
@@ -45,5 +50,7 @@ describe('R0-06 — rotação de logs', () => {
   it('documenta o teto e a ação para ENOSPC sem prometer redação R3', () => {
     const doc = fs.readFileSync('docs/SYSTEM_OVERVIEW.md', 'utf8');
     expect(doc).toContain('160 MiB'); expect(doc).toContain('SAGE-LOG-ENOSPC'); expect(doc).toContain('R3');
+    expect(require('../src/config/logger').MAXSIZE).toBe(10 * 1024 * 1024);
+    expect(require('../src/config/logger').MAXFILES).toBe(8);
   });
 });

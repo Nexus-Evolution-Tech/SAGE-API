@@ -151,9 +151,17 @@ jobs:
             api/package-lock.json
             web/package-lock.json
 
-      - name: Instalar Inno Setup 6.7.3
+      - name: Baixar e verificar Inno Setup 6.7.3
         shell: powershell
-        run: choco install innosetup --version=6.7.3 --no-progress --yes
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $esperado = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $arquivo = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $url -OutFile $arquivo
+          $obtido = (Get-FileHash -LiteralPath $arquivo -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($obtido -ne $esperado) { throw "SHA-256 do Inno Setup diverge: $obtido" }
+          $processo = Start-Process -FilePath $arquivo -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -PassThru
+          if ($processo.ExitCode -ne 0) { throw "Instalador do Inno Setup falhou com exit $($processo.ExitCode)" }
 
       - name: Montar layout interno
         shell: powershell
