@@ -201,6 +201,7 @@ Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   DB_HOST='127.0.0.1'; DB_PORT='3307'; DB_USER='sage_runtime'; DB_PASSWORD=$secretMarker
   DB_NAME='sage'; REDIS_ENABLED='false'; JWT_SECRET=$secretMarker
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=$secretMarker
+  SYNC_CHECK_INTERVAL='*/5 * * * *'; SYNC_BATCH_SIZE='50'; HEALTH_CHECK_INTERVAL='60000'; PROMOCAO_CRON='false'; BACKUP_CRON='0 3 * * *'
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
   MYSQL_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysql.exe')
   SAGE_REQUIRE_MAINTENANCE_DB='true'
@@ -212,6 +213,7 @@ Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   DB_HOST='127.0.0.1'; DB_PORT='3307'; DB_USER='sage_runtime'; DB_PASSWORD=(New-Secret)
   DB_NAME='sage'; REDIS_ENABLED='false'; JWT_SECRET=(New-Secret 48)
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=(New-Secret)
+  SYNC_CHECK_INTERVAL='*/5 * * * *'; SYNC_BATCH_SIZE='50'; HEALTH_CHECK_INTERVAL='60000'; PROMOCAO_CRON='false'; BACKUP_CRON='0 3 * * *'
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
   MYSQL_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysql.exe')
   SAGE_REQUIRE_MAINTENANCE_DB='true'
