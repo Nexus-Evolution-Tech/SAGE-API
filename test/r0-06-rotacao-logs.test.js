@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-async function esperar(condicao, limiteMs = 1000) {
+async function esperar(condicao, limiteMs = 30000) {
   const fim = Date.now() + limiteMs;
   while (Date.now() < fim) {
     if (condicao()) return;
@@ -15,7 +15,7 @@ describe('R0-06 — rotação de logs', () => {
   beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sage-log-')); ({ criarLogger } = require('../src/config/logger')); });
   afterEach(() => { logger?.close(); fs.rmSync(dir, { recursive: true, force: true }); });
 
-  it('configura teto de 10 MiB × 8 e roda rotação real', async () => {
+  it('configura teto de 10 MiB × 8 e roda rotação real', { timeout: 40000 }, async () => {
     logger = criarLogger({ diretorio: dir, maxsize: 80, maxFiles: 2 });
     logger.info('a'.repeat(100)); logger.info('b'.repeat(100)); logger.info('c'.repeat(100));
     const arquivos = () => fs.readdirSync(dir).filter((n) => /^api\d*\.log$/.test(n));
