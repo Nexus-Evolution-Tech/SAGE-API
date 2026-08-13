@@ -8,6 +8,10 @@ on:
     branches: [main, integration, 'f*/**']
   pull_request:
 
+env:
+  # Trocar para main quando a branch temporária do frontend for integrada.
+  FRONTEND_REF: wip/recuperacao-local-pre-auditoria
+
 jobs:
   caminhos:
     runs-on: ubuntu-latest
@@ -19,13 +23,14 @@ jobs:
         with:
           fetch-depth: 0
       - id: filtro
-        uses: dorny/paths-filter@v3
         if: github.event_name == 'pull_request'
-        with:
-          filters: |
-            instalador:
-              - 'installer/**'
-              - '.github/workflows/**'
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "$GITHUB_SHA" |
+            grep -Eq '^(installer/|\.github/workflows/)'; then
+            echo "instalador=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "instalador=false" >> "$GITHUB_OUTPUT"
+          fi
       - id: push_main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: echo "instalador=true" >> "$GITHUB_OUTPUT"
@@ -139,7 +144,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Nexus-Evolution-Tech/SAGE
-          ref: wip/recuperacao-local-pre-auditoria
+          ref: ${{ env.FRONTEND_REF }}
           path: web
 
       - name: Configurar Node 24

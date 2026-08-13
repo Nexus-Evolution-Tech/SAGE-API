@@ -52,5 +52,6 @@ describe('R0-06 — rotação de logs', () => {
     expect(doc).toContain('160 MiB'); expect(doc).toContain('SAGE-LOG-ENOSPC'); expect(doc).toContain('R3');
     expect(require('../src/config/logger').MAXSIZE).toBe(10 * 1024 * 1024);
     expect(require('../src/config/logger').MAXFILES).toBe(8);
+    expect(require('../src/config/logger').LIMITE_TOTAL_BYTES).toBe(160 * 1024 * 1024);
   });
 });
