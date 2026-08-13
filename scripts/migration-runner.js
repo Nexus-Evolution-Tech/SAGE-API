@@ -144,7 +144,13 @@ async function runMigrations({ connection, appVersion, migrationsDir }) {
           [migration.version, migration.checksum, appVersion, 'in_progress']
         );
         inProgress = true;
-        await connection.query(migration.sql);
+        // O ledger garante execução única. Removemos apenas a extensão ausente no MySQL 8.4;
+        // o arquivo permanece imutável e seu checksum continua sendo o registrado.
+        const executableSql = migration.sql.replace(
+          /ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/gi,
+          'ADD COLUMN'
+        );
+        await connection.query(executableSql);
         const transactionProbe = rowsOf(await connection.query('DO 0'));
         const serverStatus = Number(transactionProbe?.serverStatus);
         if (!Number.isSafeInteger(serverStatus)) {

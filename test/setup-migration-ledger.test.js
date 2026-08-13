@@ -22,15 +22,16 @@ describeMySql('setup real registra o ledger de migrations (MySQL 8.4)', () => {
 
   it('aplica o baseline e preserva o checkpoint numa segunda execução', async () => {
     const [ledger] = await banco.pool.query(
-      'SELECT version, status, app_version, CAST(applied_at AS CHAR) AS applied_at FROM schema_migrations'
+      `SELECT version, status, app_version, CAST(applied_at AS CHAR) AS applied_at
+         FROM schema_migrations ORDER BY version`
     );
 
-    expect(ledger).toEqual([{
-      version: '0000',
+    expect(ledger).toEqual(['0000', '0002'].map((version) => ({
+      version,
       status: 'applied',
       app_version: packageJson.version,
       applied_at: expect.any(String)
-    }]);
+    })));
 
     const config = configConexao();
     const env = {
@@ -45,7 +46,8 @@ describeMySql('setup real registra o ledger de migrations (MySQL 8.4)', () => {
     };
     await execFileAsync(process.execPath, [path.join(ROOT, 'scripts/setup-database.js')], { env });
     const [afterUpgrade] = await banco.pool.query(
-      'SELECT version, status, app_version, CAST(applied_at AS CHAR) AS applied_at FROM schema_migrations'
+      `SELECT version, status, app_version, CAST(applied_at AS CHAR) AS applied_at
+         FROM schema_migrations ORDER BY version`
     );
     expect(afterUpgrade).toEqual(ledger);
   });
