@@ -86,7 +86,7 @@ describeDatabase('fluxo HTTP completo do primeiro acesso', () => {
     });
     expect(duplicate.status).toBe(409);
 
-    const onboardingDb = await mysql.createConnection(configConexao());
+    const onboardingDb = await mysql.createConnection({ ...configConexao(), database });
     const [[schoolForLogin]] = await onboardingDb.query(
       'SELECT id FROM UnidadeEscolar WHERE nome = ? LIMIT 1', ['Unidade Teste']
     );
