@@ -5,6 +5,7 @@ const { gerarToken } = require('../utils/jwt');
 const db = require('../config/database');
 const { FIRST_RUN_BOOTSTRAP_LOCK } = require('../config/env');
 const { compararHash, hashSenha } = require('../utils/criptografia');
+const { autenticar: autenticarUsuario } = require('../services/usuarioService');
 const crud = require('../utils/generic-db-utils');
 const logger = require('../config/logger');
 const { emitNotification, emitNotificationToUser } = require('../services/notificationService');
@@ -155,31 +156,24 @@ const recuperarAcesso = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const unidade_id = req.params.id;
     const { usuario, senha } = req.body;
+    const resultado = await autenticarUsuario(String(usuario || '').trim(), senha);
+    if (!resultado.ok) return res.status(resultado.bloqueado ? 429 : 401).json({ message: 'Credenciais inválidas' });
+    const conta = resultado.usuario;
+    const token = gerarToken({
+      usuario_id: conta.id, papel: conta.papel, emitido_em: new Date().toISOString()
+    });
 
-    const query = `SELECT * FROM UnidadeEscolar WHERE id = ?`;
-    const [rows] = await db.query(query, [unidade_id]);
-    const unidade = rows[0];
-
-    if (!unidade) return res.status(401).json({ message: 'Usuário não encontrado' });
-
-    const senhaCorreta = await compararHash(senha, unidade.senha);
-    if (!senhaCorreta || unidade.login !== usuario)
-      return res.status(401).json({ message: 'Credenciais inválidas' });
-
-    // gera o token válido por 1h
-    const token = gerarToken({ id: unidade.id, nome: unidade.nome });
-
-    emitNotificationToUser(unidade.id, {
+    emitNotificationToUser(conta.id, {
       title: 'Novo login na sua conta',
       message: 'Sua conta foi acessada em outro dispositivo ou aba. Se não foi você, altere sua senha.',
       type: 'info',
     });
 
-    res.status(200).json({ message: 'Logado com sucesso', token });
+    res.status(200).json({ message: 'Logado com sucesso', token, precisa_trocar_senha: Boolean(conta.precisa_trocar_senha) });
   } catch (error) {
-    res.status(500).json({ message: 'Erro interno', error: error.message });
+    logger.error('[AUTH] codigo=LOGIN_FALHOU');
+    res.status(503).json({ message: 'Autenticação indisponível' });
   }
 };
 
@@ -224,24 +218,26 @@ const atualizarUnidadeAtual = async (req, res) => {
 /** PATCH /unidade/trocar-senha — altera a senha (exige senha atual) */
 const trocarSenha = async (req, res) => {
   try {
-    const id = req.user?.id;
+    const id = req.user?.usuario_id;
     if (!id) return res.status(401).json({ message: 'Não autorizado' });
     const { senha_atual, nova_senha } = req.body;
-    if (!senha_atual || !nova_senha) {
+    if (typeof senha_atual !== 'string' || typeof nova_senha !== 'string' || !senha_atual || !nova_senha) {
       return res.status(400).json({ message: 'Informe a senha atual e a nova senha' });
     }
-    if (nova_senha.length < 6) {
-      return res.status(400).json({ message: 'A nova senha deve ter no mínimo 6 caracteres' });
+    if (nova_senha.length < 8) {
+      return res.status(400).json({ message: 'A nova senha deve ter no mínimo 8 caracteres' });
     }
-    const [rows] = await db.query('SELECT senha FROM UnidadeEscolar WHERE id = ?', [id]);
-    const unidade = rows[0];
-    if (!unidade) return res.status(404).json({ message: 'Unidade não encontrada' });
-    const senhaCorreta = await compararHash(senha_atual, unidade.senha);
+    const [[usuario]] = await db.query('SELECT senha_hash FROM Usuario WHERE id = ?', [id]);
+    if (!usuario) return res.status(404).json({ message: 'Usuário não encontrado' });
+    const senhaCorreta = await compararHash(senha_atual, usuario.senha_hash);
     if (!senhaCorreta) {
       return res.status(401).json({ message: 'Senha atual incorreta' });
     }
     const senhaHash = await hashSenha(nova_senha);
-    await db.query('UPDATE UnidadeEscolar SET senha = ? WHERE id = ?', [senhaHash, id]);
+    await db.query(
+      'UPDATE Usuario SET senha_hash = ?, precisa_trocar_senha = FALSE, falhas_login = 0, bloqueado_ate = NULL WHERE id = ?',
+      [senhaHash, id]
+    );
     emitNotificationToUser(id, {
       title: 'Alteração de senha',
       message: 'Sua senha foi alterada com sucesso.',
@@ -249,8 +245,8 @@ const trocarSenha = async (req, res) => {
     });
     res.json({ message: 'Senha alterada com sucesso' });
   } catch (error) {
-    logger.error(`Erro ao trocar senha: ${error.message}`);
-    res.status(500).json({ message: 'Erro ao alterar senha', error: error.message });
+    logger.error('[AUTH] codigo=TROCA_SENHA_FALHOU');
+    res.status(503).json({ message: 'Não foi possível alterar a senha' });
   }
 };
 

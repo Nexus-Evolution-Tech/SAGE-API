@@ -31,6 +31,8 @@ function requisitar(porta, rota, headers = {}, method = 'GET') {
 function iniciarApp(env) {
   const script = `
     const http = require('http');
+    const usuarioService = require(${JSON.stringify(path.join(RAIZ, 'src', 'services', 'usuarioService.js'))});
+    usuarioService.buscarParaSessao = async () => ({ id: 1, ativo: true, papel: 'ADMINISTRADOR', precisa_trocar_senha: false });
     const app = require(${JSON.stringify(APP)});
     const { initWebSocket } = require(${JSON.stringify(path.join(RAIZ, 'src', 'websocket', 'wsServer.js'))});
     const server = http.createServer(app);
@@ -90,7 +92,7 @@ describe('F8.3b — painel servido pela API', () => {
       JWT_SECRET
     });
     try {
-      const authorization = `Bearer ${jwt.sign({ id: 1 }, JWT_SECRET)}`;
+      const authorization = `Bearer ${jwt.sign({ usuario_id: 1, papel: 'ADMINISTRADOR', emitido_em: new Date().toISOString() }, JWT_SECRET, { noTimestamp: true, expiresIn: '1h' })}`;
       const [raiz, asset, turmasHtml, turmasJson, turmasSemAccept, turmasWildcard, profunda, health, ready, docs, apiProtegida, apiAusente, endpointApiAusente, socket, uploadAusente, horarios, horarioId, horariosPost, horarioPut, horarioDelete, horarioValidar, horariosAulas] = await Promise.all([
         requisitar(porta, '/', { accept: 'text/html' }),
         requisitar(porta, '/app.js'),
