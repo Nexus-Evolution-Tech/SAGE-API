@@ -100,6 +100,8 @@ describeDatabase('fluxo HTTP completo do primeiro acesso', () => {
     const course = await request(port, 'POST', '/cursos', { nome: 'Informática', duracao: 1200 }, token);
     expect(course.status).toBe(201);
     const testDb = await mysql.createConnection({ ...configConexao(), database });
+    const [[user]] = await testDb.query('SELECT id, login, papel FROM Usuario WHERE login = ?', ['admin.teste']);
+    expect(user).toEqual(expect.objectContaining({ login: 'admin.teste', papel: 'ADMINISTRADOR' }));
     const [[createdCourse]] = await testDb.query('SELECT id FROM Curso WHERE nome = ?', ['Informática']);
     const coursePatch = await request(port, 'PATCH', `/cursos/${createdCourse.id}`, { duracao: 1400 }, token);
     expect(coursePatch.status).toBe(200);

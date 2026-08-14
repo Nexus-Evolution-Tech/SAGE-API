@@ -1,5 +1,5 @@
 // Carregar configuração por caminho absoluto antes de ler as variáveis.
-require('../src/config/env');
+const { FIRST_RUN_BOOTSTRAP_LOCK } = require('../src/config/env');
 
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
@@ -243,41 +243,74 @@ async function executarSeeds() {
 
     // A credencial inicial só é consumida quando ainda não existe unidade. Em upgrades, qualquer
     // valor presente no ambiente deve ser ignorado para nunca redefinir acesso existente.
-    const [existingSchool] = await connection.query(
-      `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
-    );
-
-    if (existingSchool.length === 0) {
-      const login = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
-      const senha = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
-      const nome = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
-      const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
-        !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
-        !process.env.SAGE_INITIAL_SCHOOL_NAME;
-
-      if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
-        throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
-      }
-      if (!onboardingLocal && senha.length < 8) {
-        throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 8 caracteres');
-      }
-      if (!onboardingLocal && !nome) {
-        throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
-      }
-
-      if (onboardingLocal) {
-        logger.info(' Schema preparado; cadastro inicial será concluído na tela local do SAGE');
-      } else {
-        logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
-        const senhaHashed = await bcrypt.hash(senha, 10);
-        await connection.query(
-          `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
-          [nome, login, senhaHashed]
+    const initialLogin = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
+    const initialPassword = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
+    const initialName = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
+    const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
+      !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
+      !process.env.SAGE_INITIAL_SCHOOL_NAME;
+    let lockAcquired = false;
+    try {
+      if (!onboardingLocal) {
+        const [[lock]] = await connection.query(
+          'SELECT GET_LOCK(?, 5) AS acquired', [FIRST_RUN_BOOTSTRAP_LOCK]
         );
-        logger.info(' Unidade escolar inicial inserida com sucesso');
+        lockAcquired = Number(lock.acquired) === 1;
+        if (!lockAcquired) throw new Error('Nao foi possivel adquirir lock do bootstrap');
       }
-    } else {
-      logger.info('🏫 Unidade escolar já existe; credencial preservada');
+      const [existingSchool] = await connection.query(
+        `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
+      );
+
+      if (existingSchool.length === 0) {
+        const login = initialLogin;
+        const senha = initialPassword;
+        const nome = initialName;
+
+        if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
+          throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
+        }
+        if (!onboardingLocal && senha.length < 8) {
+          throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 8 caracteres');
+        }
+        if (!onboardingLocal && !nome) {
+          throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
+        }
+
+        if (onboardingLocal) {
+          logger.info(' Schema preparado; cadastro inicial será concluído na tela local do SAGE');
+        } else {
+          logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
+          const senhaHashed = await bcrypt.hash(senha, 10);
+          await connection.beginTransaction();
+          try {
+            await connection.query(
+              `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
+              [nome, login, senhaHashed]
+            );
+            await connection.query(
+              `INSERT INTO Usuario
+               (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
+               VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
+              [login, senhaHashed, nome]
+            );
+            await connection.commit();
+          } catch (error) {
+            await connection.rollback().catch(() => logger.warn('[SETUP] codigo=ROLLBACK_SEED_FALHOU'));
+            throw error;
+          }
+          logger.info(' Unidade escolar inicial inserida com sucesso');
+        }
+      } else {
+        logger.info('🏫 Unidade escolar já existe; credencial preservada');
+      }
+
+    } finally {
+      if (lockAcquired) {
+        await connection.query(
+          'SELECT RELEASE_LOCK(?)', [FIRST_RUN_BOOTSTRAP_LOCK]
+        ).catch(() => logger.warn('[SETUP] codigo=LOCK_RELEASE_FALHOU'));
+      }
     }
 
     // Seed: Área padrão (para dispositivos/catracas)

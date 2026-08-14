@@ -86,7 +86,7 @@ const describeBanco = temBanco ? describe : describe.skip;
 describeBanco('F8.1 — bootstrap seguro', () => {
   afterEach(apagarBancos);
 
-  it('cria credencial gerada no banco limpo e nunca a redefine em upgrade', async () => {
+  it('cria credencial gerada e ignora input parcial em upgrade', async () => {
     const nomeBanco = novoBanco('upgrade');
     const inicial = credencialInicial();
     const primeiraExecucao = await executarSetup(nomeBanco, inicial);
@@ -103,21 +103,29 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     expect(criadas[0].login).toBe(inicial.login);
     expect(criadas[0].senha).not.toBe(inicial.senha);
     expect(await bcrypt.compare(inicial.senha, criadas[0].senha)).toBe(true);
+    const [usuarios] = await db.query(
+      'SELECT id, login, senha_hash, papel FROM Usuario WHERE login = ?', [inicial.login]
+    );
+    expect(usuarios).toHaveLength(1);
+    expect(usuarios[0]).toMatchObject({ login: inicial.login, papel: 'ADMINISTRADOR' });
+    expect(await bcrypt.compare(inicial.senha, usuarios[0].senha_hash)).toBe(true);
 
     const hashOriginal = criadas[0].senha;
-    const tentativaDeReset = credencialInicial();
+    const tentativaDeReset = { ...credencialInicial(), login: '' };
     const upgrade = await executarSetup(nomeBanco, tentativaDeReset);
     expect(upgrade.codigo).toBe(0);
 
     const [preservadas] = await db.query(
       'SELECT id, login, senha FROM UnidadeEscolar ORDER BY id'
     );
+    const [usuariosPreservados] = await db.query('SELECT login FROM Usuario');
     await db.end();
 
     expect(preservadas).toHaveLength(1);
     expect(preservadas[0].login).toBe(inicial.login);
     expect(preservadas[0].senha).toBe(hashOriginal);
     expect(await bcrypt.compare(tentativaDeReset.senha, preservadas[0].senha)).toBe(false);
+    expect(usuariosPreservados).toHaveLength(1);
   });
 
   it.each([
@@ -151,5 +159,67 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     await db.end();
     expect(unidades).toEqual([]);
     expect(tabelas[0].total).toBeGreaterThan(0);
+  });
+
+  it('serializa duas instalacoes concorrentes e preserva um par de credenciais', async () => {
+    const nomeBanco = novoBanco('concorrente');
+    const schema = await executarSetup(nomeBanco, null, {
+      SAGE_ALLOW_FIRST_RUN_ONBOARDING: 'true'
+    });
+    expect(schema.codigo).toBe(0);
+
+    const primeira = credencialInicial();
+    const segunda = credencialInicial();
+    const resultados = await Promise.all([
+      executarSetup(nomeBanco, primeira),
+      executarSetup(nomeBanco, segunda)
+    ]);
+    expect(resultados.every(({ codigo }) => codigo === 0)).toBe(true);
+
+    const db = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    const [[resultado]] = await db.query(
+      `SELECT
+         (SELECT COUNT(*) FROM UnidadeEscolar) unidades,
+         (SELECT COUNT(*) FROM Usuario) usuarios,
+         (SELECT login FROM UnidadeEscolar LIMIT 1) unidade_login,
+         (SELECT senha FROM UnidadeEscolar LIMIT 1) unidade_senha,
+         (SELECT login FROM Usuario LIMIT 1) usuario_login,
+         (SELECT senha_hash FROM Usuario LIMIT 1) usuario_hash`
+    );
+    await db.end();
+
+    const vencedora = [primeira, segunda].find(({ login }) => login === resultado.unidade_login);
+    expect(resultado).toMatchObject({
+      unidades: 1,
+      usuarios: 1,
+      usuario_login: resultado.unidade_login
+    });
+    expect(vencedora).toBeDefined();
+    expect(await bcrypt.compare(vencedora.senha, resultado.unidade_senha)).toBe(true);
+    expect(await bcrypt.compare(vencedora.senha, resultado.usuario_hash)).toBe(true);
+  });
+
+  it('faz rollback dos dois inserts quando o Usuario falha', async () => {
+    const nomeBanco = novoBanco('rollback_usuario');
+    const schema = await executarSetup(nomeBanco, null, {
+      SAGE_ALLOW_FIRST_RUN_ONBOARDING: 'true'
+    });
+    expect(schema.codigo).toBe(0);
+
+    const db = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    await db.query(
+      "CREATE TRIGGER falha_usuario_bootstrap BEFORE INSERT ON Usuario FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rollback deterministico'"
+    );
+    await db.end();
+
+    const resultado = await executarSetup(nomeBanco, credencialInicial());
+    expect(resultado.codigo).not.toBe(0);
+
+    const consulta = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    const [[totais]] = await consulta.query(
+      'SELECT (SELECT COUNT(*) FROM UnidadeEscolar) unidades, (SELECT COUNT(*) FROM Usuario) usuarios'
+    );
+    await consulta.end();
+    expect(totais).toEqual({ unidades: 0, usuarios: 0 });
   });
 });
