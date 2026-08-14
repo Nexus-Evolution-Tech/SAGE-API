@@ -98,19 +98,8 @@ function autenticacaoPropria(nome) {
   }, { tipo: 'autenticacaoPropria', nome, issue: 67 });
 }
 
-const PUBLICAS_FECHADAS = new Set([
-  'GET /health',
-  'GET /ready',
-  'GET /status',
-  'GET /diagnostico'
-]);
-
-const PRE_AUTENTICACAO = new Set([
-  'GET /setup/status',
-  'POST /setup/initialize',
-  'POST /escolas/login/:id',
-  'POST /escolas/recuperar-acesso'
-]);
+const PUBLICAS_FECHADAS = new Set(['GET /health', 'GET /ready', 'GET /status', 'GET /diagnostico']);
+const PRE_AUTENTICACAO = new Set(['GET /setup/status', 'POST /setup/initialize', 'POST /escolas/login/:id', 'POST /escolas/recuperar-acesso']);
 
 function unirCaminhos(prefixo, caminho) {
   const partes = [prefixo, caminho].filter((parte) => parte && parte !== '/');
