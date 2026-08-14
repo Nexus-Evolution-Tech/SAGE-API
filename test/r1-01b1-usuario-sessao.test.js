@@ -14,6 +14,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toStri
 process.env.NODE_ENV = 'test';
 const app = require('../src/app');
 const db = require('../src/config/database');
+const logger = require('../src/config/logger');
 const autenticar = require('../src/middlewares/autenticar');
 const { gerarToken, verificarToken } = require('../src/utils/jwt');
 const execFileAsync = promisify(execFile);
@@ -46,6 +47,7 @@ describe('R1-01B1 — contrato JWT e consulta de sessão', () => {
     expect(verificarToken(token)).toMatchObject(claims);
     expect(() => gerarToken({ ...claims, extra: true })).toThrow();
     [
+      assinar({ ...claims, extra: true }),
       assinar({ papel: claims.papel, emitido_em: claims.emitido_em }),
       assinar({ ...claims, usuario_id: '7' }),
       assinar({ ...claims, papel: 'GESTOR' }),
@@ -57,6 +59,8 @@ describe('R1-01B1 — contrato JWT e consulta de sessão', () => {
 
   it('consulta Usuario por requisição e nega falha do banco sem PII', async () => {
     const originalQuery = db.query;
+    const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    let loggerCalls;
     db.query = vi.fn().mockRejectedValue(new Error('falha de banco com dado sensível'));
     const token = gerarToken({ usuario_id: 7, papel: 'ADMINISTRADOR', emitido_em: new Date().toISOString() });
     const req = { headers: { authorization: `Bearer ${token}` }, method: 'GET', path: '/config' };
@@ -66,10 +70,14 @@ describe('R1-01B1 — contrato JWT e consulta de sessão', () => {
       await autenticar(req, res, vi.fn());
     } finally {
       db.query = originalQuery;
+      loggerCalls = loggerError.mock.calls.map((call) => [...call]);
+      loggerError.mockRestore();
     }
 
     expect(res.status).toHaveBeenCalledWith(503);
     expect(JSON.stringify(res.json.mock.calls)).not.toContain('dado sensível');
+    expect(loggerCalls).toContainEqual(['[AUTH] codigo=CONSULTA_USUARIO_FALHOU']);
+    expect(loggerCalls.flat().join(' ')).not.toContain('falha de banco com dado sensível');
   });
 });
 
