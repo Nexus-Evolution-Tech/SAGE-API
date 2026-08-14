@@ -36,6 +36,7 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
   let pessoaId;
   let atorId;
   let gerarToken;
+  let ids;
 
   beforeAll(async () => {
     banco = await criarBancoDeTeste('r1_01c_usuarios');
@@ -65,13 +66,16 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
     if (banco) await banco.destruir();
   });
 
-  it('exige token e sessão ativa nas três rotas', async () => {
+  it('exige token e sessão ativa em todas as rotas de usuário', async () => {
     const semToken = await Promise.all([
       requisitar(porta, 'POST', '/usuarios', {}),
       requisitar(porta, 'GET', '/usuarios'),
-      requisitar(porta, 'GET', '/usuarios/1')
+      requisitar(porta, 'GET', '/usuarios/1'),
+      requisitar(porta, 'PATCH', '/usuarios/1', {}),
+      requisitar(porta, 'PATCH', '/usuarios/1/desativar'),
+      requisitar(porta, 'PATCH', '/usuarios/1/redefinir-senha', {})
     ]);
-    expect(semToken.map((resposta) => resposta.status)).toEqual([401, 401, 401]);
+    expect(semToken.map((resposta) => resposta.status)).toEqual([401, 401, 401, 401, 401, 401]);
 
     await banco.pool.query('UPDATE Usuario SET ativo = FALSE WHERE id = ?', [atorId]);
     expect((await requisitar(porta, 'GET', '/usuarios', undefined, token)).status).toBe(401);
@@ -88,7 +92,7 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
 
     expect(primeiro.status).toBe(201);
     expect(segundo.status).toBe(201);
-    const ids = [primeiro.body.data.id, segundo.body.data.id];
+    ids = [primeiro.body.data.id, segundo.body.data.id];
     expect(new Set(ids).size).toBe(2);
     const lista = await requisitar(porta, 'GET', '/usuarios', undefined, token);
     expect(lista.status).toBe(200);
@@ -146,5 +150,95 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
     for (const id of ['0', '-1', '1.5', 'abc', '01']) {
       expect((await requisitar(porta, 'GET', `/usuarios/${id}`, undefined, token)).status).toBe(400);
     }
+  });
+
+  it('edita somente os quatro campos permitidos e preserva o hash', async () => {
+    const id = ids[0];
+    const [[antes]] = await banco.pool.query('SELECT senha_hash FROM Usuario WHERE id = ?', [id]);
+    const resposta = await requisitar(porta, 'PATCH', `/usuarios/${id}`, {
+      login: 'secretaria.r1c.editada', nome_exibicao: 'Nome editado',
+      papel: 'ADMINISTRADOR', pessoa_id: null
+    }, token);
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data).toMatchObject({ id, login: 'secretaria.r1c.editada', nome_exibicao: 'Nome editado', papel: 'ADMINISTRADOR', pessoa_id: null });
+    expect(resposta.body.data).not.toHaveProperty('senha_hash');
+    const [[depois]] = await banco.pool.query(
+      'SELECT login, nome_exibicao, papel, pessoa_id, senha_hash, ativo FROM Usuario WHERE id = ?', [id]
+    );
+    expect(depois).toMatchObject({ login: 'secretaria.r1c.editada', nome_exibicao: 'Nome editado', papel: 'ADMINISTRADOR', pessoa_id: null, ativo: 1 });
+    expect(depois.senha_hash).toBe(antes.senha_hash);
+
+    for (const corpo of [
+      {}, [], { senha_hash: 'nao-pode' }, { senha: 'nao-pode' }, { ativo: false },
+      { falhas_login: 0 }, { login: 'x' }, { nome_exibicao: '\u0000' },
+      { pessoa_id: '1' }, { papel: 'GESTOR' }
+    ]) {
+      expect((await requisitar(porta, 'PATCH', `/usuarios/${id}`, corpo, token)).status).toBe(400);
+    }
+  });
+
+  it('desativa sem excluir e recusa a sessão na requisição seguinte', async () => {
+    const id = ids[1];
+    const tokenDoAlvo = gerarToken({ usuario_id: id, papel: 'SECRETARIA', emitido_em: new Date().toISOString() });
+    const resposta = await requisitar(porta, 'PATCH', `/usuarios/${id}/desativar`, undefined, token);
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data).toMatchObject({ id, ativo: 0 });
+    expect((await requisitar(porta, 'GET', `/usuarios/${id}`, undefined, tokenDoAlvo)).status).toBe(401);
+    const [[persistido]] = await banco.pool.query('SELECT id, ativo FROM Usuario WHERE id = ?', [id]);
+    expect(persistido).toEqual({ id, ativo: 0 });
+    expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/desativar`, { ativo: true }, token)).status).toBe(400);
+  });
+
+  it('redefine a senha, exige troca e limpa falhas e bloqueio', async () => {
+    const id = ids[0];
+    await banco.pool.query(
+      'UPDATE Usuario SET precisa_trocar_senha = FALSE, falhas_login = 4, bloqueado_ate = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?', [id]
+    );
+    const novaSenha = 'senha-redefinida-8';
+    const resposta = await requisitar(porta, 'PATCH', `/usuarios/${id}/redefinir-senha`, { nova_senha: novaSenha }, token);
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data).not.toHaveProperty('senha_hash');
+    const [[usuario]] = await banco.pool.query(
+      'SELECT senha_hash, precisa_trocar_senha, falhas_login, bloqueado_ate FROM Usuario WHERE id = ?', [id]
+    );
+    expect(await bcrypt.compare(novaSenha, usuario.senha_hash)).toBe(true);
+    expect(usuario).toMatchObject({ precisa_trocar_senha: 1, falhas_login: 0, bloqueado_ate: null });
+    expect((await requisitar(porta, 'POST', '/escolas/login/1', { usuario: 'secretaria.r1c.editada', senha: novaSenha })).body.precisa_trocar_senha).toBe(true);
+    for (const corpo of [{}, { senha_hash: 'nao-pode' }, { nova_senha: 'curta' }, { nova_senha: novaSenha, extra: true }, { nova_senha: 12345678 }]) {
+      expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/redefinir-senha`, corpo, token)).status).toBe(400);
+    }
+  });
+
+  it('faz rollback da redefinição quando o update falha', async () => {
+    const id = ids[0];
+    await banco.pool.query(
+      'UPDATE Usuario SET precisa_trocar_senha = FALSE, falhas_login = 3, bloqueado_ate = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE id = ?', [id]
+    );
+    const [[antes]] = await banco.pool.query(
+      'SELECT senha_hash, precisa_trocar_senha, falhas_login, bloqueado_ate FROM Usuario WHERE id = ?', [id]
+    );
+    const trigger = `tr_r1_01c_reset_${process.pid}`;
+    await banco.pool.query(`CREATE TRIGGER ${trigger} BEFORE UPDATE ON Usuario FOR EACH ROW
+      BEGIN IF NEW.id = ${id} AND NEW.precisa_trocar_senha = TRUE THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'falha controlada';
+      END IF; END`);
+    try {
+      const resposta = await requisitar(porta, 'PATCH', `/usuarios/${id}/redefinir-senha`, { nova_senha: 'outra-senha-8' }, token);
+      expect(resposta.status).toBe(503);
+      expect(JSON.stringify(resposta.body)).not.toMatch(/falha controlada|outra-senha-8|senha_hash/i);
+    } finally {
+      await banco.pool.query(`DROP TRIGGER ${trigger}`);
+    }
+    const [[depois]] = await banco.pool.query(
+      'SELECT senha_hash, precisa_trocar_senha, falhas_login, bloqueado_ate FROM Usuario WHERE id = ?', [id]
+    );
+    expect(depois).toEqual(antes);
+  });
+
+  it('não oferece DELETE de usuário e preserva a linha', async () => {
+    const resposta = await requisitar(porta, 'DELETE', `/usuarios/${ids[0]}`, undefined, token);
+    expect(resposta.status).toBe(404);
+    const [[usuario]] = await banco.pool.query('SELECT id FROM Usuario WHERE id = ?', [ids[0]]);
+    expect(usuario).toEqual({ id: ids[0] });
   });
 });

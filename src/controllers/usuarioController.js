@@ -4,12 +4,18 @@ const logger = require('../config/logger');
 function responderErro(res, error) {
   const statusPorCodigo = {
     USUARIO_DADOS_INVALIDOS: 400,
+    USUARIO_ID_INVALIDO: 400,
     USUARIO_PESSOA_INVALIDA: 400,
+    USUARIO_SENHA_INVALIDA: 400,
     USUARIO_LOGIN_DUPLICADO: 409,
+    USUARIO_NAO_ENCONTRADO: 404,
     USUARIOS_INDISPONIVEIS: 503
   };
   const status = statusPorCodigo[error.code] || 503;
   const mensagens = {
+    USUARIO_ID_INVALIDO: 'id invalido',
+    USUARIO_SENHA_INVALIDA: 'Nova senha invalida',
+    USUARIO_NAO_ENCONTRADO: 'Usuario nao encontrado',
     USUARIO_DADOS_INVALIDOS: 'Dados de usuário inválidos',
     USUARIO_PESSOA_INVALIDA: 'pessoa_id inválido',
     USUARIO_LOGIN_DUPLICADO: 'Login já cadastrado',
@@ -53,4 +59,47 @@ async function obter(req, res) {
   }
 }
 
-module.exports = { criar, listar, obter };
+function idDaRota(req, res) {
+  const id = Number(req.params.id);
+  if (!usuarioService.validarId(id) || String(id) !== req.params.id) {
+    responderErro(res, { code: 'USUARIO_ID_INVALIDO' });
+    return undefined;
+  }
+  return id;
+}
+
+async function editar(req, res) {
+  const id = idDaRota(req, res);
+  if (id === undefined) return res;
+  try {
+    const usuario = await usuarioService.atualizarUsuario(id, req.body);
+    return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
+  } catch (error) {
+    return responderErro(res, error);
+  }
+}
+
+async function desativar(req, res) {
+  const id = idDaRota(req, res);
+  if (id === undefined) return res;
+  if (req.body && Object.keys(req.body).length) return responderErro(res, { code: 'USUARIO_DADOS_INVALIDOS' });
+  try {
+    const usuario = await usuarioService.desativarUsuario(id);
+    return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
+  } catch (error) {
+    return responderErro(res, error);
+  }
+}
+
+async function redefinirSenha(req, res) {
+  const id = idDaRota(req, res);
+  if (id === undefined) return res;
+  try {
+    const usuario = await usuarioService.redefinirSenha(id, req.body);
+    return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
+  } catch (error) {
+    return responderErro(res, error);
+  }
+}
+
+module.exports = { criar, listar, obter, editar, desativar, redefinirSenha };

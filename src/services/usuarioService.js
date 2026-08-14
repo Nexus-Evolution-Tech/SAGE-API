@@ -12,6 +12,13 @@ const CAMPOS_SESSAO_SQL = CAMPOS_SESSAO.join(', ');
 const CAMPOS_USUARIO = ['id', 'login', 'nome_exibicao', 'papel', 'ativo', 'pessoa_id'];
 const CAMPOS_USUARIO_SQL = CAMPOS_USUARIO.join(', ');
 const CAMPOS_CRIACAO = new Set(['login', 'nome_exibicao', 'papel', 'senha', 'pessoa_id']);
+const CAMPOS_EDICAO = new Set(['login', 'nome_exibicao', 'papel', 'pessoa_id']);
+const COLUNAS_EDICAO = Object.freeze({
+  login: 'login',
+  nome_exibicao: 'nome_exibicao',
+  papel: 'papel',
+  pessoa_id: 'pessoa_id'
+});
 const PAPEIS = new Set(['ADMINISTRADOR', 'SECRETARIA']);
 
 class ErroUsuario extends Error {
@@ -25,15 +32,45 @@ function validarId(id) {
   return Number.isSafeInteger(id) && id > 0 && id <= 2147483647;
 }
 
+function objetoPlano(dados) {
+  return dados !== null && typeof dados === 'object' && !Array.isArray(dados)
+    && Object.getPrototypeOf(dados) === Object.prototype;
+}
+
+function textoExibicaoValido(valor) {
+  return typeof valor === 'string' && valor.trim().length >= 1 && valor.length <= 100
+    && !/[\u0000-\u001F\u007F]/.test(valor);
+}
+
+function senhaValida(valor) {
+  return typeof valor === 'string' && valor.length >= 8
+    && Buffer.byteLength(valor, 'utf8') <= 72;
+}
+
 function validarCriacao(dados) {
-  if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return false;
+  if (!objetoPlano(dados)) return false;
   const campos = Object.keys(dados);
   if (campos.some((campo) => !CAMPOS_CRIACAO.has(campo))) return false;
   if (typeof dados.login !== 'string' || !/^[A-Za-z0-9._-]{3,100}$/.test(dados.login)) return false;
-  if (typeof dados.nome_exibicao !== 'string' || dados.nome_exibicao.trim().length < 1 || dados.nome_exibicao.length > 100) return false;
+  if (!textoExibicaoValido(dados.nome_exibicao)) return false;
   if (!PAPEIS.has(dados.papel)) return false;
-  if (typeof dados.senha !== 'string' || dados.senha.length < 8) return false;
+  if (!senhaValida(dados.senha)) return false;
   return dados.pessoa_id === undefined || dados.pessoa_id === null || validarId(dados.pessoa_id);
+}
+
+function validarEdicao(dados) {
+  if (!objetoPlano(dados)) return false;
+  const campos = Object.keys(dados);
+  if (!campos.length || campos.some((campo) => !CAMPOS_EDICAO.has(campo))) return false;
+  if (dados.login !== undefined && (typeof dados.login !== 'string' || !/^[A-Za-z0-9._-]{3,100}$/.test(dados.login))) return false;
+  if (dados.nome_exibicao !== undefined && !textoExibicaoValido(dados.nome_exibicao)) return false;
+  if (dados.papel !== undefined && !PAPEIS.has(dados.papel)) return false;
+  return dados.pessoa_id === undefined || dados.pessoa_id === null || validarId(dados.pessoa_id);
+}
+
+function validarRedefinicao(dados) {
+  return objetoPlano(dados) && Object.keys(dados).length === 1
+    && Object.keys(dados)[0] === 'nova_senha' && senhaValida(dados.nova_senha);
 }
 
 function projetarSessao(usuario) {
@@ -89,6 +126,96 @@ async function buscarUsuarioPorId(id) {
     `SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ? LIMIT 1`, [id]
   );
   return usuario ? projetarUsuario(usuario) : undefined;
+}
+
+async function atualizarUsuario(id, dados) {
+  if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
+  if (!validarEdicao(dados)) throw new ErroUsuario('USUARIO_DADOS_INVALIDOS');
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[existente]] = await connection.query('SELECT id FROM Usuario WHERE id = ? FOR UPDATE', [id]);
+    if (!existente) {
+      await connection.rollback();
+      return undefined;
+    }
+    if (dados.pessoa_id !== undefined && dados.pessoa_id !== null) {
+      const [[pessoa]] = await connection.query('SELECT id FROM Pessoa WHERE id = ? LIMIT 1', [dados.pessoa_id]);
+      if (!pessoa) throw new ErroUsuario('USUARIO_PESSOA_INVALIDA');
+    }
+    const campos = Object.keys(dados);
+    const valores = campos.map((campo) => campo === 'nome_exibicao' ? dados[campo].trim() : dados[campo]);
+    await connection.query(
+      `UPDATE Usuario SET ${campos.map((campo) => `${COLUNAS_EDICAO[campo]} = ?`).join(', ')} WHERE id = ?`,
+      [...valores, id]
+    );
+    const [[usuario]] = await connection.query(
+      `SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]
+    );
+    await connection.commit();
+    return projetarUsuario(usuario);
+  } catch (error) {
+    await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
+    if (error.code === 'ER_DUP_ENTRY') throw new ErroUsuario('USUARIO_LOGIN_DUPLICADO');
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') throw new ErroUsuario('USUARIO_PESSOA_INVALIDA');
+    if (typeof error.code === 'string' && error.code.startsWith('USUARIO_')) throw error;
+    logger.error('[USUARIOS] codigo=EDICAO_FALHOU');
+    throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
+  } finally {
+    connection.release();
+  }
+}
+
+async function desativarUsuario(id) {
+  if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[existente]] = await connection.query('SELECT id FROM Usuario WHERE id = ? FOR UPDATE', [id]);
+    if (!existente) {
+      await connection.rollback();
+      return undefined;
+    }
+    await connection.query('UPDATE Usuario SET ativo = FALSE WHERE id = ?', [id]);
+    const [[usuario]] = await connection.query(`SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]);
+    await connection.commit();
+    return projetarUsuario(usuario);
+  } catch (error) {
+    await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
+    logger.error('[USUARIOS] codigo=DESATIVACAO_FALHOU');
+    throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
+  } finally {
+    connection.release();
+  }
+}
+
+async function redefinirSenha(id, dados) {
+  if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
+  if (!validarRedefinicao(dados)) throw new ErroUsuario('USUARIO_SENHA_INVALIDA');
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[existente]] = await connection.query('SELECT id FROM Usuario WHERE id = ? FOR UPDATE', [id]);
+    if (!existente) {
+      await connection.rollback();
+      return undefined;
+    }
+    const senhaHash = await hashSenha(dados.nova_senha);
+    await connection.query(
+      `UPDATE Usuario SET senha_hash = ?, precisa_trocar_senha = TRUE,
+       falhas_login = 0, bloqueado_ate = NULL WHERE id = ?`,
+      [senhaHash, id]
+    );
+    const [[usuario]] = await connection.query(`SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]);
+    await connection.commit();
+    return projetarUsuario(usuario);
+  } catch (error) {
+    await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
+    logger.error('[USUARIOS] codigo=REDEFINICAO_SENHA_FALHOU');
+    throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
+  } finally {
+    connection.release();
+  }
 }
 
 async function autenticar(login, senha) {
@@ -160,6 +287,11 @@ module.exports = {
   criarUsuario,
   listarUsuarios,
   buscarUsuarioPorId,
+  validarEdicao,
+  validarRedefinicao,
+  atualizarUsuario,
+  desativarUsuario,
+  redefinirSenha,
   autenticar,
   buscarParaSessao
 };
