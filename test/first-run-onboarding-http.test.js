@@ -86,16 +86,22 @@ describeDatabase('fluxo HTTP completo do primeiro acesso', () => {
     });
     expect(duplicate.status).toBe(409);
 
-    const schools = await request(port, 'GET', '/escolas');
-    const school = JSON.parse(schools.body).data[0];
-    expect(school).toEqual(expect.objectContaining({ nome: 'Unidade Teste', login: 'admin.teste' }));
+    const onboardingDb = await mysql.createConnection({ ...configConexao(), database });
+    const [[schoolForLogin]] = await onboardingDb.query(
+      'SELECT id FROM UnidadeEscolar WHERE nome = ? LIMIT 1', ['Unidade Teste']
+    );
+    await onboardingDb.end();
 
-    const login = await request(port, 'POST', `/escolas/login/${school.id}`, {
+    const login = await request(port, 'POST', `/escolas/login/${schoolForLogin.id}`, {
       usuario: 'admin.teste', senha: 'senha123'
     });
     expect(login.status).toBe(200);
     const token = JSON.parse(login.body).token;
     expect(token).toBeTruthy();
+
+    const schools = await request(port, 'GET', '/escolas', undefined, token);
+    const school = JSON.parse(schools.body).data[0];
+    expect(school).toEqual(expect.objectContaining({ nome: 'Unidade Teste', login: 'admin.teste' }));
 
     const course = await request(port, 'POST', '/cursos', { nome: 'Informática', duracao: 1200 }, token);
     expect(course.status).toBe(201);

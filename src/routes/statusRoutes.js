@@ -21,10 +21,11 @@ const db = require('../config/database');
 const logger = require('../config/logger');
 const backupBanco = require('../services/backupBanco');
 const diagnostico = require('../services/diagnostico');
+const { publica } = require('../middlewares/autorizacao');
 
 const router = express.Router();
 
-router.get('/status', async (req, res) => {
+router.get('/status', publica(), async (req, res) => {
   const inicio = Date.now();
   const problemas = [];
 
@@ -131,7 +132,7 @@ router.get('/status', async (req, res) => {
  * Segredo aparece apenas como [DEFINIDO]/[NAO_DEFINIDO], o que responde "está configurado?" sem
  * revelar nada.
  */
-router.get('/diagnostico', async (req, res) => {
+router.get('/diagnostico', publica(), async (req, res) => {
   try {
     const bundle = await diagnostico.gerarBundle({ db, backupBanco });
     const nome = diagnostico.nomeArquivoBundle();

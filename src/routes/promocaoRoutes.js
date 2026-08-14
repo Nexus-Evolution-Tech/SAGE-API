@@ -1,6 +1,6 @@
 const express = require('express');
 const promocaoController = require('../controllers/promocaoController');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 
 const router = express.Router();
 

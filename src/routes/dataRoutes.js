@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 const { importarPlanilha } = require('../services/importService');
 const { exportarDados } = require('../services/exportService');
 const { emitNotification } = require('../services/notificationService');

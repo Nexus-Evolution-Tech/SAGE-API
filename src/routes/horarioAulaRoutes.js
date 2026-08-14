@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const horarioAulaController = require("../controllers/horarioAulaController");
-const autenticar = require("../middlewares/autenticar");
+const autenticar = require("../middlewares/autorizacao").exige('SECRETARIA');
 
 // Todas as rotas requerem autenticação
 router.use("/horarios-aulas", autenticar);

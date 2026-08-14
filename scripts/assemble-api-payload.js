@@ -31,7 +31,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
     'relatorioController.js', 'roomController.js', 'salaController.js',
     'schoolController.js', 'schoolPhotoController.js', 'subjectController.js', 'usuarioController.js'],
   docs: ['swagger.yml'], errors: ['ErroDispositivo.js'], jobs: ['scheduledJobs.js'],
-  middlewares: ['autenticar.js', 'monitorCallbackAuth.js', 'uploadFoto.js', 'validacao.js'],
+  middlewares: ['autenticar.js', 'autorizacao.js', 'monitorCallbackAuth.js', 'uploadFoto.js', 'validacao.js'],
   routes: ['accessRoutes.js', 'acessSolicitationRoutes.js', 'areaRoutes.js', 'classRoutes.js',
     'companyRoutes.js', 'courseRoutes.js', 'dataRoutes.js', 'deviceRoutes.js',
     'funcionarioHorarioRoutes.js', 'genericRoutesFactory.js', 'horarioAulaRoutes.js',

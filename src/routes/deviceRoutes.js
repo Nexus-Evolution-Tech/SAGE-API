@@ -1,9 +1,9 @@
 const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const dispositivosController = require('../controllers/deviceController');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 
-const router = gerarRotas(dispositivosController, 'dispositivos');
+const router = gerarRotas(dispositivosController, 'dispositivos', { autorizacao: 'ADMINISTRADOR' });
 
 const routerExtra = express.Router();
 
