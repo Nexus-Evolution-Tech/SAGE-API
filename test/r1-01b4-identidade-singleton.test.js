@@ -64,11 +64,13 @@ async function upload(port, token) {
 const describeDatabase = (await temBancoDisponivel()) ? describe : describe.skip;
 
 describe('helper singleton da unidade', () => {
-  it.each([[[]], [[{ id: 10 }, { id: 20 }]]])('rejeita cardinalidade %j sem LIMIT 1', async (unidades) => {
-    const query = vi.spyOn(db, 'query').mockResolvedValue([unidades, []]);
+  it('rejeita campo não permitido antes de consultar o banco', async () => {
+    const query = vi.spyOn(db, 'query');
     try {
-      await expect(buscarUnidadeSingleton()).rejects.toMatchObject({ code: singletonCode });
-      expect(query).toHaveBeenCalledWith('SELECT id FROM UnidadeEscolar ORDER BY id');
+      await expect(buscarUnidadeSingleton(['senha'])).rejects.toMatchObject({
+        code: 'UNIDADE_SINGLETON_CAMPOS_INVALIDOS'
+      });
+      expect(query).not.toHaveBeenCalled();
     } finally {
       query.mockRestore();
     }
