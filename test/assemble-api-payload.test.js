@@ -32,6 +32,7 @@ async function fixture() {
 
 describe('montagem segura do payload da API', () => {
   it('copia somente runtime, migrations e modelos vazios por allowlist', async () => {
+    expect(SOURCE_FILES).toContain('src/middlewares/autorizacao.js');
     const source = await fixture();
     const destination = `${source}-payload`;
     tempDirs.push(destination);
