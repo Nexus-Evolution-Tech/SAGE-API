@@ -258,52 +258,52 @@ async function executarSeeds() {
         lockAcquired = Number(lock.acquired) === 1;
         if (!lockAcquired) throw new Error('Nao foi possivel adquirir lock do bootstrap');
       }
-    const [existingSchool] = await connection.query(
-      `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
-    );
+      const [existingSchool] = await connection.query(
+        `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
+      );
 
-    if (existingSchool.length === 0) {
-      const login = initialLogin;
-      const senha = initialPassword;
-      const nome = initialName;
+      if (existingSchool.length === 0) {
+        const login = initialLogin;
+        const senha = initialPassword;
+        const nome = initialName;
 
-      if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
-        throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
-      }
-      if (!onboardingLocal && senha.length < 8) {
-        throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 8 caracteres');
-      }
-      if (!onboardingLocal && !nome) {
-        throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
-      }
-
-      if (onboardingLocal) {
-        logger.info(' Schema preparado; cadastro inicial será concluído na tela local do SAGE');
-      } else {
-        logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
-        const senhaHashed = await bcrypt.hash(senha, 10);
-        await connection.beginTransaction();
-        try {
-          await connection.query(
-            `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
-            [nome, login, senhaHashed]
-          );
-          await connection.query(
-            `INSERT INTO Usuario
-             (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
-             VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
-            [login, senhaHashed, nome]
-          );
-          await connection.commit();
-        } catch (error) {
-          await connection.rollback().catch(() => logger.warn('[SETUP] codigo=ROLLBACK_SEED_FALHOU'));
-          throw error;
+        if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
+          throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
         }
-        logger.info(' Unidade escolar inicial inserida com sucesso');
+        if (!onboardingLocal && senha.length < 8) {
+          throw new Error('SAGE_INITIAL_ADMIN_PASSWORD é obrigatório e deve ter ao menos 8 caracteres');
+        }
+        if (!onboardingLocal && !nome) {
+          throw new Error('SAGE_INITIAL_SCHOOL_NAME não pode ser vazio');
+        }
+
+        if (onboardingLocal) {
+          logger.info(' Schema preparado; cadastro inicial será concluído na tela local do SAGE');
+        } else {
+          logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
+          const senhaHashed = await bcrypt.hash(senha, 10);
+          await connection.beginTransaction();
+          try {
+            await connection.query(
+              `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
+              [nome, login, senhaHashed]
+            );
+            await connection.query(
+              `INSERT INTO Usuario
+               (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
+               VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
+              [login, senhaHashed, nome]
+            );
+            await connection.commit();
+          } catch (error) {
+            await connection.rollback().catch(() => logger.warn('[SETUP] codigo=ROLLBACK_SEED_FALHOU'));
+            throw error;
+          }
+          logger.info(' Unidade escolar inicial inserida com sucesso');
+        }
+      } else {
+        logger.info('🏫 Unidade escolar já existe; credencial preservada');
       }
-    } else {
-      logger.info('🏫 Unidade escolar já existe; credencial preservada');
-    }
 
     } finally {
       if (lockAcquired) {
