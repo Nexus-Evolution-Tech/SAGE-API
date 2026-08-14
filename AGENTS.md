@@ -9,12 +9,13 @@
 
 ## 0. Coordenação entre máquinas — leia antes de qualquer outra coisa
 
-O trabalho acontece em **duas máquinas que não enxergam o disco uma da outra**:
+O trabalho acontece em **três papéis coordenados por dois repositórios**:
 
 | Quem | Onde | Faz |
 |---|---|---|
-| **Arquiteto** (Claude) | macOS | Plano, spec, ADR, revisão de PR |
-| **Implementador** (Codex) | Windows, `C:\SAGE-WS` | Código, teste, PR |
+| **Arquiteto** | macOS | Plano, spec e ADR; valida somente ao fim da release |
+| **Engenheiro Pleno** | macOS, `~/Projetos/SAGE-WS` | Conduz os pacotes, revisa por conteúdo, aprova e avança |
+| **Agente de codificação** | Windows, `C:\SAGE-WS` | Escreve código, testes e PR; não decide arquitetura |
 
 **O GitHub é o único canal entre as duas. Não existe outro.** Se você mudou algo e não
 empurrou, para a outra máquina aquilo **não existe**.
@@ -45,9 +46,11 @@ empurrou, para a outra máquina aquilo **não existe**.
 
 ### Quem decide o quê
 
-O arquiteto não escreve código de produção; o implementador não decide arquitetura. Se a
-issue estiver ambígua **ou** se o plano contradisser o que você está vendo no código,
-**pare e pergunte** — não escolha por conta própria e não "conserte" o plano.
+O arquiteto define plano, especificação e ADR, e só valida ao fim da release. O Engenheiro
+Pleno conduz os pacotes, revisa por conteúdo, aprova e avança. O agente de codificação escreve
+código, testes e PR, mas não decide arquitetura. Se a issue estiver ambígua **ou** se o plano
+contradisser o que você está vendo no código, **pare e pergunte** — não escolha por conta
+própria e não "conserte" o plano.
 
 ---
 
