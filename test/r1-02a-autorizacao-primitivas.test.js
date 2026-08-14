@@ -44,10 +44,17 @@ describe('R1-02A — primitivas de autorização', () => {
 
     const app = express();
     const router = express.Router();
-    router.get('/admin', autorizacao.exige('ADMINISTRADOR'), (_req, res) => res.json({ ok: true }));
-    router.get('/secretaria', autorizacao.exige('SECRETARIA'), (_req, res) => res.json({ ok: true }));
-    router.get('/publica', autorizacao.publica(), (_req, res) => res.json({ ok: true }));
-    router.get('/sem-declaracao', (_req, res) => res.json({ ok: true }));
+    const adminMiddleware = autorizacao.exige('ADMINISTRADOR');
+    const secretariaMiddleware = autorizacao.exige('SECRETARIA');
+    const publicaMiddleware = autorizacao.publica();
+    router.get('/admin', autorizacao.barreiraAutorizacao(adminMiddleware), (_req, res) => res.json({ ok: true }));
+    router.get('/secretaria', autorizacao.barreiraAutorizacao(secretariaMiddleware), (_req, res) => res.json({ ok: true }));
+    router.get('/publica', autorizacao.barreiraAutorizacao(publicaMiddleware), (_req, res) => res.json({ ok: true }));
+    const semDeclaracao = (_req, res) => res.json({ ok: true });
+    const metadataAdulterado = (_req, res) => res.json({ ok: true });
+    metadataAdulterado.autorizacao = { tipo: 'publica' };
+    router.get('/sem-declaracao', autorizacao.barreiraAutorizacao(semDeclaracao));
+    router.get('/metadata-adulterado', autorizacao.barreiraAutorizacao(metadataAdulterado));
     app.use(router);
     server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -57,9 +64,13 @@ describe('R1-02A — primitivas de autorização', () => {
     const secretariaLayer = router.stack.find((layer) => layer.route?.path === '/secretaria');
     const publicaLayer = router.stack.find((layer) => layer.route?.path === '/publica');
     const semDeclaracaoLayer = router.stack.find((layer) => layer.route?.path === '/sem-declaracao');
-    expect(obterDeclaracaoAutorizacao(adminLayer.route.stack[0].handle)).toEqual({ tipo: 'papel', papel: 'ADMINISTRADOR' });
-    expect(obterDeclaracaoAutorizacao(secretariaLayer.route.stack[0].handle)).toEqual({ tipo: 'papel', papel: 'SECRETARIA' });
-    expect(obterDeclaracaoAutorizacao(publicaLayer.route.stack[0].handle)).toEqual({ tipo: 'publica' });
+    expect(obterDeclaracaoAutorizacao(adminMiddleware)).toEqual({ tipo: 'papel', papel: 'ADMINISTRADOR' });
+    expect(obterDeclaracaoAutorizacao(secretariaMiddleware)).toEqual({ tipo: 'papel', papel: 'SECRETARIA' });
+    expect(obterDeclaracaoAutorizacao(publicaMiddleware)).toEqual({ tipo: 'publica' });
+    expect(obterDeclaracaoAutorizacao(adminLayer.route.stack[0].handle)).toBeNull();
+    expect(obterDeclaracaoAutorizacao(secretariaLayer.route.stack[0].handle)).toBeNull();
+    expect(obterDeclaracaoAutorizacao(publicaLayer.route.stack[0].handle)).toBeNull();
+    expect(obterDeclaracaoAutorizacao(semDeclaracao)).toBeNull();
     expect(obterDeclaracaoAutorizacao(semDeclaracaoLayer.route.stack[0].handle)).toBeNull();
   });
 
@@ -81,6 +92,8 @@ describe('R1-02A — primitivas de autorização', () => {
     expect((await requisitar(porta, '/secretaria', { authorization: `Bearer ${tokenSecretaria}` })).status).toBe(200);
     expect((await requisitar(porta, '/secretaria', { authorization: `Bearer ${tokenAdmin}` })).status).toBe(200);
     expect((await requisitar(porta, '/admin?papel=ADMINISTRADOR')).status).toBe(401);
+    expect((await requisitar(porta, '/sem-declaracao')).status).toBe(403);
+    expect((await requisitar(porta, '/metadata-adulterado')).status).toBe(403);
   });
 
   it('recusa papel ausente ou desconhecido e libera pública somente por declaração explícita', async () => {

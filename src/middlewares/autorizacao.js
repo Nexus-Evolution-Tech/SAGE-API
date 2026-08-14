@@ -1,6 +1,8 @@
 const autenticar = require('./autenticar');
 
 const METADADO_AUTORIZACAO = 'autorizacao';
+const MARCA_DECLARACAO = Symbol('declaracao-autorizacao-sage');
+const PROPRIETARIO_DECLARACAO = Symbol('proprietario-declaracao-autorizacao-sage');
 const PAPEIS = new Set(['ADMINISTRADOR', 'SECRETARIA']);
 const PAPEIS_PERMITIDOS = Object.freeze({
   ADMINISTRADOR: Object.freeze(new Set(['ADMINISTRADOR'])),
@@ -8,8 +10,12 @@ const PAPEIS_PERMITIDOS = Object.freeze({
 });
 
 function anexarDeclaracao(middleware, declaracao) {
+  const metadado = { ...declaracao };
+  Object.defineProperty(metadado, MARCA_DECLARACAO, { value: true });
+  Object.defineProperty(metadado, PROPRIETARIO_DECLARACAO, { value: middleware });
+  Object.freeze(metadado);
   Object.defineProperty(middleware, METADADO_AUTORIZACAO, {
-    value: Object.freeze(declaracao),
+    value: metadado,
     enumerable: true,
     writable: false,
     configurable: false
@@ -20,11 +26,21 @@ function anexarDeclaracao(middleware, declaracao) {
 function obterDeclaracaoAutorizacao(handler) {
   const declaracao = handler?.[METADADO_AUTORIZACAO];
   if (!declaracao || typeof declaracao !== 'object' || Array.isArray(declaracao)) return null;
+  if (declaracao[MARCA_DECLARACAO] !== true || declaracao[PROPRIETARIO_DECLARACAO] !== handler) return null;
   if (declaracao.tipo === 'publica' && Object.keys(declaracao).length === 1) return declaracao;
   if (declaracao.tipo === 'papel' && Object.keys(declaracao).length === 2 && PAPEIS.has(declaracao.papel)) {
     return declaracao;
   }
   return null;
+}
+
+function barreiraAutorizacao(handler) {
+  return function verificarDeclaracaoAutorizacao(req, res, next) {
+    if (typeof handler !== 'function' || !obterDeclaracaoAutorizacao(handler)) {
+      return res.status(403).json({ message: 'Declaração de autorização inválida' });
+    }
+    return handler(req, res, next);
+  };
 }
 
 function exige(papel) {
@@ -52,6 +68,7 @@ function publica() {
 
 module.exports = {
   METADADO_AUTORIZACAO,
+  barreiraAutorizacao,
   exige,
   publica,
   obterDeclaracaoAutorizacao
