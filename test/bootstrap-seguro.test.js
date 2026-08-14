@@ -103,6 +103,12 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     expect(criadas[0].login).toBe(inicial.login);
     expect(criadas[0].senha).not.toBe(inicial.senha);
     expect(await bcrypt.compare(inicial.senha, criadas[0].senha)).toBe(true);
+    const [usuarios] = await db.query(
+      'SELECT id, login, senha_hash, papel FROM Usuario WHERE login = ?', [inicial.login]
+    );
+    expect(usuarios).toHaveLength(1);
+    expect(usuarios[0]).toMatchObject({ login: inicial.login, papel: 'ADMINISTRADOR' });
+    expect(await bcrypt.compare(inicial.senha, usuarios[0].senha_hash)).toBe(true);
 
     const hashOriginal = criadas[0].senha;
     const tentativaDeReset = credencialInicial();
@@ -112,12 +118,14 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     const [preservadas] = await db.query(
       'SELECT id, login, senha FROM UnidadeEscolar ORDER BY id'
     );
+    const [usuariosPreservados] = await db.query('SELECT login FROM Usuario');
     await db.end();
 
     expect(preservadas).toHaveLength(1);
     expect(preservadas[0].login).toBe(inicial.login);
     expect(preservadas[0].senha).toBe(hashOriginal);
     expect(await bcrypt.compare(tentativaDeReset.senha, preservadas[0].senha)).toBe(false);
+    expect(usuariosPreservados).toHaveLength(1);
   });
 
   it.each([

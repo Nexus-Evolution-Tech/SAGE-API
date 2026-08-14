@@ -270,10 +270,23 @@ async function executarSeeds() {
       } else {
         logger.info('🌱 Inserindo unidade escolar e credencial administrativa inicial');
         const senhaHashed = await bcrypt.hash(senha, 10);
-        await connection.query(
-          `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
-          [nome, login, senhaHashed]
-        );
+        await connection.beginTransaction();
+        try {
+          await connection.query(
+            `INSERT INTO UnidadeEscolar (nome, login, senha) VALUES (?, ?, ?)`,
+            [nome, login, senhaHashed]
+          );
+          await connection.query(
+            `INSERT INTO Usuario
+             (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
+             VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
+            [login, senhaHashed, nome]
+          );
+          await connection.commit();
+        } catch (error) {
+          await connection.rollback().catch(() => logger.warn('[SETUP] codigo=ROLLBACK_SEED_FALHOU'));
+          throw error;
+        }
         logger.info(' Unidade escolar inicial inserida com sucesso');
       }
     } else {
