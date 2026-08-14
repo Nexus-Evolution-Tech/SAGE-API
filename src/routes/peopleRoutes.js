@@ -2,7 +2,7 @@ const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const peopleController = require('../controllers/peopleController');
 const upload = require('../middlewares/uploadFoto');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = gerarRotas(peopleController, 'pessoas');
 

@@ -1,5 +1,5 @@
 const express = require('express');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 const usuarioController = require('../controllers/usuarioController');
 
 const router = express.Router();

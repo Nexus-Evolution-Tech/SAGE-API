@@ -2,7 +2,7 @@ const gerarRotas = require('./genericRoutesFactory');
 const schoolPhotoController = require('../controllers/schoolPhotoController');
 const express = require('express');
 const upload = require('../middlewares/uploadFoto');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = gerarRotas(schoolPhotoController, 'foto_escolas');
 

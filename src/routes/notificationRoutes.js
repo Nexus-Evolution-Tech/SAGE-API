@@ -7,12 +7,13 @@
 const express = require('express');
 const router = express.Router();
 const monitorCallbackAuth = require('../middlewares/monitorCallbackAuth');
+const { autenticacaoPropria } = require('../middlewares/autorizacao');
 const { processarNotificacaoMonitorDao } = require('../services/accessService');
 const logger = require('../config/logger');
 
 // POST /api/notifications/dao — alterações em access_logs, templates, cards, alarm_logs
 // Middleware opcional: token (query ?token= ou header X-Monitor-Token) e/ou IP whitelist quando configurados
-router.post('/api/notifications/dao', monitorCallbackAuth, async (req, res) => {
+router.post('/api/notifications/dao', autenticacaoPropria('monitorCallbackAuth'), monitorCallbackAuth, async (req, res) => {
   try {
     const payload = req.body || {};
     const deviceId = payload.device_id;

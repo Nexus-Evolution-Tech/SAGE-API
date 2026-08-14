@@ -1,11 +1,14 @@
 const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const schoolController = require('../controllers/schoolController');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 const upload = require('../middlewares/uploadFoto');
+const { preAutenticacao } = require('../middlewares/autorizacao');
 
 const router = gerarRotas(schoolController, 'escolas', {
+  listar: false,
   autenticarTodas: false,
+  autorizacao: 'ADMINISTRADOR',
   autenticarReqs: {
     listar: false,
     criar: true,
@@ -17,11 +20,11 @@ const router = gerarRotas(schoolController, 'escolas', {
 
 const routerExtra = express.Router();
 
-routerExtra.get('/setup/status', schoolController.bootstrapStatus);
-routerExtra.post('/setup/initialize', schoolController.bootstrapInitialize);
+routerExtra.get('/setup/status', preAutenticacao('bootstrap e estado de instalação'), schoolController.bootstrapStatus);
+routerExtra.post('/setup/initialize', preAutenticacao('criação inicial do administrador'), schoolController.bootstrapInitialize);
 
 // Recuperação de senha (público)
-routerExtra.post('/escolas/recuperar-acesso', schoolController.recuperarAcesso);
+routerExtra.post('/escolas/recuperar-acesso', preAutenticacao('recuperação local da conta'), schoolController.recuperarAcesso);
 
 // Configuração do sistema (modo Monitor vs Polling) — para Ferramentas na interface
 routerExtra.get('/config', autenticar, schoolController.getConfig);
@@ -33,9 +36,10 @@ routerExtra.patch('/unidade/trocar-senha', autenticar, schoolController.trocarSe
 routerExtra.post('/unidade/upload-logo', upload.single('logo'), autenticar, schoolController.uploadLogo);
 
 // Login (público)
-routerExtra.post('/escolas/login/:id', schoolController.login);
+routerExtra.post('/escolas/login/:id', preAutenticacao('obtenção de sessão'), schoolController.login);
 
 // CRUD escolas (listar, criar, por id, editar, deletar)
 routerExtra.use(router);
+routerExtra.get('/escolas', autenticar, schoolController.listar);
 
 module.exports = routerExtra;

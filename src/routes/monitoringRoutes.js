@@ -9,6 +9,9 @@ const globalState = require('../state/globalState');
 const redis = require('../config/redis');
 const logger = require('../config/logger');
 const db = require('../config/database');
+const { exige } = require('../middlewares/autorizacao');
+
+router.use('/monitoring', exige('ADMINISTRADOR'));
 
 // GET /monitoring/state - Snapshot completo do estado
 router.get('/monitoring/state', async (req, res) => {
@@ -184,7 +187,7 @@ router.get('/monitoring/sync-db', async (req, res) => {
 });
 
 // GET /sync-db - Rota alternativa sem prefixo /monitoring
-router.get('/sync-db', async (req, res) => {
+router.get('/sync-db', exige('ADMINISTRADOR'), async (req, res) => {
   try {
     const [[{ total }]] = await db.query('SELECT COUNT(*) AS total FROM sync_pendente');
     const [byOperation] = await db.query('SELECT operation, COUNT(*) AS total FROM sync_pendente GROUP BY operation');

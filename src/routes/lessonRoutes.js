@@ -1,6 +1,6 @@
 const express = require('express');
 const lessonController = require('../controllers/lessonController');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = express.Router();
 

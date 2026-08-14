@@ -2,7 +2,7 @@ const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const accessController = require('../controllers/accessController');
 const { sincronizarAcessos, sincronizarTodosAcessos } = require('../services/accessService');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = gerarRotas(accessController, 'acessos');
 const routerExtra = express.Router();

@@ -1,7 +1,7 @@
 const express = require('express');
 const gerarRotas = require('./genericRoutesFactory');
 const accessSolicitationController = require('../controllers/accessSolicitationController');
-const autenticar = require('../middlewares/autenticar');
+const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = gerarRotas(accessSolicitationController, 'solicitacoes-acessos', { criar: false, editar: false });
 

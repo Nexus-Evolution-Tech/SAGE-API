@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
 const loadRoutes = require("./config/loadRoutes");
+const { publica, assertArvoreExpress, instrumentarAplicacao } = require('./middlewares/autorizacao');
 const logger = require("./config/logger");
 const { globalDB, db } = require("./config/queryBuilder");
 global.db = globalDB;
@@ -24,6 +25,7 @@ const swaggerDocument = YAML.parse(
 );
 
 const app = express();
+instrumentarAplicacao(app);
 const webBuildIsAvailable = webBuildAvailable();
 
 function serveSpaNavigation(req, res, next) {
@@ -94,23 +96,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rotas de monitoramento (sem autenticação para simplificar)
-const monitoringRoutes = require('./routes/monitoringRoutes');
-app.use('/monitoring', monitoringRoutes);
-logger.info("Monitoramento disponível em: /monitoring/*");
-
-// Diagnóstico de acessos (catraca vs banco) — sem auth em desenvolvimento para poder abrir no navegador
-const dispositivosController = require('./controllers/deviceController');
-app.get('/diagnostico-acessos/:id', (req, res) => {
-  const key = process.env.DIAGNOSTICO_KEY;
-  const isDev = process.env.NODE_ENV !== 'production';
-  if (!isDev && key !== undefined && req.query.key !== key) {
-    return res.status(401).json({ message: 'Use ?key=... (configure DIAGNOSTICO_KEY no .env)' });
-  }
-  return dispositivosController.diagnosticoAcessos(req, res);
-});
-logger.info("Diagnóstico de acessos: GET /diagnostico-acessos/:id (em dev sem auth)");
-
 // Garante que todo estado gravável existe fora do release quando SAGE_DATA_DIR está configurado.
 try {
   ensureDataDirs();
@@ -169,7 +154,7 @@ app.use((err, req, res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', publica(), (req, res) => {
   const redis = require('./config/redis');
   const globalState = require('./state/globalState');
 
@@ -201,8 +186,11 @@ const checkReadiness = createReadinessChecker({
 });
 app.get(
   '/ready',
+  publica(),
   createReadinessHandler(checkReadiness, process.env.API_VERSION || packageVersion)
 );
+
+assertArvoreExpress(app);
 
 // Assets são resolvidos depois da infraestrutura. O fallback repete a lista explícita de rotas
 // do painel, para não transformar endpoints desconhecidos da API em index.html.
