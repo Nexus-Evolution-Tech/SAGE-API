@@ -68,6 +68,12 @@ function idDaRota(req, res) {
   return id;
 }
 
+function corpoDesativacaoVazio(body) {
+  return body === undefined || (body !== null && typeof body === 'object'
+    && !Array.isArray(body) && Object.getPrototypeOf(body) === Object.prototype
+    && Object.keys(body).length === 0);
+}
+
 async function editar(req, res) {
   const id = idDaRota(req, res);
   if (id === undefined) return res;
@@ -82,7 +88,7 @@ async function editar(req, res) {
 async function desativar(req, res) {
   const id = idDaRota(req, res);
   if (id === undefined) return res;
-  if (req.body && Object.keys(req.body).length) return responderErro(res, { code: 'USUARIO_DADOS_INVALIDOS' });
+  if (!corpoDesativacaoVazio(req.body)) return responderErro(res, { code: 'USUARIO_DADOS_INVALIDOS' });
   try {
     const usuario = await usuarioService.desativarUsuario(id);
     return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });

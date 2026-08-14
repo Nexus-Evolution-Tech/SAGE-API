@@ -186,7 +186,9 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
     expect((await requisitar(porta, 'GET', `/usuarios/${id}`, undefined, tokenDoAlvo)).status).toBe(401);
     const [[persistido]] = await banco.pool.query('SELECT id, ativo FROM Usuario WHERE id = ?', [id]);
     expect(persistido).toEqual({ id, ativo: 0 });
+    expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/desativar`, {}, token)).status).toBe(200);
     expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/desativar`, { ativo: true }, token)).status).toBe(400);
+    expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/desativar`, [], token)).status).toBe(400);
   });
 
   it('redefine a senha, exige troca e limpa falhas e bloqueio', async () => {
@@ -203,8 +205,12 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
     );
     expect(await bcrypt.compare(novaSenha, usuario.senha_hash)).toBe(true);
     expect(usuario).toMatchObject({ precisa_trocar_senha: 1, falhas_login: 0, bloqueado_ate: null });
-    expect((await requisitar(porta, 'POST', '/escolas/login/1', { usuario: 'secretaria.r1c.editada', senha: novaSenha })).body.precisa_trocar_senha).toBe(true);
-    for (const corpo of [{}, { senha_hash: 'nao-pode' }, { nova_senha: 'curta' }, { nova_senha: novaSenha, extra: true }, { nova_senha: 12345678 }]) {
+    const login = await requisitar(porta, 'POST', '/escolas/login/1', { usuario: 'secretaria.r1c.editada', senha: novaSenha });
+    expect(login.status).toBe(200);
+    expect(login.body.precisa_trocar_senha).toBe(true);
+    expect(login.body.token).toEqual(expect.any(String));
+    expect((await requisitar(porta, 'GET', '/usuarios', undefined, login.body.token)).status).toBe(428);
+    for (const corpo of [{}, { senha_hash: 'nao-pode' }, { nova_senha: 'curta' }, { nova_senha: novaSenha, extra: true }, { nova_senha: 12345678 }, { nova_senha: 'x'.repeat(73) }]) {
       expect((await requisitar(porta, 'PATCH', `/usuarios/${id}/redefinir-senha`, corpo, token)).status).toBe(400);
     }
   });
