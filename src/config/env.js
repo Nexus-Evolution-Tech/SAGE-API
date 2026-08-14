@@ -2,6 +2,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 
 const appRoot = path.resolve(__dirname, '..', '..');
+const FIRST_RUN_BOOTSTRAP_LOCK = 'sage_first_run_onboarding';
 const dataDir = process.env.SAGE_DATA_DIR;
 const explicitConfigFile = process.env.SAGE_CONFIG_FILE;
 
@@ -72,4 +73,4 @@ const config = Object.freeze({
   })
 });
 
-module.exports = { appRoot, configFile, config, numericConfig, numericEnvironment };
+module.exports = { appRoot, configFile, config, numericConfig, numericEnvironment, FIRST_RUN_BOOTSTRAP_LOCK };

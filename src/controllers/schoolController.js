@@ -3,6 +3,7 @@ const fs = require('fs');
 const gerarController = require('./genericControllerFactory');
 const { gerarToken } = require('../utils/jwt');
 const db = require('../config/database');
+const { FIRST_RUN_BOOTSTRAP_LOCK } = require('../config/env');
 const { compararHash, hashSenha } = require('../utils/criptografia');
 const crud = require('../utils/generic-db-utils');
 const logger = require('../config/logger');
@@ -59,7 +60,9 @@ const bootstrapInitialize = async (req, res) => {
   const connection = await db.getConnection();
   let lockAcquired = false;
   try {
-    const [[lock]] = await connection.query("SELECT GET_LOCK('sage_first_run_onboarding', 5) AS acquired");
+    const [[lock]] = await connection.query(
+      'SELECT GET_LOCK(?, 5) AS acquired', [FIRST_RUN_BOOTSTRAP_LOCK]
+    );
     lockAcquired = Number(lock.acquired) === 1;
     if (!lockAcquired) return res.status(503).json({ message: 'Outra configuração está em andamento' });
     await connection.beginTransaction();
@@ -76,6 +79,12 @@ const bootstrapInitialize = async (req, res) => {
        VALUES (?, ?, ?, ?, 0, NOW())`,
       [nome, loginInicial, senhaHash, hashChaveRecuperacao(chaveRecuperacao)]
     );
+    await connection.query(
+      `INSERT INTO Usuario
+       (login, senha_hash, nome_exibicao, papel, ativo, precisa_trocar_senha)
+       VALUES (?, ?, ?, 'ADMINISTRADOR', TRUE, FALSE)`,
+      [loginInicial, senhaHash, nome]
+    );
     await connection.commit();
     return res.status(201).json({ initialized: true, recoveryKey: chaveRecuperacao });
   } catch (error) {
@@ -84,7 +93,9 @@ const bootstrapInitialize = async (req, res) => {
     return res.status(500).json({ message: 'Não foi possível concluir a configuração inicial' });
   } finally {
     if (lockAcquired) {
-      await connection.query("SELECT RELEASE_LOCK('sage_first_run_onboarding')").catch(() => logger.warn('[ONBOARDING] codigo=LOCK_RELEASE_FALHOU'));
+      await connection.query(
+        'SELECT RELEASE_LOCK(?)', [FIRST_RUN_BOOTSTRAP_LOCK]
+      ).catch(() => logger.warn('[ONBOARDING] codigo=LOCK_RELEASE_FALHOU'));
     }
     connection.release();
   }
