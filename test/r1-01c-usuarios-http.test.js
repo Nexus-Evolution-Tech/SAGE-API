@@ -94,15 +94,23 @@ descreveMySql('R1-01C — criar, listar e obter usuários', () => {
     expect(lista.status).toBe(200);
     expect(lista.body.data.map(({ id }) => id)).toEqual(expect.arrayContaining(ids));
 
+    const respostas = [primeiro.body, segundo.body, lista.body];
     for (const id of ids) {
       const obtido = await requisitar(porta, 'GET', `/usuarios/${id}`, undefined, token);
       expect(obtido.status).toBe(200);
       expect(obtido.body.data).toEqual(expect.objectContaining({ id }));
+      expect(obtido.body.data).not.toHaveProperty('senha_hash');
+      expect(obtido.body.data).not.toHaveProperty('falhas_login');
+      expect(obtido.body.data).not.toHaveProperty('bloqueado_ate');
+      expect(obtido.body.data).not.toHaveProperty('ultimo_acesso');
+      respostas.push(obtido.body);
     }
-    const respostas = JSON.stringify([primeiro.body, segundo.body, lista.body]);
-    expect(respostas).not.toContain(token);
+    const inexistente = Math.max(...ids) + 100;
+    expect((await requisitar(porta, 'GET', `/usuarios/${inexistente}`, undefined, token)).status).toBe(404);
+    const respostasJson = JSON.stringify(respostas);
+    expect(respostasJson).not.toContain(token);
     for (const segredo of ['senha-segura-1', 'senha-segura-2', 'senha_hash', 'falhas_login', 'bloqueado_ate', 'ultimo_acesso']) {
-      expect(respostas).not.toContain(segredo);
+      expect(respostasJson).not.toContain(segredo);
     }
   });
 
