@@ -160,4 +160,19 @@ describeBanco('F8.1 — bootstrap seguro', () => {
     expect(unidades).toEqual([]);
     expect(tabelas[0].total).toBeGreaterThan(0);
   });
+
+  it('serializa duas instalacoes concorrentes e preserva um par de credenciais', async () => {
+    const nomeBanco = novoBanco('concorrente'); expect((await executarSetup(nomeBanco, null, { SAGE_ALLOW_FIRST_RUN_ONBOARDING: 'true' })).codigo).toBe(0);
+    const primeira = credencialInicial(); const segunda = credencialInicial(); const resultados = await Promise.all([executarSetup(nomeBanco, primeira), executarSetup(nomeBanco, segunda)]);
+    expect(resultados.every(({ codigo }) => codigo === 0)).toBe(true); const db = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    const [[resultado]] = await db.query('SELECT (SELECT COUNT(*) FROM UnidadeEscolar) unidades, (SELECT COUNT(*) FROM Usuario) usuarios, (SELECT login FROM UnidadeEscolar LIMIT 1) unidade_login, (SELECT senha FROM UnidadeEscolar LIMIT 1) unidade_senha, (SELECT login FROM Usuario LIMIT 1) usuario_login, (SELECT senha_hash FROM Usuario LIMIT 1) usuario_hash'); await db.end();
+    const vencedora = [primeira, segunda].find(({ login }) => login === resultado.unidade_login); expect(resultado).toMatchObject({ unidades: 1, usuarios: 1, usuario_login: resultado.unidade_login }); expect(vencedora).toBeDefined(); expect(await bcrypt.compare(vencedora.senha, resultado.unidade_senha)).toBe(true); expect(await bcrypt.compare(vencedora.senha, resultado.usuario_hash)).toBe(true);
+  });
+
+  it('faz rollback dos dois inserts quando o Usuario falha', async () => {
+    const nomeBanco = novoBanco('rollback_usuario'); expect((await executarSetup(nomeBanco, null, { SAGE_ALLOW_FIRST_RUN_ONBOARDING: 'true' })).codigo).toBe(0);
+    const db = await mysql.createConnection({ ...configConexao(), database: nomeBanco }); await db.query("CREATE TRIGGER falha_usuario_bootstrap BEFORE INSERT ON Usuario FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rollback deterministico'"); await db.end();
+    expect((await executarSetup(nomeBanco, credencialInicial())).codigo).not.toBe(0); const consulta = await mysql.createConnection({ ...configConexao(), database: nomeBanco });
+    const [[totais]] = await consulta.query('SELECT (SELECT COUNT(*) FROM UnidadeEscolar) unidades, (SELECT COUNT(*) FROM Usuario) usuarios'); await consulta.end(); expect(totais).toEqual({ unidades: 0, usuarios: 0 });
+  });
 });

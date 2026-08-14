@@ -243,17 +243,36 @@ async function executarSeeds() {
 
     // A credencial inicial só é consumida quando ainda não existe unidade. Em upgrades, qualquer
     // valor presente no ambiente deve ser ignorado para nunca redefinir acesso existente.
+    const initialLogin = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
+    const initialPassword = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
+    const initialName = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
+    const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
+      !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
+      !process.env.SAGE_INITIAL_SCHOOL_NAME;
+    const hasInitialInput = Boolean(process.env.SAGE_INITIAL_ADMIN_LOGIN ||
+      process.env.SAGE_INITIAL_ADMIN_PASSWORD || process.env.SAGE_INITIAL_SCHOOL_NAME);
+    if (!onboardingLocal && hasInitialInput &&
+      (initialLogin.length < 3 || initialLogin.length > 100 || initialPassword.length < 8 || !initialName)) {
+      throw new Error('SAGE_INITIAL_ADMIN_LOGIN SAGE_INITIAL_ADMIN_PASSWORD SAGE_INITIAL_SCHOOL_NAME invalidos');
+    }
+
+    let lockAcquired = false;
+    try {
+      if (!onboardingLocal) {
+        const [[lock]] = await connection.query(
+          'SELECT GET_LOCK(?, 5) AS acquired', ['sage_environment_bootstrap']
+        );
+        lockAcquired = Number(lock.acquired) === 1;
+        if (!lockAcquired) throw new Error('Nao foi possivel adquirir lock do bootstrap');
+      }
     const [existingSchool] = await connection.query(
       `SELECT id FROM UnidadeEscolar ORDER BY id LIMIT 1`
     );
 
     if (existingSchool.length === 0) {
-      const login = (process.env.SAGE_INITIAL_ADMIN_LOGIN || '').trim();
-      const senha = process.env.SAGE_INITIAL_ADMIN_PASSWORD || '';
-      const nome = (process.env.SAGE_INITIAL_SCHOOL_NAME || 'Unidade Escolar').trim();
-      const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
-        !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
-        !process.env.SAGE_INITIAL_SCHOOL_NAME;
+      const login = initialLogin;
+      const senha = initialPassword;
+      const nome = initialName;
 
       if (!onboardingLocal && (login.length < 3 || login.length > 100)) {
         throw new Error('SAGE_INITIAL_ADMIN_LOGIN é obrigatório e deve ter entre 3 e 100 caracteres');
@@ -291,6 +310,12 @@ async function executarSeeds() {
       }
     } else {
       logger.info('🏫 Unidade escolar já existe; credencial preservada');
+    }
+
+    } finally {
+      if (lockAcquired) {
+        await connection.query('SELECT RELEASE_LOCK(?)', ['sage_environment_bootstrap']).catch(() => logger.warn('[SETUP] codigo=LOCK_RELEASE_FALHOU'));
+      }
     }
 
     // Seed: Área padrão (para dispositivos/catracas)
