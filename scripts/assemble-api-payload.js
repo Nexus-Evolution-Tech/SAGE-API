@@ -42,6 +42,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
   services: ['accessService.js', 'backupBanco.js', 'catracaImportService.js', 'controlIdService.js',
     'deviceService.js', 'diagnostico.js', 'exportService.js', 'importService.js',
     'networkDiscoveryService.js', 'notificationService.js', 'peopleService.js', 'presenceService.js',
+    'usuarioService.js',
     'promocaoAlunosService.js', 'protecaoLogs.js', 'readinessService.js', 'sanitizador.js',
     'saudeDispositivos.js', 'sync.js'],
   state: ['globalState.js'],
