@@ -20,9 +20,19 @@ process.env.NODE_ENV = 'test';
 
 const app = require('../src/app');
 const schoolController = require('../src/controllers/schoolController');
+const logger = require('../src/config/logger');
 
 function hashChave(chave) {
   return crypto.createHash('sha256').update(chave, 'utf8').digest('hex');
+}
+
+function payloadRecuperacao(login, chave, senha) {
+  return {
+    login,
+    chave_recuperacao: chave,
+    nova_senha: senha,
+    confirmacao_nova_senha: senha
+  };
 }
 
 function request(port, body) {
@@ -130,23 +140,20 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
   it('aplica bloqueio temporário para chave inválida sem enumerar login', async () => {
     const respostas = [];
     for (let tentativa = 0; tentativa < 5; tentativa++) {
-      respostas.push(await request(port, {
-        login: tentativa === 4 ? 'login-inexistente' : 'admin-diferente',
-        chave_recuperacao: 'chave-incorreta',
-        nova_senha: 'senha-nova-8',
-        confirmacao_nova_senha: 'senha-nova-8'
-      }));
+      respostas.push(await request(
+        port,
+        payloadRecuperacao(
+          tentativa === 4 ? 'login-inexistente' : 'admin-diferente',
+          'chave-incorreta',
+          'senha-nova-8'
+        )
+      ));
     }
     expect(respostas.slice(0, 4).every((resposta) => resposta.status === 401)).toBe(true);
     expect(respostas[4].status).toBe(429);
     expect(respostas[0].body).toEqual(respostas[4].body);
     expect(JSON.stringify(respostas[0].body)).not.toContain('admin-diferente');
-    const bloqueada = await request(port, {
-      login: 'admin-diferente',
-      chave_recuperacao: chaveInicial,
-      nova_senha: 'senha-nova-8',
-      confirmacao_nova_senha: 'senha-nova-8'
-    });
+    const bloqueada = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, 'senha-nova-8'));
     expect(bloqueada.status).toBe(429);
     await db.query(
       'UPDATE UnidadeEscolar SET recuperacao_falhas = 0, recuperacao_bloqueada_ate = NULL WHERE id = ?',
@@ -155,16 +162,26 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
   });
 
   it('recusa SECRETARIA mesmo com a chave local válida', async () => {
-    const resposta = await request(port, {
-      login: 'secretaria-r1-01b3',
-      chave_recuperacao: chaveInicial,
-      nova_senha: 'senha-nova-8',
-      confirmacao_nova_senha: 'senha-nova-8'
-    });
+    const resposta = await request(port, payloadRecuperacao('secretaria-r1-01b3', chaveInicial, 'senha-nova-8'));
     expect(resposta.status).toBe(401);
     expect(JSON.stringify(resposta.body)).not.toMatch(/secretaria-r1-01b3|senha-nova-8|chave-local-r1-01b3/i);
     const [[secretaria]] = await db.query('SELECT senha_hash FROM Usuario WHERE id = ?', [secretariaId]);
     expect(await bcrypt.compare('senha-secretaria', secretaria.senha_hash)).toBe(true);
+  });
+
+  it('recusa administrador inativo sem alterar sua senha', async () => {
+    await db.query('UPDATE Usuario SET ativo = FALSE WHERE id = ?', [adminId]);
+    const resposta = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, 'senha-inativa-8'));
+    expect(resposta.status).toBe(401);
+    expect(resposta.body).toEqual({ message: 'Chave inválida ou login não autorizado.' });
+    expect(JSON.stringify(resposta.body)).not.toContain('admin-diferente');
+    const [[admin]] = await db.query('SELECT senha_hash FROM Usuario WHERE id = ?', [adminId]);
+    expect(await bcrypt.compare(senhaAdminAntiga, admin.senha_hash)).toBe(true);
+    await db.query('UPDATE Usuario SET ativo = TRUE WHERE id = ?', [adminId]);
+    await db.query(
+      'UPDATE UnidadeEscolar SET recuperacao_falhas = 0, recuperacao_bloqueada_ate = NULL WHERE id = ?',
+      [unidadeId]
+    );
   });
 
   it('faz rollback se a rotação da chave falhar depois da senha do usuário', async () => {
@@ -173,14 +190,17 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
       `CREATE TRIGGER \`${trigger}\` BEFORE UPDATE ON UnidadeEscolar FOR EACH ROW
        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'falha transacional controlada'`
     );
-    const resposta = await request(port, {
-      login: 'admin-diferente',
-      chave_recuperacao: chaveInicial,
-      nova_senha: 'senha-nova-8',
-      confirmacao_nova_senha: 'senha-nova-8'
-    });
-    expect(resposta.status).toBe(500);
-    expect(JSON.stringify(resposta.body)).not.toMatch(/falha transacional|admin-diferente|senha-nova-8/i);
+    const loggerError = vi.spyOn(logger, 'error');
+    try {
+      const resposta = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, 'senha-nova-8'));
+      expect(resposta.status).toBe(500);
+      expect(JSON.stringify(resposta.body)).not.toMatch(/falha transacional|admin-diferente|senha-nova-8/i);
+      expect(loggerError).toHaveBeenCalledWith('[RECUPERACAO] codigo=RECUPERACAO_LOCAL_FALHOU');
+      expect(JSON.stringify(loggerError.mock.calls)).not.toContain('falha transacional controlada');
+    } finally {
+      loggerError.mockRestore();
+      await db.query(`DROP TRIGGER \`${trigger}\``);
+    }
     const [[admin]] = await db.query(
       'SELECT senha_hash, precisa_trocar_senha, falhas_login, bloqueado_ate FROM Usuario WHERE id = ?',
       [adminId]
@@ -193,9 +213,8 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
     );
     expect(unidade.senha).toBe(hashUnidadeOriginal);
     expect(unidade.recuperacao_chave_hash).toBe(hashChave(chaveInicial));
-    expect(unidade.recuperacao_falhas).toBe(1);
+    expect(unidade.recuperacao_falhas).toBe(0);
     expect(unidade.recuperacao_bloqueada_ate).toBeNull();
-    await db.query(`DROP TRIGGER \`${trigger}\``);
   });
 
   it('exige a única unidade, seleciona o administrador separadamente e limpa os estados', async () => {
@@ -205,24 +224,17 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
        VALUES (?, ?, ?, ?)`,
       ['Outra unidade', 'outra-unidade', hashUnidadeOriginal, hashChave('outra-chave')]
     );
-    const comDuasUnidades = await request(port, {
-      login: 'admin-diferente',
-      chave_recuperacao: chaveInicial,
-      nova_senha: senhaNova,
-      confirmacao_nova_senha: senhaNova
-    });
+    const comDuasUnidades = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, senhaNova));
     expect(comDuasUnidades.status).toBe(401);
     await db.query('DELETE FROM UnidadeEscolar WHERE id = ?', [outra.insertId]);
 
-    const resposta = await request(port, {
-      login: 'admin-diferente',
-      chave_recuperacao: chaveInicial,
-      nova_senha: senhaNova,
-      confirmacao_nova_senha: senhaNova
-    });
+    const resposta = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, senhaNova));
     expect(resposta.status).toBe(200);
-    expect(resposta.body).toEqual({ message: expect.any(String) });
-    expect(resposta.body).not.toHaveProperty('recoveryKey');
+    expect(resposta.body).toMatchObject({
+      message: expect.any(String),
+      recoveryKey: expect.any(String)
+    });
+    expect(resposta.body.recoveryKey).not.toBe(chaveInicial);
     expect(JSON.stringify(resposta.body)).not.toMatch(/senha-recuperada-8|chave-local-r1-01b3|admin-diferente/i);
 
     const [[admin]] = await db.query(
@@ -236,15 +248,11 @@ describeDatabase('R1-01B3 — recuperação local administrativa', () => {
       [unidadeId]
     );
     expect(await bcrypt.compare(senhaUnidadeLegada, unidade.senha)).toBe(true);
+    expect(unidade.recuperacao_chave_hash).toBe(hashChave(resposta.body.recoveryKey));
     expect(unidade.recuperacao_chave_hash).not.toBe(hashChave(chaveInicial));
     expect(unidade).toMatchObject({ recuperacao_falhas: 0, recuperacao_bloqueada_ate: null });
 
-    const chaveAntiga = await request(port, {
-      login: 'admin-diferente',
-      chave_recuperacao: chaveInicial,
-      nova_senha: 'outra-senha-8',
-      confirmacao_nova_senha: 'outra-senha-8'
-    });
+    const chaveAntiga = await request(port, payloadRecuperacao('admin-diferente', chaveInicial, 'outra-senha-8'));
     expect(chaveAntiga.status).toBe(401);
   });
 });

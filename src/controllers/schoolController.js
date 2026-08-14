@@ -149,7 +149,7 @@ const recuperarAcesso = async (req, res) => {
     }
     const [[usuario]] = await connection.query(
       `SELECT id FROM Usuario
-       WHERE login = ? AND papel = 'ADMINISTRADOR' LIMIT 1 FOR UPDATE`, [login]
+       WHERE login = ? AND papel = 'ADMINISTRADOR' AND ativo = TRUE LIMIT 1 FOR UPDATE`, [login]
     );
     if (!usuario) {
       const falhas = Number(unidade.recuperacao_falhas || 0) + 1;
@@ -173,7 +173,7 @@ const recuperarAcesso = async (req, res) => {
       [hashChaveRecuperacao(novaChave), unidade.id]
     );
     await connection.commit();
-    return res.json({ message: 'Senha alterada com sucesso.' });
+    return res.json({ message: 'Senha alterada com sucesso.', recoveryKey: novaChave });
   } catch (error) {
     await connection.rollback().catch(() => logger.warn('[RECUPERACAO] codigo=ROLLBACK_FALHOU'));
     logger.error('[RECUPERACAO] codigo=RECUPERACAO_LOCAL_FALHOU');
