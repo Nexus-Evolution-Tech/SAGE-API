@@ -26,6 +26,14 @@ function hashChaveRecuperacao(chave) {
   return crypto.createHash('sha256').update(String(chave), 'utf8').digest('hex');
 }
 
+function compararChaveRecuperacao(hashArmazenado, chave) {
+  const recebido = Buffer.from(hashChaveRecuperacao(chave), 'hex');
+  const esperado = Buffer.alloc(recebido.length);
+  const hashValido = typeof hashArmazenado === 'string' && /^[a-f0-9]{64}$/i.test(hashArmazenado);
+  if (hashValido) Buffer.from(hashArmazenado, 'hex').copy(esperado);
+  return crypto.timingSafeEqual(esperado, recebido) && hashValido;
+}
+
 function isLoopbackRequest(req) {
   const address = req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || '';
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
@@ -115,36 +123,57 @@ const recuperarAcesso = async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [[unidade]] = await connection.query(
+    const [unidades] = await connection.query(
       `SELECT id, recuperacao_chave_hash, recuperacao_falhas, recuperacao_bloqueada_ate
-       FROM UnidadeEscolar WHERE login = ? LIMIT 1 FOR UPDATE`, [login]
+       FROM UnidadeEscolar ORDER BY id FOR UPDATE`
     );
+    const unidade = unidades.length === 1 ? unidades[0] : undefined;
     const bloqueada = unidade?.recuperacao_bloqueada_ate && new Date(unidade.recuperacao_bloqueada_ate).getTime() > Date.now();
-    if (!unidade || bloqueada) {
+    const chaveCorreta = compararChaveRecuperacao(unidade?.recuperacao_chave_hash, chave);
+    if (bloqueada) {
       await connection.rollback();
       return res.status(429).json({ message: 'Chave inválida ou temporariamente bloqueada. Tente novamente mais tarde.' });
     }
-    const esperado = Buffer.from(unidade.recuperacao_chave_hash || '', 'hex');
-    const recebido = Buffer.from(hashChaveRecuperacao(chave), 'hex');
-    const correta = esperado.length === recebido.length && crypto.timingSafeEqual(esperado, recebido);
-    if (!correta) {
+    if (!unidade || !chaveCorreta) {
+      if (!unidade) {
+        await connection.rollback();
+        return res.status(401).json({ message: 'Chave inválida ou login não autorizado.' });
+      }
       const falhas = Number(unidade.recuperacao_falhas || 0) + 1;
       await connection.query(
         'UPDATE UnidadeEscolar SET recuperacao_falhas = ?, recuperacao_bloqueada_ate = ? WHERE id = ?',
         [falhas, falhas >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null, unidade.id]
       );
       await connection.commit();
-      return res.status(falhas >= 5 ? 429 : 401).json({ message: 'Chave inválida.' });
+      return res.status(falhas >= 5 ? 429 : 401).json({ message: 'Chave inválida ou login não autorizado.' });
+    }
+    const [[usuario]] = await connection.query(
+      `SELECT id FROM Usuario
+       WHERE login = ? AND papel = 'ADMINISTRADOR' LIMIT 1 FOR UPDATE`, [login]
+    );
+    if (!usuario) {
+      const falhas = Number(unidade.recuperacao_falhas || 0) + 1;
+      await connection.query(
+        'UPDATE UnidadeEscolar SET recuperacao_falhas = ?, recuperacao_bloqueada_ate = ? WHERE id = ?',
+        [falhas, falhas >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null, unidade.id]
+      );
+      await connection.commit();
+      return res.status(falhas >= 5 ? 429 : 401).json({ message: 'Chave inválida ou login não autorizado.' });
     }
     const senhaHash = await hashSenha(novaSenha);
     const novaChave = gerarChaveRecuperacao();
     await connection.query(
-      `UPDATE UnidadeEscolar SET senha = ?, recuperacao_chave_hash = ?, recuperacao_falhas = 0,
+      `UPDATE Usuario SET senha_hash = ?, precisa_trocar_senha = FALSE,
+       falhas_login = 0, bloqueado_ate = NULL WHERE id = ?`,
+      [senhaHash, usuario.id]
+    );
+    await connection.query(
+      `UPDATE UnidadeEscolar SET recuperacao_chave_hash = ?, recuperacao_falhas = 0,
        recuperacao_bloqueada_ate = NULL, recuperacao_gerada_em = NOW() WHERE id = ?`,
-      [senhaHash, hashChaveRecuperacao(novaChave), unidade.id]
+      [hashChaveRecuperacao(novaChave), unidade.id]
     );
     await connection.commit();
-    return res.json({ message: 'Senha alterada com sucesso.', recoveryKey: novaChave });
+    return res.json({ message: 'Senha alterada com sucesso.' });
   } catch (error) {
     await connection.rollback().catch(() => logger.warn('[RECUPERACAO] codigo=ROLLBACK_FALHOU'));
     logger.error('[RECUPERACAO] codigo=RECUPERACAO_LOCAL_FALHOU');
