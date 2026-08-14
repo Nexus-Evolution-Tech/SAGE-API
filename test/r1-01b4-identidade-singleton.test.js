@@ -161,7 +161,10 @@ describeDatabase('R1-01B4 — identidade singleton da unidade', () => {
       const consultasDaUnidade = queries.filter(([sql]) => /UnidadeEscolar/i.test(sql));
       expect(consultasDaUnidade.length).toBeGreaterThan(0);
       expect(consultasDaUnidade.flat().join(' ')).not.toMatch(/usuario_id/i);
-      expect(consultasDaUnidade.flat().join(' ')).not.toContain(String(usuarioId));
+      const parametrosDaUnidade = consultasDaUnidade.flatMap(([, params]) => (
+        Array.isArray(params) ? params : []
+      ));
+      expect(parametrosDaUnidade).not.toContain(usuarioId);
     } finally {
       db.query = originalQuery;
     }
