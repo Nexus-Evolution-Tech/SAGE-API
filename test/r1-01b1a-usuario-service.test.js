@@ -34,6 +34,12 @@ describeMySql('R1-01B1a — serviço de Usuario e sessão', () => {
     const resultados = await Promise.all(usuarios.map((usuario) => usuarioService.autenticar(usuario.login, usuario.senha)));
     expect(resultados.every((resultado) => resultado.ok)).toBe(true);
     expect(resultados[0].usuario.id).not.toBe(resultados[1].usuario.id);
+    expect(resultados[0].usuario).not.toHaveProperty('senha_hash');
+    expect(resultados[0].usuario).not.toHaveProperty('bloqueio_expirado');
+    const sessao = await usuarioService.buscarParaSessao(usuarios[0].id);
+    expect(sessao).toMatchObject({ id: usuarios[0].id, ativo: 1 });
+    expect(sessao).not.toHaveProperty('senha_hash');
+    expect(sessao).not.toHaveProperty('bloqueio_expirado');
   });
 
   it('recusa usuario inativo e inexistente', async () => {
@@ -72,11 +78,15 @@ describeMySql('R1-01B1a — serviço de Usuario e sessão', () => {
 
   it('limpa falhas e bloqueio após login correto', async () => {
     await banco.pool.query(
-      'UPDATE Usuario SET falhas_login = 4, bloqueado_ate = NULL WHERE id = ?', [usuarios[1].id]
+      'UPDATE Usuario SET falhas_login = 4, bloqueado_ate = NULL, ultimo_acesso = NULL WHERE id = ?', [usuarios[1].id]
     );
     expect((await usuarioService.autenticar(usuarios[1].login, usuarios[1].senha)).ok).toBe(true);
-    const [[estado]] = await banco.pool.query('SELECT falhas_login, bloqueado_ate FROM Usuario WHERE id = ?', [usuarios[1].id]);
-    expect(estado).toEqual({ falhas_login: 0, bloqueado_ate: null });
+    const [[estado]] = await banco.pool.query(
+      'SELECT falhas_login, bloqueado_ate, ultimo_acesso FROM Usuario WHERE id = ?', [usuarios[1].id]
+    );
+    expect(estado.falhas_login).toBe(0);
+    expect(estado.bloqueado_ate).toBeNull();
+    expect(estado.ultimo_acesso).not.toBeNull();
   });
 
   it('aceita a credencial migrada curta preservada', async () => {

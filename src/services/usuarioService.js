@@ -4,15 +4,23 @@ const logger = require('../config/logger');
 
 const LIMITE_FALHAS = 5;
 const BLOQUEIO_MS = 15 * 60 * 1000;
-const CAMPOS_SESSAO = `id, login, nome_exibicao, papel, ativo, pessoa_id,
-  precisa_trocar_senha, falhas_login, bloqueado_ate, ultimo_acesso`;
+const CAMPOS_SESSAO = [
+  'id', 'login', 'nome_exibicao', 'papel', 'ativo', 'pessoa_id',
+  'precisa_trocar_senha', 'falhas_login', 'bloqueado_ate', 'ultimo_acesso'
+];
+const CAMPOS_SESSAO_SQL = CAMPOS_SESSAO.join(', ');
+
+function projetarSessao(usuario) {
+  return Object.fromEntries(CAMPOS_SESSAO.map((campo) => [campo, usuario[campo]]));
+}
 
 async function autenticar(login, senha) {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
     const [[usuario]] = await connection.query(
-      `SELECT *, (bloqueado_ate IS NOT NULL AND bloqueado_ate <= NOW()) AS bloqueio_expirado
+      `SELECT ${CAMPOS_SESSAO_SQL}, senha_hash,
+              (bloqueado_ate IS NOT NULL AND bloqueado_ate <= NOW()) AS bloqueio_expirado
        FROM Usuario WHERE login = ? LIMIT 1 FOR UPDATE`, [login]
     );
     const bloqueioExpirado = Boolean(usuario?.bloqueio_expirado);
@@ -32,6 +40,8 @@ async function autenticar(login, senha) {
     const senhaCorreta = typeof senha === 'string' && senha.length > 0
       ? await compararHash(senha, usuario.senha_hash)
       : false;
+    delete usuario.senha_hash;
+    delete usuario.bloqueio_expirado;
     if (!senhaCorreta) {
       const falhas = falhasAnteriores + 1;
       await connection.query(
@@ -47,7 +57,7 @@ async function autenticar(login, senha) {
       [usuario.id]
     );
     await connection.commit();
-    return { ok: true, usuario };
+    return { ok: true, usuario: projetarSessao(usuario) };
   } catch (error) {
     await connection.rollback().catch(() => logger.warn('[AUTH] codigo=ROLLBACK_FALHOU'));
     throw error;
@@ -58,9 +68,9 @@ async function autenticar(login, senha) {
 
 async function buscarParaSessao(usuarioId) {
   const [[usuario]] = await db.query(
-    `SELECT ${CAMPOS_SESSAO} FROM Usuario WHERE id = ? AND ativo = TRUE LIMIT 1`, [usuarioId]
+    `SELECT ${CAMPOS_SESSAO_SQL} FROM Usuario WHERE id = ? AND ativo = TRUE LIMIT 1`, [usuarioId]
   );
-  return usuario;
+  return usuario ? projetarSessao(usuario) : usuario;
 }
 
 module.exports = { LIMITE_FALHAS, BLOQUEIO_MS, autenticar, buscarParaSessao };
