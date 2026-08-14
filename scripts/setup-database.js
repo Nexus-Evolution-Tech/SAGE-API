@@ -1,5 +1,5 @@
 // Carregar configuração por caminho absoluto antes de ler as variáveis.
-require('../src/config/env');
+const { FIRST_RUN_BOOTSTRAP_LOCK } = require('../src/config/env');
 
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
@@ -249,18 +249,11 @@ async function executarSeeds() {
     const onboardingLocal = process.env.SAGE_ALLOW_FIRST_RUN_ONBOARDING === 'true' &&
       !process.env.SAGE_INITIAL_ADMIN_LOGIN && !process.env.SAGE_INITIAL_ADMIN_PASSWORD &&
       !process.env.SAGE_INITIAL_SCHOOL_NAME;
-    const hasInitialInput = Boolean(process.env.SAGE_INITIAL_ADMIN_LOGIN ||
-      process.env.SAGE_INITIAL_ADMIN_PASSWORD || process.env.SAGE_INITIAL_SCHOOL_NAME);
-    if (!onboardingLocal && hasInitialInput &&
-      (initialLogin.length < 3 || initialLogin.length > 100 || initialPassword.length < 8 || !initialName)) {
-      throw new Error('SAGE_INITIAL_ADMIN_LOGIN SAGE_INITIAL_ADMIN_PASSWORD SAGE_INITIAL_SCHOOL_NAME invalidos');
-    }
-
     let lockAcquired = false;
     try {
       if (!onboardingLocal) {
         const [[lock]] = await connection.query(
-          'SELECT GET_LOCK(?, 5) AS acquired', ['sage_environment_bootstrap']
+          'SELECT GET_LOCK(?, 5) AS acquired', [FIRST_RUN_BOOTSTRAP_LOCK]
         );
         lockAcquired = Number(lock.acquired) === 1;
         if (!lockAcquired) throw new Error('Nao foi possivel adquirir lock do bootstrap');
@@ -314,7 +307,9 @@ async function executarSeeds() {
 
     } finally {
       if (lockAcquired) {
-        await connection.query('SELECT RELEASE_LOCK(?)', ['sage_environment_bootstrap']).catch(() => logger.warn('[SETUP] codigo=LOCK_RELEASE_FALHOU'));
+        await connection.query(
+          'SELECT RELEASE_LOCK(?)', [FIRST_RUN_BOOTSTRAP_LOCK]
+        ).catch(() => logger.warn('[SETUP] codigo=LOCK_RELEASE_FALHOU'));
       }
     }
 
