@@ -1,4 +1,35 @@
 const db = require('../config/database');
+const projecoes = require('../config/projecoes');
+const { filtrarDadosDeEscrita } = require('./generic-db-utils');
+
+const camposFilhos = new Set(['ra', 'rm', 'turma_id', 'divisao', 'status', 'matricula', 'data_admissao', 'data_saida', 'tipo_contrato', 'cargo', 'empresa_id', 'funcao', 'aluno_id']);
+
+function filtrarDadosPessoa(dados = {}) {
+  const base = {}, filhos = {}, desconhecidas = [];
+  const declaradas = new Set([...projecoes.Pessoa.leitura, ...projecoes.Pessoa.escrita, ...projecoes.Pessoa.segredo]);
+  for (const [chave, valor] of Object.entries(dados)) {
+    if (declaradas.has(chave)) base[chave] = valor;
+    else if (camposFilhos.has(chave)) filhos[chave] = valor;
+    else if (valor !== undefined) desconhecidas.push(chave);
+  }
+  if (desconhecidas.length) {
+    const erro = new Error(`ESCRITA_CHAVE_NAO_DECLARADA: ${desconhecidas.join(', ')}`);
+    erro.code = 'ESCRITA_CHAVE_NAO_DECLARADA'; erro.chaves = desconhecidas; throw erro;
+  }
+  let filtrado = { dados: {}, ignorados: [] };
+  if (Object.keys(base).length) {
+    try { filtrado = filtrarDadosDeEscrita('Pessoa', base); }
+    catch (erro) {
+      if (erro.code !== 'ESCRITA_NENHUM_CAMPO_APLICAVEL' || !Object.keys(filhos).length) throw erro;
+      filtrado = { dados: {}, ignorados: erro.ignorados || [] };
+    }
+  }
+  if (!Object.keys(filtrado.dados).length && !Object.keys(filhos).length) {
+    const erro = new Error('ESCRITA_NENHUM_CAMPO_APLICAVEL: nenhum campo aplicável');
+    erro.code = 'ESCRITA_NENHUM_CAMPO_APLICAVEL'; erro.ignorados = filtrado.ignorados; throw erro;
+  }
+  return { dados: { ...filtrado.dados, ...filhos }, ignorados: filtrado.ignorados };
+}
 
 // Buscar dados base da Pessoa
 async function buscarPessoaBase(id) {
@@ -70,24 +101,10 @@ async function buscarProfAdm(id) {
 
 // Criar Pessoa base
 async function criarPessoaBase(dados) {
-  const query = `
-    INSERT INTO Pessoa (nome, foto, rg, cpf, telefone, email, unidade_id, qr_code, cartao_rfid, senha_acesso, data_nascimento, tipo)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  const values = [
-    dados.nome,
-    dados.foto,
-    dados.rg,
-    dados.cpf,
-    dados.telefone,
-    dados.email,
-    dados.unidade_id,
-    dados.qr_code,
-    dados.cartao_rfid,
-    dados.senha_acesso,
-    dados.data_nascimento,
-    dados.tipo
-  ];
+  const { dados: campos } = filtrarDadosDeEscrita('Pessoa', dados);
+  const nomes = Object.keys(campos);
+  const query = `INSERT INTO Pessoa (${nomes.join(', ')}) VALUES (${nomes.map(() => '?').join(', ')})`;
+  const values = nomes.map((campo) => campos[campo]);
   const [result] = await db.query(query, values);
   return { id: result.insertId };
 }
@@ -308,16 +325,15 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id, connect
 //  Função principal do PATCH
 async function atualizarPessoaCompleta(id, updates, connection = db) {
   // Campos específicos por tabela
-  const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento'];
+  const pessoaFields = projecoes.Pessoa.escrita;
   const funcionarioFields = ['matricula', 'data_admissao', 'data_saida', 'tipo_contrato'];
   const alunoFields = ['ra', 'rm', 'turma_id', 'divisao', 'status'];
   const administradorFields = ['cargo'];
   const terceirizadoFields = ['empresa_id', 'funcao'];
 
-  // Não permitir alterar tipo
-  const dadosAtualizacao = { ...updates };
-  delete dadosAtualizacao.tipo;
-  delete dadosAtualizacao.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
+  // A lista de escrita da Pessoa é a fonte única desta atualização.
+  const filtrado = filtrarDadosPessoa(updates);
+  const dadosAtualizacao = filtrado.dados;
 
   // Buscar o tipo da pessoa para saber quais tabelas atualizar
   const tipo = await buscarTipoPessoa(id, connection);
@@ -359,6 +375,7 @@ async function atualizarPessoaCompleta(id, updates, connection = db) {
     default:
       throw new Error(`Tipo '${tipo}' não reconhecido para atualização.`);
   }
+  return { ignorados: filtrado.ignorados };
 }
 
 // Remover pessoa (incluindo nas tabelas filhas)
@@ -390,5 +407,6 @@ module.exports = {
   buscarTodasPessoas,
   buscarPorId,
   atualizarPessoaCompleta,
-  removerPessoa
+  removerPessoa,
+  filtrarDadosPessoa
 };

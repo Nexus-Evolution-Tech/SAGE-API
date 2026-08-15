@@ -14,6 +14,7 @@ const {
   buscarProfAdm,
   buscarTerceirizado,
   criarFuncionarioBase,
+  filtrarDadosPessoa,
 } = require('../utils/people-db-utils');
 const { hashSenha } = require('../utils/criptografia');
 const db = require('../config/database');
@@ -55,6 +56,8 @@ async function buscarPessoaExistente(dados) {
 
 // Upsert = Update or Insert -> se ele identificar uma pessoa existente, ele atualiza, senão cria uma nova (isso é fundamental para o bot da planilha)
 async function criarPessoaCompleta(dados) {
+  const filtrado = filtrarDadosPessoa(dados);
+  dados = filtrado.dados;
   const {
     nome, foto, rg, cpf, telefone, email, data_nascimento,
     tipo, ...camposExtras
@@ -68,25 +71,25 @@ async function criarPessoaCompleta(dados) {
   if (idExistente) {
     
     // Chamamos sua função de atualização enviando todos os dados recebidos
-    await atualizarPessoaCompleta(idExistente, {
+    const atualizacao = await atualizarPessoaCompleta(idExistente, {
       nome, foto, rg, cpf, telefone, email, data_nascimento, ...camposExtras
     });
 
     // Registrar sincronismo de atualização (UPDATE)
     await registrarSyncPendente(idExistente, 'UPDATE');
     
-    return { idPessoa: idExistente, tipoCriado: tipo, status: 'ATUALIZADO' };
+    return { idPessoa: idExistente, tipoCriado: tipo, status: 'ATUALIZADO', ignorados: [...filtrado.ignorados, ...(atualizacao?.ignorados || [])] };
   }
 
   // --- SE NÃO EXISTIR, SEGUE O FLUXO ORIGINAL DE CRIAÇÃO ---
   
   const pessoa = await criarPessoaBase({
-    nome, foto, rg, cpf, telefone, email, tipo,
+    nome, foto, orgao_emissor_rg: camposExtras.orgao_emissor_rg, rg, cpf, telefone, email, tipo,
     unidade_id: camposExtras.unidade_id || null,
     qr_code: camposExtras.qr_code || gerarNumero8Digitos(),
     cartao_rfid: camposExtras.cartao_rfid || null,
     senha_acesso: camposExtras.senha_acesso ? await hashSenha(camposExtras.senha_acesso) : null,
-    data_nascimento
+    data_nascimento, visivel: camposExtras.visivel
   });
 
   const idPessoa = pessoa.id;
@@ -108,7 +111,7 @@ async function criarPessoaCompleta(dados) {
   }
 
   await registrarSyncPendente(idPessoa, 'CREATE');
-  return { idPessoa, tipoCriado: tipo, status: 'CRIADO' };
+  return { idPessoa, tipoCriado: tipo, status: 'CRIADO', ignorados: filtrado.ignorados };
 }
 
 async function buscarPessoasPorTipo(tipo, limit = 50, offset = 0) {

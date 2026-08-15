@@ -22,8 +22,12 @@ const criar = async (req, res) => {
     res.status(201).json({
       message: 'Solicitação de acesso criada com sucesso',
       data: novoRegistro,
+      ignorados: novoRegistro.ignorados || [],
     });
   } catch (error) {
+    if (error.code === 'ESCRITA_CHAVE_NAO_DECLARADA' || error.code === 'ESCRITA_NENHUM_CAMPO_APLICAVEL') {
+      return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
+    }
     res.status(500).json({ message: 'Erro ao criar solicitação de acesso', error: error.message });
   }
 };

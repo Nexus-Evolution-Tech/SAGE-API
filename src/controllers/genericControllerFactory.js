@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const { cacheQuery, cacheMutation, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
 const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 const projecoes = require('../config/projecoes');
+const ERROS_ESCRITA = new Set(['ESCRITA_CHAVE_NAO_DECLARADA', 'ESCRITA_NENHUM_CAMPO_APLICAVEL']);
 
 function capitalize(text) {
   if (!text) return '';
@@ -116,11 +117,15 @@ function gerarController(tabela, campos, entidadeNome) {
           [`${tabela}:*`]
         );
         
-        res.status(201).json({ 
+        res.status(201).json({
           message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'criad')} com sucesso`, 
-          data: projetar(novoRegistro)
+          data: projetar(novoRegistro),
+          ignorados: novoRegistro.ignorados || []
         });
       } catch (error) {
+        if (ERROS_ESCRITA.has(error.code)) {
+          return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
+        }
         logger.error(`Erro ao criar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao criar ${entidadeNome}`, error: error.message });
       }
@@ -130,7 +135,7 @@ function gerarController(tabela, campos, entidadeNome) {
       try {
         const id = req.params.id;
         
-        await cacheMutation(
+        const resultado = await cacheMutation(
           async () => executarOperacaoAuditada({
             req, acao: ACOES.REGISTRO_EDITADO, entidade: tabela, entidadeId: Number(id),
             operacao: (connection) => crud.atualizarRegistro(tabela, id, req.body, connection)
@@ -138,8 +143,11 @@ function gerarController(tabela, campos, entidadeNome) {
           [`${tabela}:*`]
         );
         
-        res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'atualizad')} com sucesso` });
+        res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'atualizad')} com sucesso`, ignorados: resultado?.ignorados || [] });
       } catch (error) {
+        if (ERROS_ESCRITA.has(error.code)) {
+          return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
+        }
         logger.error(`Erro ao atualizar ${entidadeNome}: ${error.message}`);
         res.status(500).json({ message: `Erro ao atualizar ${entidadeNome}`, error: error.message });
       }
