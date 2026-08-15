@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const projecoes = require('../config/projecoes');
 
 async function buscarTodos(tabela, campos = ['*'], limit = 50, offset = 0) {
   const query = `SELECT ${campos.join(', ')} FROM ${tabela} LIMIT ? OFFSET ?`;
@@ -22,8 +23,12 @@ async function criarRegistro(tabela, dados, connection = db) {
   const [result] = await connection.query(query, valores);
   const insertId = result?.insertId;
   if (insertId == null) return undefined;
-  const [rows] = await connection.query(`SELECT * FROM ${tabela} WHERE id = ?`, [insertId]);
-  return rows[0] || { id: insertId, ...dados };
+  const possuiProjecao = tabela === 'UnidadeEscolar' || tabela === 'Dispositivo';
+  if (possuiProjecao) projecoes.exigirProjecao(tabela);
+  const colunas = possuiProjecao ? projecoes.colunasDeLeitura(tabela) : ['*'];
+  const [rows] = await connection.query(`SELECT ${colunas.join(', ')} FROM ${tabela} WHERE id = ?`, [insertId]);
+  const registro = rows[0] || { id: insertId, ...dados };
+  return possuiProjecao ? projecoes.projetarRegistro(tabela, registro) : registro;
 }
 
 async function atualizarRegistro(tabela, id, updates, connection = db) {
