@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
 
 const materiaController = {
   // GET /materias - Lista todas as matérias
@@ -32,6 +33,7 @@ const materiaController = {
     }
 
     try {
+      validarAutor(req?.user?.usuario_id);
       // Verificar se já existe (case-insensitive)
       const [existente] = await db.query(
         `SELECT id FROM Materia WHERE LOWER(TRIM(nome)) = LOWER(TRIM(?))`,
@@ -43,18 +45,24 @@ const materiaController = {
       }
 
       // Inserir nova matéria
-      const [result] = await db.query(
-        `INSERT INTO Materia (nome) VALUES (?)`,
-        [nome.trim()]
-      );
+      const materia = await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_CRIADO, entidade: 'Materia',
+        entidadeId: (registro) => registro?.id,
+        operacao: async (connection) => {
+          const [result] = await connection.query(
+            'INSERT INTO Materia (nome) VALUES (?)', [nome.trim()]
+          );
 
       // Retornar matéria criada
-      const [materia] = await db.query(
+      const [rows] = await connection.query(
         `SELECT id, nome, created_at as createdAt, updated_at as updatedAt FROM Materia WHERE id = ?`,
         [result.insertId]
       );
+          return rows[0];
+        }
+      });
 
-      res.status(201).json(materia[0]);
+      res.status(201).json(materia);
     } catch (error) {
       logger.error(`Erro ao criar matéria: ${error.message}`);
       res.status(500).json({ message: 'Erro ao criar matéria', error: error.message });
@@ -66,6 +74,7 @@ const materiaController = {
     const { id } = req.params;
 
     try {
+      validarAutor(req?.user?.usuario_id);
       // Verificar se há aulas usando esta matéria
       const [aulasUsando] = await db.query(
         'SELECT COUNT(*) as total FROM Aula WHERE materia_id = ?',
@@ -79,12 +88,16 @@ const materiaController = {
       }
 
       // Deletar matéria
-      const [result] = await db.query('DELETE FROM Materia WHERE id = ?', [id]);
+      const [existente] = await db.query('SELECT id FROM Materia WHERE id = ?', [id]);
 
-      if (result.affectedRows === 0) {
+      if (existente.length === 0) {
         return res.status(404).json({ message: 'Matéria não encontrada' });
       }
 
+      await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_DELETADO, entidade: 'Materia', entidadeId: Number(id),
+        operacao: (connection) => connection.query('DELETE FROM Materia WHERE id = ?', [id])
+      });
       return res.status(204).send();
     } catch (error) {
       logger.error(`Erro ao deletar matéria: ${error.message}`);

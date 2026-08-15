@@ -2,6 +2,7 @@ const gerarController = require('./genericControllerFactory');
 const crud = require('../utils/generic-db-utils');
 const { cacheMutation } = require('../cache/helpers');
 const { emitNotification } = require('../services/notificationService');
+const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 
 const tabela = 'SolicitacaoAcesso';
 const campos = ['id', 'aluno_id', 'data_hora_solicitacao', 'motivo', 'status', 'data_hora_resposta', 'observacao_resposta'];
@@ -30,7 +31,12 @@ const criar = async (req, res) => {
 const aprovarSolicitacao = async (req, res) => {
   try {
     const id = req.params.id;
-    await crud.atualizarRegistro(tabela, id, { status: 'APROVADA', data_hora_resposta: new Date() });
+    await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_EDITADO, entidade: tabela, entidadeId: Number(id),
+      operacao: (connection) => crud.atualizarRegistro(
+        tabela, id, { status: 'APROVADA', data_hora_resposta: new Date() }, connection
+      )
+    });
     emitNotification({
       title: 'Solicitação aprovada',
       message: 'Uma solicitação de acesso foi aprovada.',
@@ -45,7 +51,12 @@ const aprovarSolicitacao = async (req, res) => {
 const negarSolicitacao = async (req, res) => {
   try {
     const id = req.params.id;
-    await crud.atualizarRegistro(tabela, id, { status: 'NEGADA', data_hora_resposta: new Date() });
+    await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_EDITADO, entidade: tabela, entidadeId: Number(id),
+      operacao: (connection) => crud.atualizarRegistro(
+        tabela, id, { status: 'NEGADA', data_hora_resposta: new Date() }, connection
+      )
+    });
     emitNotification({
       title: 'Solicitação negada',
       message: 'Uma solicitação de acesso foi negada.',
