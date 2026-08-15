@@ -67,7 +67,7 @@ describeMySql('R1-03A — trilha append-only do ciclo de Usuario', () => {
 
     await banco.pool.query(
       `INSERT INTO TrilhaAuditoria (usuario_id, acao, entidade, entidade_id, detalhe)
-       VALUES (?, 'LOGIN_SUCESSO', 'Usuario', ?, NULL)`, [autores[0], autores[0]]
+       VALUES (?, 'LOGIN_SUCESSO', 'Usuario', NULL, NULL)`, [autores[0]]
     );
     await expect(banco.pool.query(
       'UPDATE TrilhaAuditoria SET acao = ? WHERE usuario_id = ?', ['USUARIO_EDITADO', autores[0]]
