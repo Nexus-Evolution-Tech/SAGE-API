@@ -28,6 +28,11 @@ function auditarCatraca(req, acao, dispositivoId, detalhe, resultado) {
     detalhe: { ...detalhe, resultado } });
 }
 
+async function prepararBackupCatraca(dispositivo, objectType) {
+  if (objectType) return deviceService.backupPorTipo(dispositivo, objectType);
+  await deviceService.gerarBackupCompletoCatraca(dispositivo); return deviceService.gerarBackupLogsCatraca(dispositivo);
+}
+
 const tabela = 'Dispositivo';
 
 /** Valida id de dispositivo (params): deve ser inteiro positivo. Retorna id numérico ou null. */
@@ -430,6 +435,7 @@ async function deletarObjetoCatraca(req, res) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
     }
     const where = { [objectType]: { id: objectId } };
+    await prepararBackupCatraca(dispositivo, objectType);
     const result = await executarOperacaoRemotaAuditada({
       req,
       acao: ACOES.CATRACA_OBJETO_DELETADO,
@@ -497,6 +503,7 @@ async function zerarPorTipo(req, res) {
     validarAutor(req?.user?.usuario_id);
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    await prepararBackupCatraca(dispositivo, objectType);
     if (objectType === 'access_logs') {
       globalState.setZerandoDispositivo(id, true);
       try {
@@ -569,10 +576,12 @@ async function importFromCatraca(req, res) {
 async function zerarTudo(req, res) {
   try {
     validarAutor(req?.user?.usuario_id);
+    if (req.body?.confirmacao !== 'APAGAR TUDO') return res.status(403).json({ message: 'Confirmação obrigatória.' });
     const id = parseDispositivoId(req.params.id);
     if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
+    await prepararBackupCatraca(dispositivo);
     const result = await executarOperacaoRemotaAuditada({
       req,
       acao: ACOES.CATRACA_TUDO_ZERADO,
