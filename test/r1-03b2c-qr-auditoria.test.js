@@ -81,7 +81,7 @@ descreveMySql('R1-03B2c — auditoria da geração de QR', () => {
   it('persiste o QR e a trilha com autor, ação fechada e detalhe nulo', async () => {
     const resposta = await requisitar(porta, { pessoaId, jwt });
     expect(resposta.status).toBe(200);
-    expect(resposta.body.qr_code).toMatch(/^\d{8}$/);
+    expect(String(resposta.body.qr_code)).toMatch(/^\d{8}$/);
 
     const [[pessoa]] = await banco.pool.query('SELECT qr_code FROM Pessoa WHERE id = ?', [pessoaId]);
     const [[evento]] = await banco.pool.query(
