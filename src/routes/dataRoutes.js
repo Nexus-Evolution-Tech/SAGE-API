@@ -7,6 +7,7 @@ const { exportarDados } = require('../services/exportService');
 const { emitNotification } = require('../services/notificationService');
 const logger = require('../config/logger');
 const { paths } = require('../config/paths');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const router = express.Router();
 // Configuração robusta de upload para evitar falhas silenciosas
@@ -75,7 +76,7 @@ router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) 
     res.json({ message: 'Importação concluída.', resultado });
   } catch (err) {
     logger.error(`Erro ao importar planilha: ${err.message}`);
-    res.status(500).json({ error: 'Erro ao importar planilha.', detalhe: err.message, stack: process.env.LOG_LEVEL === 'debug' ? err.stack : undefined });
+    responderErroInterno(res, err, 'Erro ao importar planilha.');
   }
 });
 

@@ -12,6 +12,7 @@ const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas')
 const registrarSyncPendente = require('../services/sync');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 // --- LISTAR (Sem alterações) ---
 const listar = async (req, res) => {
@@ -31,7 +32,7 @@ const listar = async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+    responderErroInterno(res, error, 'Erro ao listar pessoas');
   }
 };
 
@@ -79,7 +80,7 @@ const getStatus = async (req, res) => {
     const estaPresenteAtrasado = await peopleService.verificarTodasPessoasPresentesEAtrasadas();
     res.json(estaPresenteAtrasado);
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+    responderErroInterno(res, error, 'Erro ao listar pessoas');
   }
 };
 
@@ -90,7 +91,7 @@ const getStatusId = async (req, res) => {
     const estaPresente = await peopleService.verificarPessoaPresenteEAtrasada(id);
     res.json(estaPresente);
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+    responderErroInterno(res, error, 'Erro ao listar pessoas');
   }
 };
 
@@ -101,7 +102,7 @@ const listarPorId = async (req, res) => {
     const pessoas = await buscarPorId(id);
     res.json(ajustarFusoHorarioBrasil(pessoas));
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao listar pessoas', error: error.message });
+    responderErroInterno(res, error, 'Erro ao listar pessoas');
   }
 };
 
@@ -124,7 +125,7 @@ const listarPorTipo = async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao listar pessoas por tipo', error: error.message });
+    responderErroInterno(res, error, 'Erro ao listar pessoas por tipo');
   }
 };
 
@@ -155,7 +156,7 @@ const editar = async (req, res) => {
     if (error.code === 'ESCRITA_CHAVE_NAO_DECLARADA' || error.code === 'ESCRITA_NENHUM_CAMPO_APLICAVEL') {
       return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
     }
-    res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
+    responderErroInterno(res, error, 'Erro ao editar pessoa');
   }
 };
 
@@ -183,7 +184,7 @@ const deletar = async (req, res) => {
 
     res.json({ message: 'Pessoa removida com sucesso', catracas: resultados });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao remover pessoa', error: error.message });
+    responderErroInterno(res, error, 'Erro ao remover pessoa');
   }
 };
 
@@ -203,7 +204,7 @@ const getUrls = async (req, res) => {
 
     res.json(urls);
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao buscar URLs das pessoas', error: error.message });
+    responderErroInterno(res, error, 'Erro ao buscar URLs das pessoas');
   }
 }
 
@@ -237,7 +238,7 @@ const uploadFoto = async (req, res) => {
     res.json({ message: 'Foto enviada com sucesso', file: req.file ? req.file.filename : null, sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
   } catch (error) {
     if (!res.headersSent) {
-      res.status(500).json({ message: 'Erro ao enviar foto', error: error.message });
+      responderErroInterno(res, error, 'Erro ao enviar foto');
     }
   }
 }
@@ -259,7 +260,7 @@ const gerarQrCode = async (req, res) => {
 
     res.json({ message: "QR Code gerado com sucesso", id, qr_code: qrcode });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao gerar qrcode', error: error.message });
+    responderErroInterno(res, error, 'Erro ao gerar qrcode');
   }
 }
 
@@ -269,7 +270,7 @@ const sincronizarBanco = async (req, res) => {
     await sincronizarTodasPessoasNasCatracas();
     res.json({ message: "Sincronização concluída com sucesso" });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao sincronizar banco', error: error.message });
+    responderErroInterno(res, error, 'Erro ao sincronizar banco');
   }
 }
 

@@ -5,6 +5,7 @@
 
 const promocaoAlunosService = require('../services/promocaoAlunosService');
 const logger = require('../config/logger');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 /**
  * POST /promocao/executar
@@ -31,10 +32,7 @@ const executar = async (req, res) => {
     });
   } catch (error) {
     logger.error(`[PROMOÇÃO] Erro no controller: ${error.message}`);
-    res.status(500).json({
-      message: 'Erro ao executar promoção',
-      error: error.message
-    });
+    responderErroInterno(res, error, 'Erro ao executar promoção');
   }
 };
 
@@ -51,10 +49,7 @@ const reverter = async (req, res) => {
     res.json(resultado);
   } catch (error) {
     logger.error(`[PROMOÇÃO] Erro ao reverter finalizados: ${error.message}`);
-    res.status(500).json({
-      message: 'Erro ao reverter alunos finalizados',
-      error: error.message
-    });
+    responderErroInterno(res, error, 'Erro ao reverter alunos finalizados');
   }
 };
 

@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { get } = require('http');
 const { paths } = require('../config/paths');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const tabela = 'UnidadeFoto';
 const campos = ['id', 'unidade_id', 'tipo', 'caminho', 'descricao'];
@@ -69,7 +70,7 @@ const uploadFoto = async (req, res) => {
 
     res.status(201).json({ id: result.insertId, caminho: caminhoRelativo });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao salvar a foto', error: error.message });
+    responderErroInterno(res, error, 'Erro ao salvar a foto');
   }
 };
 

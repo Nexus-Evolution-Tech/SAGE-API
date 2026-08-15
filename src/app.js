@@ -16,6 +16,7 @@ const {
   createReadinessHandler
 } = require("./services/readinessService");
 const { version: packageVersion } = require("../package.json");
+const { responderErroInterno } = require('./utils/responderErroInterno');
 
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
@@ -126,6 +127,28 @@ logger.info("Arquivos estáticos disponíveis em: /uploads");
 if (webBuildIsAvailable) app.use(serveSpaNavigation);
 
 // Rotas da aplicação (com tratamento de erro)
+// Normaliza respostas 500 legadas para o contrato publico unico.
+app.use((req, res, next) => {
+  const statusOriginal = res.status.bind(res);
+  const jsonOriginal = res.json.bind(res);
+  let statusAtual = res.statusCode;
+  res.status = (status) => {
+    statusAtual = status;
+    return statusOriginal(status);
+  };
+  res.json = (body) => {
+    if (statusAtual === 500 && !res.locals?.sageErroInterno) {
+      const mensagem = typeof body?.error === 'string'
+        ? body.error
+        : (typeof body?.message === 'string' ? body.message : 'Erro interno no servidor');
+      const detalhe = body?.detalhe || body?.stack || body?.error;
+      return responderErroInterno(res, detalhe, mensagem);
+    }
+    return jsonOriginal(body);
+  };
+  next();
+});
+
 let routesReady = false;
 try {
   const loadedRoutes = loadRoutes(app);
@@ -136,23 +159,29 @@ try {
     'peopleRoutes.js',
     'schoolRoutes.js'
   ];
-  routesReady = essentialRoutes.every((route) => loadedRoutes.includes(route));
-  if (!routesReady) throw new Error('Rotas essenciais não foram carregadas');
-  logger.info('✓ Rotas carregadas com sucesso');
+  const falhaEssencial = loadedRoutes.failures?.find(({ file }) => essentialRoutes.includes(file));
+  if (falhaEssencial || !essentialRoutes.every((route) => loadedRoutes.includes(route))) {
+    const rota = falhaEssencial?.file || 'desconhecida';
+    logger.error('[BOOT] codigo=ROTAS_ESSENCIAIS_INDISPONIVEIS', { rota, detalhe: falhaEssencial?.error });
+    process.exitCode = 1;
+    throw new Error(`Falha ao carregar rota essencial: ${rota}`);
+  }
+  routesReady = (loadedRoutes.failures?.length || 0) === 0;
+  for (const { file, error } of loadedRoutes.failures || []) {
+    logger.error('[BOOT] codigo=ROTA_NAO_ESSENCIAL_INDISPONIVEL', { rota: file, detalhe: error });
+  }
+  logger[loadedRoutes.failures?.length ? 'warn' : 'info'](loadedRoutes.failures?.length
+    ? '[BOOT] codigo=ROTAS_NAO_ESSENCIAIS_INDISPONIVEIS' : '✓ Rotas carregadas com sucesso');
 } catch (error) {
-  logger.error(`✗ Erro ao carregar rotas: ${error.message}`);
-  // Continuar mesmo com erro de rotas
+  logger.error('[BOOT] codigo=FALHA_CARREGAMENTO_ROTAS', { detalhe: error });
+  throw error;
 }
 
 // Middleware de tratamento de erros para evitar conexões fechadas sem resposta
 app.use((err, req, res, next) => {
   try {
-    const traceId = Math.random().toString(36).slice(2, 10);
-    logger.error(`Erro não tratado [${traceId}] ${req.method} ${rotaDeLog(req)}: ${err.message}`);
-    if (err.stack) logger.debug(err.stack);
-    // Garante resposta JSON consistente
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Erro interno no servidor', detalhe: err.message, traceId });
+      responderErroInterno(res, err);
     } else {
       // Se headers já foram enviados, delega para Express encerrar
       next(err);
@@ -165,20 +194,9 @@ app.use((err, req, res, next) => {
 
 // Health check endpoint
 app.get('/health', publica(), (req, res) => {
-  const redis = require('./config/redis');
-  const globalState = require('./state/globalState');
-
   res.json({
     status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV,
-    version: process.env.API_VERSION,
-    cache: redis.getStats(),
-    stats: globalState.getStats(),
-    connections: {
-      websocket: global.io ? global.io.engine.clientsCount : 0
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -224,12 +242,8 @@ app.use((err, req, res, next) => {
     return next(err);
   }
   
-  logger.errorWithStack('Erro não tratado', err);
-  
-  res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' ? 'Erro interno do servidor' : err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+  if (err.status && err.status < 500) return res.status(err.status).json({ error: err.message });
+  return responderErroInterno(res, err);
 });
 
 module.exports = app;

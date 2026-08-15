@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
 const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const materiaController = {
   // GET /materias - Lista todas as matérias
@@ -15,7 +16,7 @@ const materiaController = {
       res.json(materias || []);
     } catch (error) {
       logger.error(`Erro ao listar matérias: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao listar matérias', error: error.message });
+      responderErroInterno(res, error, 'Erro ao listar matérias');
     }
   },
 
@@ -65,7 +66,7 @@ const materiaController = {
       res.status(201).json(materia);
     } catch (error) {
       logger.error(`Erro ao criar matéria: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao criar matéria', error: error.message });
+      responderErroInterno(res, error, 'Erro ao criar matéria');
     }
   },
 
@@ -101,7 +102,7 @@ const materiaController = {
       return res.status(204).send();
     } catch (error) {
       logger.error(`Erro ao deletar matéria: ${error.message}`);
-      res.status(500).json({ message: 'Erro ao deletar matéria', error: error.message });
+      responderErroInterno(res, error, 'Erro ao deletar matéria');
     }
   }
 };

@@ -5,6 +5,7 @@ const gerarController = require('./genericControllerFactory');
 const { invalidate } = require('../cache/helpers');
 const logger = require('../config/logger');
 const { paths } = require('../config/paths');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const tabela = 'Area';
 const campos = ['id', 'nome', 'unidade_id', 'foto'];
@@ -70,7 +71,7 @@ async function uploadFoto(req, res) {
       const arquivoTemp = path.join(baseUploads, req.file.filename);
       if (fs.existsSync(arquivoTemp)) fs.unlinkSync(arquivoTemp);
     } catch (e) { logger.warn('[AREA-FOTO] codigo=ARQUIVO_TEMPORARIO_NAO_REMOVIDO'); }
-    res.status(500).json({ message: 'Erro ao salvar a foto da área', error: error.message });
+    responderErroInterno(res, error, 'Erro ao salvar a foto da área');
   }
 }
 

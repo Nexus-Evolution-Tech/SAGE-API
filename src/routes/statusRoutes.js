@@ -22,6 +22,7 @@ const logger = require('../config/logger');
 const backupBanco = require('../services/backupBanco');
 const diagnostico = require('../services/diagnostico');
 const { publica } = require('../middlewares/autorizacao');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const router = express.Router();
 
@@ -144,10 +145,7 @@ router.get('/diagnostico', publica(), async (req, res) => {
     return res.json(bundle);
   } catch (erro) {
     logger.errorWithStack('[DIAGNOSTICO] Falha ao gerar bundle', erro);
-    return res.status(500).json({
-      message: 'Não foi possível gerar o diagnóstico.',
-      detalhe: erro.message
-    });
+    return responderErroInterno(res, erro, 'Não foi possível gerar o diagnóstico.');
   }
 });
 

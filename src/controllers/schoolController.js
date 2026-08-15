@@ -15,6 +15,7 @@ const {
   buscarUnidadeSingleton
 } = require('../services/unidadeSingletonService');
 const crypto = require('crypto');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const tabela = 'UnidadeEscolar';
 const campos = ['id', 'nome', 'numero_unidade', 'cnpj', 'login', 'senha', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'telefone_contato', 'email', 'logo'];
@@ -300,7 +301,7 @@ const getConfig = async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter config: ${error.message}`);
-    res.status(500).json({ message: 'Erro ao carregar configuração', error: error.message });
+    responderErroInterno(res, error, 'Erro ao carregar configuração');
   }
 };
 

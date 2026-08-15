@@ -3,6 +3,7 @@ const crud = require('../utils/generic-db-utils');
 const { cacheMutation } = require('../cache/helpers');
 const { emitNotification } = require('../services/notificationService');
 const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const tabela = 'SolicitacaoAcesso';
 const campos = ['id', 'aluno_id', 'data_hora_solicitacao', 'motivo', 'status', 'data_hora_resposta', 'observacao_resposta'];
@@ -28,7 +29,7 @@ const criar = async (req, res) => {
     if (error.code === 'ESCRITA_CHAVE_NAO_DECLARADA' || error.code === 'ESCRITA_NENHUM_CAMPO_APLICAVEL') {
       return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
     }
-    res.status(500).json({ message: 'Erro ao criar solicitação de acesso', error: error.message });
+    responderErroInterno(res, error, 'Erro ao criar solicitação de acesso');
   }
 };
 
@@ -48,7 +49,7 @@ const aprovarSolicitacao = async (req, res) => {
     });
     res.json({ message: `Solicitação de acesso do aluno menor APROVADA com sucesso` });
   } catch (error) {
-    res.status(500).json({ message: `Erro ao atualizar solicitação do aluno menor de idade`, error: error.message });
+    responderErroInterno(res, error, 'Erro ao atualizar solicitação do aluno menor de idade');
   }
 };
 
@@ -68,7 +69,7 @@ const negarSolicitacao = async (req, res) => {
     });
     res.json({ message: `Solicitação de acesso do aluno menor NEGADA com sucesso` });
   } catch (error) {
-    res.status(500).json({ message: `Erro ao atualizar solicitação do aluno menor de idade`, error: error.message });
+    responderErroInterno(res, error, 'Erro ao atualizar solicitação do aluno menor de idade');
   }
 };
 
