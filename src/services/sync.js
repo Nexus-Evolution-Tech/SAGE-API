@@ -2,12 +2,15 @@ const db = require('../config/database');
 const { listarTodos } = require('./deviceService');
 const logger = require('../config/logger');
 
-const registrarSyncPendente = async (pessoaId, operation) => {
+const registrarSyncPendente = async (pessoaId, operation, connection) => {
   try {
-    const dispositivos = await listarTodos();
+    const consultar = connection ? connection.query.bind(connection) : db.execute.bind(db);
+    const dispositivos = connection
+      ? (await connection.query('SELECT * FROM Dispositivo'))[0]
+      : await listarTodos();
 
     // Busca todos os CREATEs e UPDATEs pendentes da pessoa
-    const [pendentes] = await db.execute(
+    const [pendentes] = await consultar(
       `SELECT id, dispositivo_id, operation FROM sync_pendente WHERE pessoa_id = ? AND operation IN ('CREATE', 'UPDATE')`,
       [pessoaId]
     );
@@ -37,7 +40,7 @@ const registrarSyncPendente = async (pessoaId, operation) => {
         // 1️⃣ Remove CREATE pendente, não insere DELETE
         if (mapCreate.has(dispositivoId)) {
           const createId = mapCreate.get(dispositivoId);
-          await db.execute(`DELETE FROM sync_pendente WHERE id = ?`, [createId]);
+          await consultar(`DELETE FROM sync_pendente WHERE id = ?`, [createId]);
           logger.debug(`Removido CREATE pendente do dispositivo ${dispositivoId}, DELETE não inserido`);
           continue;
         }
@@ -45,12 +48,12 @@ const registrarSyncPendente = async (pessoaId, operation) => {
         // 2️⃣ Remove UPDATE pendente, insere DELETE
         if (mapUpdate.has(dispositivoId)) {
           const updateId = mapUpdate.get(dispositivoId);
-          await db.execute(`DELETE FROM sync_pendente WHERE id = ?`, [updateId]);
+          await consultar(`DELETE FROM sync_pendente WHERE id = ?`, [updateId]);
           logger.debug(`Removido UPDATE pendente do dispositivo ${dispositivoId}`);
         }
 
         // 3️⃣ Insere DELETE (mesmo que não houvesse CREATE/UPDATE, significa que já sincronizou antes)
-        await db.execute(
+        await consultar(
           `INSERT INTO sync_pendente (pessoa_id, dispositivo_id, operation, data_tentativa)
            VALUES (?, ?, 'DELETE', ?)`,
           [pessoaId, dispositivoId, new Date()]
@@ -73,7 +76,7 @@ const registrarSyncPendente = async (pessoaId, operation) => {
       }
 
       // Insere CREATE ou UPDATE
-      await db.execute(
+      await consultar(
         `INSERT INTO sync_pendente (pessoa_id, dispositivo_id, operation, data_tentativa)
          VALUES (?, ?, ?, ?)`,
         [pessoaId, dispositivoId, operation, new Date()]

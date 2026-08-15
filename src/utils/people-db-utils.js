@@ -267,14 +267,14 @@ async function buscarPorId(id) {
 }
 
 // Buscar o tipo da pessoa
-async function buscarTipoPessoa(id) {
-  const [result] = await db.query('SELECT tipo FROM Pessoa WHERE id = ?', [id]);
+async function buscarTipoPessoa(id, connection = db) {
+  const [result] = await connection.query('SELECT tipo FROM Pessoa WHERE id = ?', [id]);
   if (result.length === 0) throw new Error('Pessoa não encontrada');
   return result[0].tipo;
 }
 
 // Atualizar a tabela
-async function atualizarTabela(tabela, campos, id) {
+async function atualizarTabela(tabela, campos, id, connection = db) {
   const setClauses = [];
   const values = [];
 
@@ -287,11 +287,11 @@ async function atualizarTabela(tabela, campos, id) {
 
   values.push(id);
   const query = `UPDATE ${tabela} SET ${setClauses.join(', ')} WHERE id = ?`;
-  await db.query(query, values);
+  await connection.query(query, values);
 }
 
 // Atualizar apenas se houver campos válidos
-async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
+async function atualizarSeExistir(tabela, camposPermitidos, updates, id, connection = db) {
   const camposFiltrados = {};
 
   for (const campo of camposPermitidos) {
@@ -301,12 +301,12 @@ async function atualizarSeExistir(tabela, camposPermitidos, updates, id) {
   }
 
   if (Object.keys(camposFiltrados).length > 0) {
-    await atualizarTabela(tabela, camposFiltrados, id);
+    await atualizarTabela(tabela, camposFiltrados, id, connection);
   }
 }
 
 //  Função principal do PATCH
-async function atualizarPessoaCompleta(id, updates) {
+async function atualizarPessoaCompleta(id, updates, connection = db) {
   // Campos específicos por tabela
   const pessoaFields = ['nome', 'foto', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento'];
   const funcionarioFields = ['matricula', 'data_admissao', 'data_saida', 'tipo_contrato'];
@@ -315,19 +315,20 @@ async function atualizarPessoaCompleta(id, updates) {
   const terceirizadoFields = ['empresa_id', 'funcao'];
 
   // Não permitir alterar tipo
-  delete updates.tipo;
-  delete updates.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
+  const dadosAtualizacao = { ...updates };
+  delete dadosAtualizacao.tipo;
+  delete dadosAtualizacao.qr_code; // não posso alterar o qr_code, preciso gerar um novo aleatório, só posso criar um do jeito que eu quero
 
   // Buscar o tipo da pessoa para saber quais tabelas atualizar
-  const tipo = await buscarTipoPessoa(id);
+  const tipo = await buscarTipoPessoa(id, connection);
 
   // Atualizar a tabela base (Pessoa) sempre
-  await atualizarSeExistir('Pessoa', pessoaFields, updates, id);
+  await atualizarSeExistir('Pessoa', pessoaFields, dadosAtualizacao, id, connection);
 
   // Atualizar conforme tipo
   switch (tipo) {
     case 'ALUNO':
-      await atualizarSeExistir('Aluno', alunoFields, updates, id);
+      await atualizarSeExistir('Aluno', alunoFields, dadosAtualizacao, id, connection);
       break;
 
     case 'RESPONSAVEL':
@@ -335,24 +336,24 @@ async function atualizarPessoaCompleta(id, updates) {
       break;
 
     case 'PROFESSOR':
-      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
+      await atualizarSeExistir('Funcionario', funcionarioFields, dadosAtualizacao, id, connection);
       // Nenhum campo específico em Professor por enquanto
       break;
 
     case 'ADMINISTRADOR':
-      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
-      await atualizarSeExistir('Administrador', administradorFields, updates, id);
+      await atualizarSeExistir('Funcionario', funcionarioFields, dadosAtualizacao, id, connection);
+      await atualizarSeExistir('Administrador', administradorFields, dadosAtualizacao, id, connection);
       break;
 
     case 'PROFADM':
-      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
-      await atualizarSeExistir('Professor', [], updates, id); // Ainda que sem campos, mantém por clareza estrutural
-      await atualizarSeExistir('Administrador', administradorFields, updates, id);
+      await atualizarSeExistir('Funcionario', funcionarioFields, dadosAtualizacao, id, connection);
+      await atualizarSeExistir('Professor', [], dadosAtualizacao, id, connection); // Ainda que sem campos, mantém por clareza estrutural
+      await atualizarSeExistir('Administrador', administradorFields, dadosAtualizacao, id, connection);
       break;
 
     case 'TERCEIRIZADO':
-      await atualizarSeExistir('Funcionario', funcionarioFields, updates, id);
-      await atualizarSeExistir('Terceirizado', terceirizadoFields, updates, id);
+      await atualizarSeExistir('Funcionario', funcionarioFields, dadosAtualizacao, id, connection);
+      await atualizarSeExistir('Terceirizado', terceirizadoFields, dadosAtualizacao, id, connection);
       break;
 
     default:
@@ -361,13 +362,13 @@ async function atualizarPessoaCompleta(id, updates) {
 }
 
 // Remover pessoa (incluindo nas tabelas filhas)
-async function removerPessoa(id) {
+async function removerPessoa(id, connection = db) {
   // await db.query('DELETE FROM Aluno WHERE id = ?', [id]);
   // await db.query('DELETE FROM Professor WHERE id = ?', [id]);
   // await db.query('DELETE FROM Administrador WHERE id = ?', [id]);
   // await db.query('DELETE FROM Terceirizado WHERE id = ?', [id]);
   // await db.query('DELETE FROM Pessoa WHERE id = ?', [id]);
-  await db.query('UPDATE Pessoa SET visivel = 0 WHERE id = ?', [id]);
+  await connection.query('UPDATE Pessoa SET visivel = 0 WHERE id = ?', [id]);
 }
 
 module.exports = {

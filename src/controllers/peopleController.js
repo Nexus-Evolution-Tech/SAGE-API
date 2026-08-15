@@ -11,6 +11,7 @@ const { buscarPessoaBase } = require('../utils/people-db-utils');
 const { sincronizarTodasPessoasNasCatracas } = require('../utils/sync_catracas');
 const registrarSyncPendente = require('../services/sync');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
+const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 
 // --- LISTAR (Sem alterações) ---
 const listar = async (req, res) => {
@@ -131,10 +132,15 @@ const editar = async (req, res) => {
   try {
     const id = req.params.id;
 
-    // 1. Atualiza no banco de dados local
-    await atualizarPessoaCompleta(id, req.body);
+    await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_EDITADO, entidade: 'Pessoa', entidadeId: Number(id),
+      operacao: async (connection) => {
+        await atualizarPessoaCompleta(id, req.body, connection);
+        await registrarSyncPendente(id, 'UPDATE', connection);
+      }
+    });
 
-    // 2. Sincronização com catraca (em background - não bloqueia resposta)
+    // A sincronização física continua assíncrona; a fila local faz parte desta transação.
     // if (req.body.nome || req.body.cartao_rfid) {
     //   buscarPessoaBase(id).then(pessoaAtualizada => {
     //     return controlIdService.editarPessoaNasCatracas(id, pessoaAtualizada.nome, pessoaAtualizada.cartao_rfid);
@@ -142,9 +148,6 @@ const editar = async (req, res) => {
     //     // Se falhar, já está registrado em sync_pendente para retry automático
     //   });
     // }
-    await registrarSyncPendente(id, 'UPDATE'); // aqui esta funcionando como um service estendido, não é boas práticas, ta chamando direto o people-db-utils, mas e pra chamar tudo no peopleService (responsável pela regra de negócios)
-
-    // 3. Retorna sucesso imediatamente
     res.json({ message: 'Pessoa atualizada com sucesso', sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
@@ -156,10 +159,13 @@ const deletar = async (req, res) => {
   try {
     const id = req.params.id;
     
-    // 1. Remove do banco local
-    await removerPessoa(id);
-
-    await registrarSyncPendente(id, 'DELETE');
+    await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_DELETADO, entidade: 'Pessoa', entidadeId: Number(id),
+      operacao: async (connection) => {
+        await removerPessoa(id, connection);
+        await registrarSyncPendente(id, 'DELETE', connection);
+      }
+    });
 
     let resultados = { message: "Sincronização com catraca em background" };
     // 2. Sincronização com catraca
