@@ -5,6 +5,7 @@ const db = require('../config/database');
 const logger = require('../config/logger');
 const { cacheQuery, cacheMutation, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
 const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
+const projecoes = require('../config/projecoes');
 
 function capitalize(text) {
   if (!text) return '';
@@ -33,6 +34,11 @@ function getGeneroTexto(classe, acao) {
 }
 
 function gerarController(tabela, campos, entidadeNome) {
+  const possuiProjecao = tabela === 'UnidadeEscolar' || tabela === 'Dispositivo';
+  if (possuiProjecao) projecoes.exigirProjecao(tabela);
+  const camposLeitura = possuiProjecao ? projecoes.colunasDeLeitura(tabela) : campos;
+  const projetar = (registro) => possuiProjecao ? projecoes.projetarRegistro(tabela, registro) : registro;
+
   return {
     async listar(req, res) {
       const page = parseInt(req.query.page) || 1;
@@ -46,11 +52,11 @@ function gerarController(tabela, campos, entidadeNome) {
         const result = await cacheQuery(
           cacheKey,
           async () => {
-            const registros = await crud.buscarTodos(tabela, campos, limit, offset);
+            const registros = await crud.buscarTodos(tabela, camposLeitura, limit, offset);
             const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM ${tabela}`);
             
             return {
-              data: ajustarFusoHorarioBrasil(registros),
+              data: projetar(ajustarFusoHorarioBrasil(registros)),
               page,
               limit,
               total,
@@ -77,8 +83,8 @@ function gerarController(tabela, campos, entidadeNome) {
         const registros = await cacheQuery(
           cacheKey,
           async () => {
-            const result = await crud.buscarPorId(id, tabela, campos);
-            return ajustarFusoHorarioBrasil(result);
+            const result = await crud.buscarPorId(id, tabela, camposLeitura);
+            return projetar(ajustarFusoHorarioBrasil(result));
           },
           CACHE_TTL.LONG
         );
@@ -113,7 +119,7 @@ function gerarController(tabela, campos, entidadeNome) {
         
         res.status(201).json({ 
           message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'criad')} com sucesso`, 
-          data: novoRegistro
+          data: projetar(novoRegistro)
         });
       } catch (error) {
         logger.error(`Erro ao criar ${entidadeNome}: ${error.message}`);

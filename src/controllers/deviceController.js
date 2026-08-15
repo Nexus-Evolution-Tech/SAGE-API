@@ -14,6 +14,7 @@ const globalState = require('../state/globalState');
 const catracaImportService = require('../services/catracaImportService');
 const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
 const { paths, isInside } = require('../config/paths');
+const { projetarRegistro } = require('../config/projecoes');
 const backupBanco = require('../services/backupBanco');
 const {
   ACOES,
@@ -829,7 +830,7 @@ async function criar(req, res) {
     }
     res.status(201).json({
       message: 'Dispositivo criado com sucesso',
-      data: dispositivo
+      data: projetarRegistro(tabela, dispositivo)
     });
   } catch (error) {
     logger.error(`Erro ao criar dispositivo: ${error.message}`);
@@ -930,7 +931,7 @@ module.exports = {
 
       res.status(201).json({
         message: 'Dispositivo criado',
-        data: dispositivo || payload,
+        data: projetarRegistro(tabela, dispositivo || payload),
         conectado: !!ok
       });
     } catch (error) {

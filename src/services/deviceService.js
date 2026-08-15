@@ -2,6 +2,7 @@ const axiosInstance = require('../config/axios');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../config/logger');
+const projecoes = require('../config/projecoes');
 const ErroDispositivo = require('../errors/ErroDispositivo');
 const saudeDispositivos = require('./saudeDispositivos');
 const { ORDEM_ZERAR_CATRACA } = require('../config/syncOrder');
@@ -60,7 +61,11 @@ async function withRetryOnUnavailable(fn, context = '') {
 
 async function listarTodos() {
   try {
-    const dispositivos = await global.db('Dispositivo').select('*').get();
+    const camposOperacionais = [
+      ...projecoes.Dispositivo.leitura,
+      ...projecoes.Dispositivo.segredo
+    ];
+    const dispositivos = await global.db('Dispositivo').select(camposOperacionais).get();
     logger.debug(`${dispositivos.length} dispositivos encontrados`);
     return dispositivos;
   } catch (error) {

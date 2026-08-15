@@ -1,0 +1,90 @@
+const fs = require('fs');
+const path = require('path');
+
+const projecoes = require('../src/config/projecoes');
+const { criarRegistro } = require('../src/utils/generic-db-utils');
+
+function colunasDoDdl(tabela) {
+  const base = fs.readFileSync(path.join(__dirname, '..', 'database', 'sage.sql'), 'utf8');
+  const migrations = fs.readdirSync(path.join(__dirname, '..', 'database', 'migrations'))
+    .map((nome) => fs.readFileSync(path.join(__dirname, '..', 'database', 'migrations', nome), 'utf8'))
+    .join('\n');
+  const colunas = new Set();
+  const create = new RegExp(`CREATE TABLE IF NOT EXISTS ${tabela}\\s*\\(([\\s\\S]*?)\\n\\);`, 'i').exec(base);
+  for (const linha of create?.[1]?.split('\n') || []) {
+    const coluna = /^\s*`?([a-z_][a-z0-9_]*)`?\s+/i.exec(linha)?.[1];
+    if (coluna && !/^(constraint|primary|foreign|unique|check|index|key)$/i.test(coluna)) colunas.add(coluna);
+  }
+  const alter = new RegExp(`ALTER TABLE\\s+${tabela}\\s+([\\s\\S]*?);`, 'gi');
+  for (const trecho of migrations.matchAll(alter)) {
+    for (const coluna of trecho[1].matchAll(/ADD COLUMN(?: IF NOT EXISTS)?\s+`?([a-z_][a-z0-9_]*)`?/gi)) {
+      colunas.add(coluna[1]);
+    }
+  }
+  return colunas;
+}
+
+describe('R1-04A - projecoes de leitura', () => {
+  it('declara as duas entidades e falha fechado em conflito', () => {
+    expect(projecoes.UnidadeEscolar).toBeDefined();
+    expect(projecoes.Dispositivo).toBeDefined();
+    expect(() => projecoes.validarDeclaracoes({
+      Teste: { leitura: ['segredo'], escrita: [], segredo: ['segredo'] }
+    })).toThrowError(/PROJECAO_INVALIDA/);
+  });
+
+  it('mantem leitura, escrita e segredo dentro do DDL', () => {
+    for (const tabela of ['UnidadeEscolar', 'Dispositivo']) {
+      const colunas = colunasDoDdl(tabela);
+      for (const conjunto of ['leitura', 'escrita', 'segredo']) {
+        for (const coluna of projecoes[tabela][conjunto]) {
+          expect(colunas, `${tabela}.${conjunto}.${coluna}`).toContain(coluna);
+        }
+      }
+      expect(projecoes[tabela].leitura.filter((coluna) => projecoes[tabela].segredo.includes(coluna))).toEqual([]);
+    }
+  });
+
+  it('guarda as tabelas referenciadas pelos controllers deste pacote', () => {
+    const controllers = {
+      UnidadeEscolar: 'schoolController.js',
+      Dispositivo: 'deviceController.js'
+    };
+    for (const [tabela, arquivo] of Object.entries(controllers)) {
+      const fonte = fs.readFileSync(path.join(__dirname, '..', 'src', 'controllers', arquivo), 'utf8');
+      expect(projecoes[tabela], tabela).toBeDefined();
+      expect(fonte).toContain(`const tabela = '${tabela}'`);
+      expect(fonte).toContain('gerarController(tabela');
+    }
+  });
+
+  it('projetarRegistro remove segredo novo sem alterar controller', () => {
+    const declaracao = {
+      ...projecoes.Dispositivo,
+      segredo: [...projecoes.Dispositivo.segredo, 'senha_backup']
+    };
+    const resposta = projecoes.projetarRegistro('Dispositivo', {
+      id: 7, nome: 'Catraca sintetica', senha: 'nao-deve-sair', senha_backup: 'tambem-nao'
+    }, declaracao);
+    expect(resposta).toEqual({ id: 7, nome: 'Catraca sintetica' });
+    expect(resposta).not.toHaveProperty('senha_backup');
+  });
+
+  it('rele a criacao com SELECT projetado, nunca SELECT *', async () => {
+    const queries = [];
+    const connection = {
+      query: async (sql) => {
+        queries.push(sql);
+        if (sql.startsWith('INSERT')) return [{ insertId: 19 }];
+        return [[{ id: 19, nome: 'Catraca sintetica', usuario: 'admin', senha: 'segredo' }]];
+      }
+    };
+    const resposta = await criarRegistro('Dispositivo', {
+      nome: 'Catraca sintetica', usuario: 'admin', senha: 'segredo'
+    }, connection);
+    expect(queries[1]).toContain('SELECT id, nome, modelo');
+    expect(queries[1]).not.toContain('SELECT *');
+    expect(resposta).not.toHaveProperty('usuario');
+    expect(resposta).not.toHaveProperty('senha');
+  });
+});
