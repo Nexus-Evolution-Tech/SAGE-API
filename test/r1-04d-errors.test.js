@@ -4,6 +4,13 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const logger = require('../src/config/logger');
 const { responderErroInterno } = require('../src/utils/responderErroInterno');
+function lerJavaScript(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const arquivo = path.join(dir, entry.name);
+    return entry.isDirectory() ? lerJavaScript(arquivo) : entry.name.endsWith('.js')
+      ? [fs.readFileSync(arquivo, 'utf8')] : [];
+  });
+}
 describe('R1-04D — erro interno e boot de rotas', () => {
   it('devolve somente contrato público e correlaciona detalhe sanitizado', () => {
     const response = { locals: {}, status: vi.fn().mockReturnThis(), json: vi.fn() };
@@ -13,15 +20,16 @@ describe('R1-04D — erro interno e boot de rotas', () => {
     expect(Object.keys(body)).toEqual(['error', 'traceId']);
     expect(body.error).toBe('Falha pública');
     expect(spy.mock.calls[0][1].traceId).toBe(body.traceId);
+    expect(spy.mock.calls[0][1].detalhe).not.toBeInstanceOf(Error);
     expect(JSON.stringify(spy.mock.calls[0][1])).not.toContain('123.456.789-09');
     spy.mockRestore();
   });
   it('mantém o guard estático contra detalhe em respostas 500', () => {
-    const arquivos = require('child_process').execFileSync('rg', ['--files', 'src'], { encoding: 'utf8' })
-      .trim().split(/\r?\n/).filter((arquivo) => arquivo.endsWith('.js'));
-    const fonte = arquivos.map((arquivo) => fs.readFileSync(arquivo, 'utf8')).join('\n');
+    const fonte = lerJavaScript(path.join(__dirname, '..', 'src')).join('\n');
     expect(fonte).not.toMatch(/res\.status\(500\)\.json\([\s\S]{0,300}(?:error|err)\.message/);
     expect(fonte).not.toMatch(/res\.status\(500\)\.json\([\s\S]{0,300}(?:detalhe|stack)\s*:/);
+    expect(fonte).toContain("responderErroInterno(res, detalhe, 'Erro interno no servidor')");
+    expect(fonte).not.toContain('body?.error');
   });
   it('falha o processo para rota essencial e segue com degradação para não essencial', () => {
     const app = path.join(__dirname, '..', 'src', 'app.js');
