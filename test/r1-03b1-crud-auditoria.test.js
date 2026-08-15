@@ -52,7 +52,9 @@ descreveMySql('R1-03B1 — auditoria transacional dos CRUDs gerados', () => {
     tokens = autores.map((usuario_id) => gerarToken({
       usuario_id, papel: 'SECRETARIA', emitido_em: new Date().toISOString()
     }));
-    const app = require('express')();
+    const express = require('express');
+    const app = express();
+    app.use(express.json());
     app.use('/', require('../src/routes/courseRoutes'));
     server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
