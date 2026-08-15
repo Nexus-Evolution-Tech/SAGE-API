@@ -28,6 +28,15 @@ const app = express();
 instrumentarAplicacao(app);
 const webBuildIsAvailable = webBuildAvailable();
 
+function rotaDeLog(req) {
+  if (req.route?.path) return req.route.path;
+  try {
+    return new URL(req.originalUrl || req.url || '/', 'http://sage.local').pathname || '/';
+  } catch {
+    return '/';
+  }
+}
+
 function serveSpaNavigation(req, res, next) {
   if (!isSpaNavigation(req)) return next();
   return res.sendFile(indexFile);
@@ -79,10 +88,11 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
+    const linha = `${req.method} ${rotaDeLog(req)} ${res.statusCode} - ${duration}ms`;
     if (duration > 1000) {
-      logger.warn(`⚠ SLOW REQUEST: ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+      logger.warn(`⚠ SLOW REQUEST: ${linha}`);
     } else {
-      logger.http(`${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+      logger.http(linha);
     }
   });
   next();
@@ -91,7 +101,7 @@ app.use((req, res, next) => {
 // Log em INFO de qualquer requisição para o Monitor (catraca) — para debugar se o POST chega
 app.use((req, res, next) => {
   if (req.path.toLowerCase().startsWith('/api/notifications')) {
-    logger.info(`[MONITOR] Requisição recebida: ${req.method} ${req.path} (origem: ${req.ip || req.connection?.remoteAddress || '?'})`);
+    logger.info(`[MONITOR] Requisição recebida: ${req.method} ${req.path}`);
   }
   next();
 });
@@ -138,7 +148,7 @@ try {
 app.use((err, req, res, next) => {
   try {
     const traceId = Math.random().toString(36).slice(2, 10);
-    logger.error(`Erro não tratado [${traceId}] ${req.method} ${req.originalUrl}: ${err.message}`);
+    logger.error(`Erro não tratado [${traceId}] ${req.method} ${rotaDeLog(req)}: ${err.message}`);
     if (err.stack) logger.debug(err.stack);
     // Garante resposta JSON consistente
     if (!res.headersSent) {
