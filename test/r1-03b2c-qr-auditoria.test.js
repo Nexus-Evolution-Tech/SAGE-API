@@ -88,7 +88,7 @@ descreveMySql('R1-03B2c — auditoria da geração de QR', () => {
       `SELECT usuario_id, acao, entidade, entidade_id, detalhe
        FROM TrilhaAuditoria WHERE entidade = 'Pessoa' AND entidade_id = ?`, [pessoaId]
     );
-    expect(pessoa.qr_code).toBe(resposta.body.qr_code);
+    expect(pessoa.qr_code).toBe(String(resposta.body.qr_code));
     expect(evento).toEqual({
       usuario_id: autorId, acao: 'REGISTRO_EDITADO', entidade: 'Pessoa',
       entidade_id: pessoaId, detalhe: null
