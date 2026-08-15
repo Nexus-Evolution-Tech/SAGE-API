@@ -1,6 +1,6 @@
 const { criarRegistro, atualizarRegistro, filtrarDadosDeEscrita } = require('../src/utils/generic-db-utils');
 const { globalDB } = require('../src/config/queryBuilder');
-const { filtrarDadosPessoa } = require('../src/utils/people-db-utils');
+const { filtrarDadosPessoa, CAMPOS_FILHOS_PESSOA } = require('../src/utils/people-db-utils');
 
 describe('R1-04B1 - allowlist de escrita', () => {
   it('rejeita chave desconhecida/maliciosa antes de mutar', async () => {
@@ -29,6 +29,9 @@ describe('R1-04B1 - allowlist de escrita', () => {
       .toEqual({ nome: 'x', senha_acesso: 'hash' });
     expect(filtrarDadosPessoa({ nome: 'x', id: 2 }).ignorados).toEqual(['id']);
     expect(filtrarDadosPessoa({ ra: '123', id: 2 })).toEqual({ dados: { ra: '123' }, ignorados: ['id'] });
+    expect(CAMPOS_FILHOS_PESSOA).toContain('ra');
+    expect(CAMPOS_FILHOS_PESSOA).not.toContain('campo_inventado');
+    expect(() => filtrarDadosPessoa({ campo_inventado: 'x' })).toThrow(/ESCRITA_CHAVE_NAO_DECLARADA/);
   });
 
   it('valida tabela, coluna/direção de ORDER BY e limites', () => {
@@ -36,6 +39,9 @@ describe('R1-04B1 - allowlist de escrita', () => {
       .toContain('ORDER BY nome DESC LIMIT 2 OFFSET 1');
     expect(() => globalDB('Curso').orderBy('nao_existe').buildQuery()).toThrow(/QUERY_ORDER_BY_INVALIDO/);
     expect(() => globalDB('Curso').orderBy('nome', 'DROP').buildQuery()).toThrow(/QUERY_ORDER_BY_INVALIDO/);
+    expect(() => globalDB('Curso').where('nao_existe', 'x').buildQuery()).toThrow(/QUERY_IDENTIFICADOR_INVALIDO/);
+    expect(() => globalDB('Curso').select(['nao_existe']).buildQuery()).toThrow(/QUERY_IDENTIFICADOR_INVALIDO/);
+    expect(globalDB('Curso').select('*').buildQuery().sql).toContain('SELECT * FROM Curso');
     expect(() => globalDB('Curso').limit('2; DROP TABLE Curso').buildQuery()).toThrow(/QUERY_LIMITE_INVALIDO/);
     expect(() => globalDB('nao_declarada').buildQuery()).toThrow(/QUERY_IDENTIFICADOR_INVALIDO/);
   });

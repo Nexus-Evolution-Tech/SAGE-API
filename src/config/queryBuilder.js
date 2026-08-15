@@ -88,6 +88,13 @@ class QueryBuilder {
     if (!this.table) throw new Error('Tabela não especificada');
 
     const colunas = colunasPermitidas(this.table);
+    for (const coluna of this.columns) {
+      if (coluna === '*' || colunas.has(coluna)) continue;
+      const agregado = /^COUNT\((\*|[A-Za-z_][A-Za-z0-9_]*)\)(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?$/i.exec(coluna);
+      if (!agregado || (agregado[1] !== '*' && !colunas.has(agregado[1]))) {
+        throw new Error(`QUERY_IDENTIFICADOR_INVALIDO: coluna ${coluna}`);
+      }
+    }
     for (const where of this.wheres) {
       if (where.type !== 'raw' && !colunas.has(where.column)) {
         throw new Error(`QUERY_IDENTIFICADOR_INVALIDO: coluna ${where.column}`);

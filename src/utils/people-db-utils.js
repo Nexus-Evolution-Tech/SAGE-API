@@ -2,7 +2,8 @@ const db = require('../config/database');
 const projecoes = require('../config/projecoes');
 const { filtrarDadosDeEscrita } = require('./generic-db-utils');
 
-const camposFilhos = new Set(['ra', 'rm', 'turma_id', 'divisao', 'status', 'matricula', 'data_admissao', 'data_saida', 'tipo_contrato', 'cargo', 'empresa_id', 'funcao', 'aluno_id']);
+const CAMPOS_FILHOS_PESSOA = Object.freeze(['ra', 'rm', 'turma_id', 'divisao', 'status', 'matricula', 'data_admissao', 'data_saida', 'tipo_contrato', 'cargo', 'empresa_id', 'funcao', 'aluno_id']);
+const camposFilhos = new Set(CAMPOS_FILHOS_PESSOA);
 
 function filtrarDadosPessoa(dados = {}) {
   const base = {}, filhos = {}, desconhecidas = [];
@@ -408,5 +409,6 @@ module.exports = {
   buscarPorId,
   atualizarPessoaCompleta,
   removerPessoa,
-  filtrarDadosPessoa
+  filtrarDadosPessoa,
+  CAMPOS_FILHOS_PESSOA
 };
