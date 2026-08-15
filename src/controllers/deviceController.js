@@ -15,6 +15,18 @@ const catracaImportService = require('../services/catracaImportService');
 const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
 const { paths, isInside } = require('../config/paths');
 const backupBanco = require('../services/backupBanco');
+const {
+  ACOES,
+  validarAutor,
+  registrarAuditoria,
+  registrarAuditoriaAutonoma,
+  executarOperacaoRemotaAuditada
+} = require('../services/auditoriaService');
+
+function auditarCatraca(req, acao, dispositivoId, detalhe, resultado) {
+  return registrarAuditoriaAutonoma({ req, acao, entidadeId: dispositivoId,
+    detalhe: { ...detalhe, resultado } });
+}
 
 const tabela = 'Dispositivo';
 
@@ -222,6 +234,7 @@ async function zerarLogs(req, res) {
     return res.status(400).json({ message: 'ID do dispositivo inválido' });
   }
   try {
+    validarAutor(req?.user?.usuario_id);
     const apagarAcessosNoSistema = req.body?.apagarAcessosNoSistema === true;
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) {
@@ -297,6 +310,11 @@ async function zerarLogs(req, res) {
     }
 
     // Marcar dispositivo como "zerando" para sync/polling não bater na mesma catraca durante o delete
+    const detalheAuditoria = {
+      dispositivo_id: id, backup_gerado: true, apagar_acessos: apagarAcessosNoSistema
+    };
+    await auditarCatraca(req, ACOES.CATRACA_LOGS_ZERADOS, id, detalheAuditoria, 'TENTATIVA');
+
     globalState.setZerandoDispositivo(id, true);
     try {
       // 1.5) Aguardar a catraca se recuperar do backup (evita 503 por sobrecarga)
@@ -307,19 +325,45 @@ async function zerarLogs(req, res) {
       }
 
       // 2) Zerar na catraca (pode demorar até CATRACA_ZERAR_LOGS_TIMEOUT_MS, ex. 3 min)
-      const zerarResult = await deviceService.zerarAccessLogsCatraca(dispositivo);
+      let zerarResult;
+      try {
+        zerarResult = await deviceService.zerarAccessLogsCatraca(dispositivo);
+      } catch (erroRemoto) {
+        await auditarCatraca(req, ACOES.CATRACA_LOGS_ZERADOS, id, detalheAuditoria, 'FALHA');
+        throw erroRemoto;
+      }
       if (!zerarResult.ok) {
+        await auditarCatraca(req, ACOES.CATRACA_LOGS_ZERADOS, id, detalheAuditoria, 'FALHA');
         return res.status(502).json({ message: zerarResult.message || 'Falha ao zerar logs na catraca' });
       }
 
-      // 3) Opcional: apagar acessos desse dispositivo no SAGE
+      const conexao = await db.getConnection();
+      try {
+        await conexao.beginTransaction();
+        // 3) Opcional: apagar acessos desse dispositivo no SAGE
       if (apagarAcessosNoSistema) {
-        const [deleteResult] = await db.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
+        const [deleteResult] = await conexao.query('DELETE FROM Acesso WHERE dispositivo_id = ?', [id]);
         logger.info(`[ZERAR] Acessos do dispositivo ${id} apagados no sistema: ${deleteResult.affectedRows} registros`);
       }
 
       // 4) Resetar ultimo_log_id_sincronizado para próxima sync começar do zero
-      await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+      await conexao.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
+
+      await registrarAuditoria(conexao, {
+        autorId: req.user.usuario_id,
+        acao: ACOES.CATRACA_LOGS_ZERADOS,
+        entidade: 'Dispositivo', entidadeId: id,
+        detalhe: { ...detalheAuditoria, resultado: 'SUCESSO' }
+      });
+      await conexao.commit();
+      } catch (erroLocal) {
+        await conexao.rollback().catch(() => logger.error('[AUDITORIA] codigo=ROLLBACK_FALHOU'));
+        await auditarCatraca(req, ACOES.CATRACA_LOGS_ZERADOS, id, detalheAuditoria, 'FALHA')
+          .catch(() => logger.error('[AUDITORIA] codigo=RESULTADO_FALHOU'));
+        throw erroLocal;
+      } finally {
+        conexao.release();
+      }
 
       return res.json({
         message: 'Logs da catraca zerados com sucesso. Backup gerado antes da operação.',
@@ -366,6 +410,7 @@ async function listarObjetosCatraca(req, res) {
 /** Remove um objeto na catraca por id (ex.: usuário, área, grupo). DELETE /dispositivos/:id/catraca/objetos/:objectType/:objectId */
 async function deletarObjetoCatraca(req, res) {
   try {
+    validarAutor(req?.user?.usuario_id);
     const id = parseDispositivoId(req.params.id);
     const objectType = (req.params.objectType || '').toLowerCase().trim();
     const objectIdRaw = req.params.objectId;
@@ -373,7 +418,7 @@ async function deletarObjetoCatraca(req, res) {
       return res.status(400).json({ message: 'ID do dispositivo inválido' });
     }
     const objectId = objectIdRaw ? parseInt(objectIdRaw, 10) : NaN;
-    if (!Number.isInteger(objectId)) {
+    if (!Number.isSafeInteger(objectId) || objectId < 1) {
       return res.status(400).json({ message: 'ID do objeto inválido' });
     }
     const allowedForDelete = ['users', 'areas', 'groups', 'cards', 'qrcodes', 'access_rules', 'portals', 'time_zones', 'time_spans', 'scheduled_unlocks'];
@@ -385,7 +430,13 @@ async function deletarObjetoCatraca(req, res) {
       return res.status(404).json({ message: 'Dispositivo não encontrado' });
     }
     const where = { [objectType]: { id: objectId } };
-    const result = await deviceService.destroyObjectsOnCatraca(dispositivo, objectType, where);
+    const result = await executarOperacaoRemotaAuditada({
+      req,
+      acao: ACOES.CATRACA_OBJETO_DELETADO,
+      entidadeId: id,
+      detalhe: { dispositivo_id: id, tipo_objeto: objectType, objeto_id: objectId },
+      operacao: () => deviceService.destroyObjectsOnCatraca(dispositivo, objectType, where)
+    });
     if (!result.ok) {
       return res.status(502).json({ message: result.message || 'Falha ao remover objeto na catraca' });
     }
@@ -443,6 +494,7 @@ async function zerarPorTipo(req, res) {
   if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
   if (!objectType) return res.status(400).json({ message: 'Tipo de objeto é obrigatório' });
   try {
+    validarAutor(req?.user?.usuario_id);
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
     if (objectType === 'access_logs') {
@@ -453,15 +505,28 @@ async function zerarPorTipo(req, res) {
           logger.info(`[ZERAR POR TIPO] Aguardando ${delayAposBackupMs / 1000}s antes de zerar access_logs`);
           await new Promise((r) => setTimeout(r, delayAposBackupMs));
         }
-        const result = await deviceService.zerarPorTipo(dispositivo, objectType);
+        const result = await executarOperacaoRemotaAuditada({
+          req,
+          acao: ACOES.CATRACA_TIPO_ZERADO,
+          entidadeId: id,
+          detalhe: { dispositivo_id: id, tipo_objeto: objectType },
+          operacao: () => deviceService.zerarPorTipo(dispositivo, objectType),
+          prepararSucesso: (connection) => connection.query(
+            'UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id])
+        });
         if (!result.ok) return res.status(502).json({ message: result.message || 'Falha ao zerar' });
-        await db.query('UPDATE Dispositivo SET ultimo_log_id_sincronizado = NULL WHERE id = ?', [id]);
         return res.json({ message: 'Logs da catraca zerados.', changes: result.changes });
       } finally {
         globalState.setZerandoDispositivo(id, false);
       }
     }
-    const result = await deviceService.zerarPorTipo(dispositivo, objectType);
+    const result = await executarOperacaoRemotaAuditada({
+      req,
+      acao: ACOES.CATRACA_TIPO_ZERADO,
+      entidadeId: id,
+      detalhe: { dispositivo_id: id, tipo_objeto: objectType },
+      operacao: () => deviceService.zerarPorTipo(dispositivo, objectType)
+    });
     if (!result.ok) return res.status(502).json({ message: result.message || 'Falha ao zerar' });
     return res.json({ message: `${objectType} zerado na catraca.`, changes: result.changes });
   } catch (error) {
@@ -503,11 +568,18 @@ async function importFromCatraca(req, res) {
 /** Apaga todos os objetos na catraca (usuários, áreas, grupos, logs). Use após backup para deixar a catraca vazia. */
 async function zerarTudo(req, res) {
   try {
+    validarAutor(req?.user?.usuario_id);
     const id = parseDispositivoId(req.params.id);
     if (id == null) return res.status(400).json({ message: 'ID do dispositivo inválido' });
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
-    const result = await deviceService.zerarTudoNaCatraca(dispositivo);
+    const result = await executarOperacaoRemotaAuditada({
+      req,
+      acao: ACOES.CATRACA_TUDO_ZERADO,
+      entidadeId: id,
+      detalhe: { dispositivo_id: id },
+      operacao: () => deviceService.zerarTudoNaCatraca(dispositivo)
+    });
     if (!result.ok) return res.status(502).json({ message: result.message, summary: result.summary, erros: result.erros });
     return res.json({ message: result.message || 'Catraca zerada.', summary: result.summary });
   } catch (error) {
@@ -527,11 +599,21 @@ async function comecarDoZero(req, res) {
     const [[dispositivo]] = await db.query(`SELECT ${campos.join(', ')} FROM ${tabela} WHERE id = ?`, [id]);
     if (!dispositivo) return res.status(404).json({ message: 'Dispositivo não encontrado' });
     const { apagarAcessosNoSistema, apagarAreasNoSistema, apagarPessoasNoSistema, confirmacao } = req.body || {};
-    if (confirmacao !== 'APAGAR TUDO' || !req.user?.id) return res.status(403).json({ message: 'Confirmação e autoria são obrigatórias.' });
+    if (confirmacao !== 'APAGAR TUDO' || !req.user?.usuario_id) return res.status(403).json({ message: 'Confirmação e autoria são obrigatórias.' });
     const backup = await backupBanco.gerarBackup();
     const prova = await backupBanco.verificarBackup(backup.caminho);
     if (!prova.ok) return res.status(502).json({ message: 'Backup não foi restaurado com sucesso. Operação cancelada.' });
     const backupCatraca = await deviceService.gerarBackupCompletoCatraca(dispositivo);
+
+    const autorId = req.user?.usuario_id;
+    if (!autorId) return res.status(403).json({ message: 'Autoria obrigatÃ³ria.' });
+    const detalheAuditoria = {
+      dispositivo_id: id, backup_banco_verificado: true,
+      apagar_acessos: !!apagarAcessosNoSistema,
+      apagar_areas: !!apagarAreasNoSistema,
+      apagar_pessoas: !!apagarPessoasNoSistema
+    };
+    await auditarCatraca(req, ACOES.CATRACA_COMECAR_DO_ZERO, id, detalheAuditoria, 'TENTATIVA');
 
     const sageRemovidos = { acessos: 0, areas: 0, pessoas: 0 };
     let conexao;
@@ -557,8 +639,13 @@ async function comecarDoZero(req, res) {
       const [r] = await conexao.query('DELETE FROM Pessoa');
       sageRemovidos.pessoas = r.affectedRows;
     }
+      await registrarAuditoria(conexao, {
+        autorId, acao: ACOES.CATRACA_COMECAR_DO_ZERO,
+        entidade: 'Dispositivo', entidadeId: id,
+        detalhe: { ...detalheAuditoria, resultado: 'SUCESSO' }
+      });
       await conexao.commit();
-      logger.info(`[COMECAR DO ZERO] operador_id=${req.user.id} dispositivo_id=${id}`);
+      logger.info(`[COMECAR DO ZERO] operador_id=${autorId} dispositivo_id=${id}`);
     } catch (erro) {
       if (conexao) {
         try { await conexao.rollback(); }
@@ -566,6 +653,8 @@ async function comecarDoZero(req, res) {
       }
       try { await deviceService.restaurarBackupCompletoCatraca(dispositivo, backupCatraca.filePath); }
       catch (_) { logger.error(`[COMECAR DO ZERO] compensação falhou codigo=CATRACA_RESTORE_FALHOU dispositivo_id=${id}`); }
+      await auditarCatraca(req, ACOES.CATRACA_COMECAR_DO_ZERO, id, detalheAuditoria, 'FALHA')
+        .catch(() => logger.error('[AUDITORIA] codigo=RESULTADO_FALHOU'));
       throw erro;
     } finally { conexao?.release(); }
 
