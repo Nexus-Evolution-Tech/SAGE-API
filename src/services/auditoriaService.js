@@ -1,11 +1,17 @@
+const db = require('../config/database');
+const logger = require('../config/logger');
+
 const ACOES = Object.freeze({ LOGIN_SUCESSO: 'LOGIN_SUCESSO', LOGOUT: 'LOGOUT',
   USUARIO_CRIADO: 'USUARIO_CRIADO', USUARIO_EDITADO: 'USUARIO_EDITADO',
-  USUARIO_DESATIVADO: 'USUARIO_DESATIVADO', SENHA_REDEFINIDA: 'SENHA_REDEFINIDA' });
+  USUARIO_DESATIVADO: 'USUARIO_DESATIVADO', SENHA_REDEFINIDA: 'SENHA_REDEFINIDA',
+  REGISTRO_CRIADO: 'REGISTRO_CRIADO', REGISTRO_EDITADO: 'REGISTRO_EDITADO',
+  REGISTRO_DELETADO: 'REGISTRO_DELETADO' });
 
 const ACOES_PERMITIDAS = new Set(Object.values(ACOES));
 const CAMPOS_DETALHE = Object.freeze({ LOGIN_SUCESSO: [], LOGOUT: [],
   USUARIO_CRIADO: ['pessoa_id', 'papel'], USUARIO_EDITADO: ['campos'],
-  USUARIO_DESATIVADO: [], SENHA_REDEFINIDA: [] });
+  USUARIO_DESATIVADO: [], SENHA_REDEFINIDA: [], REGISTRO_CRIADO: [],
+  REGISTRO_EDITADO: [], REGISTRO_DELETADO: [] });
 const CAMPOS_EDICAO_AUDITAVEIS = new Set(['login', 'exibicao', 'papel', 'pessoa_id']);
 const PAPEIS = new Set(['ADMINISTRADOR', 'SECRETARIA']);
 const CHAVES_SENSIVEIS = /(?:nome|cpf|rg|email|e_mail|foto|qr|cartao|cartão|token|senha|password|jwt)/i;
@@ -84,10 +90,31 @@ async function registrarAuditoria(connection, { autorId, acao, entidade = 'Usuar
   );
 }
 
+async function executarOperacaoAuditada({ req, acao, entidade, entidadeId, operacao }) {
+  validarAutor(req?.user?.usuario_id);
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const resultado = await operacao(connection);
+    const id = typeof entidadeId === 'function' ? entidadeId(resultado) : entidadeId;
+    await registrarAuditoria(connection, {
+      autorId: req.user.usuario_id, acao, entidade, entidadeId: id
+    });
+    await connection.commit();
+    return resultado;
+  } catch (error) {
+    await connection.rollback().catch(() => logger.error('[AUDITORIA] codigo=ROLLBACK_FALHOU'));
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   ACOES,
   ErroAuditoria,
   validarAutor,
   validarDetalhe,
-  registrarAuditoria
+  registrarAuditoria,
+  executarOperacaoAuditada
 };
