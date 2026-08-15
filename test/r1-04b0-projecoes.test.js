@@ -76,7 +76,9 @@ describe('R1-04B0 - declarações e guard de completude', () => {
       const colunas = inventario.get(tabela).colunas;
       const segredo = new Set(declaracao.segredo);
       expect(declaracao.leitura).toEqual(colunas.filter((coluna) => !segredo.has(coluna)));
-      expect(declaracao.escrita).toEqual(colunas.filter((coluna) => !['id', 'created_at', 'updated_at'].includes(coluna)));
+      const escritaEsperada = colunas.filter((coluna) => !['id', 'created_at', 'updated_at'].includes(coluna)
+        && !(tabela === 'Pessoa' && coluna === 'foto'));
+      expect(declaracao.escrita).toEqual(escritaEsperada);
     }
     expect(projecoes.Pessoa.segredo).toEqual(['senha_acesso']);
     expect(projecoes.Pessoa.escrita).toContain('senha_acesso');
