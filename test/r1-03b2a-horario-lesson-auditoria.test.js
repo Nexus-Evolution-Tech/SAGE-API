@@ -132,8 +132,13 @@ descreveMySql('R1-03B2a — auditoria explícita de horarioAula e lesson', () =>
       { usuario_id: autores[0], acao: 'REGISTRO_DELETADO', entidade: 'HorarioAula', entidade_id: horarioId, detalhe: null },
       { usuario_id: autores[1], acao: 'REGISTRO_DELETADO', entidade: 'Aula', entidade_id: aulaIds[1], detalhe: null }
     ]));
-    expect(eventos.filter((evento) => evento.entidade_id === aulaIds[0]).map((evento) => evento.usuario_id))
-      .toEqual([autores[0], autores[1]]);
+    const eventosDaAula = eventos.filter((evento) =>
+      evento.entidade === 'Aula' && evento.entidade_id === aulaIds[0]
+    );
+    expect(eventosDaAula).toEqual(expect.arrayContaining([
+      { usuario_id: autores[0], acao: 'REGISTRO_CRIADO', entidade: 'Aula', entidade_id: aulaIds[0], detalhe: null },
+      { usuario_id: autores[1], acao: 'REGISTRO_EDITADO', entidade: 'Aula', entidade_id: aulaIds[0], detalhe: null }
+    ]));
     expect(new Set(eventos.map((evento) => evento.usuario_id))).toEqual(new Set(autores));
   });
 
