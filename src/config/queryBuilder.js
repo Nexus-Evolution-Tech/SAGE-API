@@ -5,6 +5,21 @@
 
 const db = require('./database');
 const logger = require('./logger');
+const projecoes = require('./projecoes');
+const tabelasInternas = { sync_pendente: ['id', 'dispositivo_id', 'pessoa_id', 'last_attempt'] };
+
+function colunasPermitidas(tabela) {
+  const declaracao = projecoes[tabela];
+  if (declaracao) return new Set([...declaracao.leitura, ...declaracao.escrita, ...declaracao.segredo]);
+  if (tabelasInternas[tabela]) return new Set(tabelasInternas[tabela]);
+  throw new Error(`QUERY_IDENTIFICADOR_INVALIDO: tabela ${tabela}`);
+}
+
+function inteiroSeguro(valor, nome) {
+  const numero = Number(valor);
+  if (!Number.isSafeInteger(numero) || numero < 0) throw new Error(`QUERY_LIMITE_INVALIDO: ${nome}`);
+  return numero;
+}
 
 class QueryBuilder {
   constructor(table = null) {
@@ -52,7 +67,7 @@ class QueryBuilder {
 
   // ORDER BY
   orderBy(column, direction = 'asc') {
-    this.orderBys.push({ column, direction: direction.toUpperCase() });
+    this.orderBys.push({ column, direction });
     return this;
   }
 
@@ -72,6 +87,26 @@ class QueryBuilder {
   buildQuery() {
     if (!this.table) throw new Error('Tabela não especificada');
 
+    const colunas = colunasPermitidas(this.table);
+    for (const coluna of this.columns) {
+      if (coluna === '*' || colunas.has(coluna)) continue;
+      const agregado = /^COUNT\((\*|[A-Za-z_][A-Za-z0-9_]*)\)(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?$/i.exec(coluna);
+      if (!agregado || (agregado[1] !== '*' && !colunas.has(agregado[1]))) {
+        throw new Error(`QUERY_IDENTIFICADOR_INVALIDO: coluna ${coluna}`);
+      }
+    }
+    for (const where of this.wheres) {
+      if (where.type !== 'raw' && !colunas.has(where.column)) {
+        throw new Error(`QUERY_IDENTIFICADOR_INVALIDO: coluna ${where.column}`);
+      }
+    }
+    for (const order of this.orderBys) {
+      if (!colunas.has(order.column)) throw new Error(`QUERY_ORDER_BY_INVALIDO: coluna ${order.column}`);
+      if (typeof order.direction !== 'string' || !['ASC', 'DESC'].includes(order.direction.toUpperCase())) {
+        throw new Error(`QUERY_ORDER_BY_INVALIDO: direcao ${order.direction}`);
+      }
+      order.direction = order.direction.toUpperCase();
+    }
     let sql = `SELECT ${this.columns.join(', ')} FROM ${this.table}`;
     let bindings = [];
 
@@ -97,12 +132,12 @@ class QueryBuilder {
 
     // LIMIT
     if (this.limits !== null) {
-      sql += ` LIMIT ${this.limits}`;
+      sql += ` LIMIT ${inteiroSeguro(this.limits, 'LIMIT')}`;
     }
 
     // OFFSET
     if (this.offsets !== null) {
-      sql += ` OFFSET ${this.offsets}`;
+      sql += ` OFFSET ${inteiroSeguro(this.offsets, 'OFFSET')}`;
     }
 
     return { sql, bindings };

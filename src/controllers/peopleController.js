@@ -53,6 +53,7 @@ const criar = async (req, res) => {
     res.status(201).json({
       message: 'Pessoa criada com sucesso',
       pessoa: pessoaCriada,
+      ignorados: pessoaCriada.ignorados || [],
       sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' }
     });
 
@@ -132,11 +133,12 @@ const editar = async (req, res) => {
   try {
     const id = req.params.id;
 
-    await executarOperacaoAuditada({
+    const resultado = await executarOperacaoAuditada({
       req, acao: ACOES.REGISTRO_EDITADO, entidade: 'Pessoa', entidadeId: Number(id),
       operacao: async (connection) => {
-        await atualizarPessoaCompleta(id, req.body, connection);
+        const atualizacao = await atualizarPessoaCompleta(id, req.body, connection);
         await registrarSyncPendente(id, 'UPDATE', connection);
+        return atualizacao;
       }
     });
 
@@ -148,8 +150,11 @@ const editar = async (req, res) => {
     //     // Se falhar, já está registrado em sync_pendente para retry automático
     //   });
     // }
-    res.json({ message: 'Pessoa atualizada com sucesso', sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
+    res.json({ message: 'Pessoa atualizada com sucesso', ignorados: resultado?.ignorados || [], sincronizacao: { status: 'iniciada', message: 'Sincronização com catraca em background' } });
   } catch (error) {
+    if (error.code === 'ESCRITA_CHAVE_NAO_DECLARADA' || error.code === 'ESCRITA_NENHUM_CAMPO_APLICAVEL') {
+      return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
+    }
     res.status(500).json({ message: 'Erro ao editar pessoa', error: error.message, detalhes: error.detalhes });
   }
 };
