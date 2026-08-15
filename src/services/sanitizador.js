@@ -50,7 +50,7 @@ const CAMPOS_TECNICOS_PERMITIDOS = new Set([
  * segue redigido por inteiro, porque um nome escrito à mão nenhum padrão pega.
  */
 const CAMPOS_TEXTO_TECNICO = new Set([
-  'mensagem', 'stack', 'motivotecnico', 'ultimomotivo', 'texto', 'resumo',
+  'mensagem', 'message', 'stack', 'motivotecnico', 'ultimomotivo', 'texto', 'resumo',
   'plataforma', 'arquitetura', 'node', 'fusodosistema', 'pacote',
   'operacao', 'ultimaoperacaook', 'ultimaoperacaofalha', 'geradoem', 'em'
 ]);
@@ -66,6 +66,8 @@ const PADROES = [
   { nome: 'caminho_foto', re: /uploads[\/\\][\w\/\\.-]+/gi }
 ];
 
+const QUERY_SECRETA = /([?&](?:token|key|senha|password|secret)=)[^&#\s]*/gi;
+
 /** Redige dado pessoal dentro de uma string, preservando o que ajuda a diagnosticar. */
 function sanitizarTexto(texto) {
   if (typeof texto !== 'string') return texto;
@@ -73,7 +75,7 @@ function sanitizarTexto(texto) {
   for (const { nome, re } of PADROES) {
     saida = saida.replace(re, `[${nome.toUpperCase()}_REDIGIDO]`);
   }
-  return saida;
+  return saida.replace(QUERY_SECRETA, '$1[QUERY_REDIGIDA]');
 }
 
 /**

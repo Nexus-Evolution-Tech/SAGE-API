@@ -12,7 +12,7 @@ function monitorCallbackAuth(req, res, next) {
   if (token && token.length > 0) {
     const providedToken = req.query.token || req.headers['x-monitor-token'] || '';
     if (providedToken !== token) {
-      logger.warn(`[MONITOR AUTH] Token inválido ou ausente (origem: ${req.ip || req.connection?.remoteAddress || '?'})`);
+      logger.warn('[MONITOR AUTH] Token inválido ou ausente');
       return res.status(401).json({ ok: false, error: 'Token inválido ou ausente' });
     }
   }
@@ -26,7 +26,7 @@ function monitorCallbackAuth(req, res, next) {
       return normalized === normalizedClient || normalized === clientIp;
     });
     if (!allowed) {
-      logger.warn(`[MONITOR AUTH] IP não permitido: ${clientIp} (whitelist: ${allowedIps.join(', ')})`);
+      logger.warn('[MONITOR AUTH] IP não permitido');
       return res.status(403).json({ ok: false, error: 'IP não permitido' });
     }
   }
