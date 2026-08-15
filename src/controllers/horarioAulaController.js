@@ -1,5 +1,6 @@
 const db = require("../config/database");
 const logger = require('../config/logger');
+const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
 
 // ==============================
 // Normalização de dia da semana
@@ -194,6 +195,7 @@ const horarioAulaController = {
   // ====================================
   async criar(req, res) {
     try {
+      validarAutor(req?.user?.usuario_id);
       const { turmaId, aulaId, diaSemana, horario, divisao, salaId } = req.body;
 
       // Validações básicas
@@ -275,14 +277,21 @@ const horarioAulaController = {
       }
 
       // Inserir novo horário
-      const [result] = await db.query(
+      const result = await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_CRIADO, entidade: 'HorarioAula',
+        entidadeId: (insertResult) => insertResult?.insertId,
+        operacao: async (connection) => {
+          const [insertResult] = await connection.query(
         `
         INSERT INTO HorarioAula
           (turma_id, aula_id, dia_semana, horario, divisao, sala_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
         `,
         [turmaId, aulaId, diaDb, horario, divNorm, salaFinal]
-      );
+          );
+          return insertResult;
+        }
+      });
 
       if (!result || !result.insertId) {
         logger.error('[HORARIO] codigo=HORARIO_CRIAR_SEM_ID');
@@ -307,6 +316,7 @@ const horarioAulaController = {
   // ====================================
   async editar(req, res) {
     try {
+      validarAutor(req?.user?.usuario_id);
       const { id } = req.params;
       const { turmaId, aulaId, diaSemana, horario, divisao, salaId } = req.body;
 
@@ -402,7 +412,9 @@ const horarioAulaController = {
       }
 
       // Atualizar horário
-      await db.query(
+      await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_EDITADO, entidade: 'HorarioAula', entidadeId: Number(id),
+        operacao: (connection) => connection.query(
         `
         UPDATE HorarioAula
         SET
@@ -416,7 +428,8 @@ const horarioAulaController = {
         WHERE id = ?
         `,
         [novoTurmaId, novoAulaId, novoDia, novoHorario, novoDiv, novoSalaId, id]
-      );
+        )
+      });
 
       res.json({ message: 'Horário atualizado com sucesso' });
 
@@ -507,6 +520,7 @@ const horarioAulaController = {
   // ====================================
   async deletar(req, res) {
     try {
+      validarAutor(req?.user?.usuario_id);
       const { id } = req.params;
 
       const [existe] = await db.query(
@@ -518,7 +532,10 @@ const horarioAulaController = {
         return res.status(404).json({ message: 'Horário não encontrado' });
       }
 
-      await db.query('DELETE FROM HorarioAula WHERE id = ?', [id]);
+      await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_DELETADO, entidade: 'HorarioAula', entidadeId: Number(id),
+        operacao: (connection) => connection.query('DELETE FROM HorarioAula WHERE id = ?', [id])
+      });
       res.status(204).send();
 
     } catch (err) {
