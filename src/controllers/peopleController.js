@@ -243,8 +243,12 @@ const gerarQrCode = async (req, res) => {
   try {
     const qrcode = gerarNumero8Digitos();
 
-    const query = `UPDATE Pessoa SET qr_code = ? WHERE id = ?`;
-    await db.query(query, [qrcode, id]);
+    await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_EDITADO, entidade: 'Pessoa', entidadeId: Number(id),
+      operacao: (connection) => connection.query(
+        'UPDATE Pessoa SET qr_code = ? WHERE id = ?', [qrcode, id]
+      )
+    });
 
     // await registrarSyncPendente(id, 'UPDATE'); - a partir do momento em que eu clico em salvar ja cadastra um UPDATE em sync_pendente
 
