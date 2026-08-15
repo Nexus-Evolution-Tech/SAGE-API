@@ -12,21 +12,21 @@ async function buscarPorId(id, tabela, campos = ['*']) {
   return result;
 }
 
-async function criarRegistro(tabela, dados) {
+async function criarRegistro(tabela, dados, connection = db) {
   const campos = Object.keys(dados);
   const valores = Object.values(dados);
 
   const placeholders = campos.map(() => '?').join(', ');
 
   const query = `INSERT INTO ${tabela} (${campos.join(', ')}) VALUES (${placeholders})`;
-  const [result] = await db.query(query, valores);
+  const [result] = await connection.query(query, valores);
   const insertId = result?.insertId;
   if (insertId == null) return undefined;
-  const [rows] = await db.query(`SELECT * FROM ${tabela} WHERE id = ?`, [insertId]);
+  const [rows] = await connection.query(`SELECT * FROM ${tabela} WHERE id = ?`, [insertId]);
   return rows[0] || { id: insertId, ...dados };
 }
 
-async function atualizarRegistro(tabela, id, updates) {
+async function atualizarRegistro(tabela, id, updates, connection = db) {
   const campos = Object.keys(updates);
   const valores = Object.values(updates);
 
@@ -35,12 +35,12 @@ async function atualizarRegistro(tabela, id, updates) {
   const setClauses = campos.map(campo => `${campo} = ?`).join(', ');
   const query = `UPDATE ${tabela} SET ${setClauses} WHERE id = ?`;
 
-  await db.query(query, [...valores, id]);
+  await connection.query(query, [...valores, id]);
 }
 
-async function removerRegistro(tabela, id) {
+async function removerRegistro(tabela, id, connection = db) {
   const query = `DELETE FROM ${tabela} WHERE id = ?`;
-  await db.query(query, [id]);
+  await connection.query(query, [id]);
 }
 
 module.exports = {

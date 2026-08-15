@@ -4,6 +4,7 @@ const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
 const db = require('../config/database');
 const logger = require('../config/logger');
 const { cacheQuery, cacheMutation, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
+const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 
 function capitalize(text) {
   if (!text) return '';
@@ -102,7 +103,11 @@ function gerarController(tabela, campos, entidadeNome) {
           }
 
         const novoRegistro = await cacheMutation(
-          async () => crud.criarRegistro(tabela, dados),
+          async () => executarOperacaoAuditada({
+            req, acao: ACOES.REGISTRO_CRIADO, entidade: tabela,
+            entidadeId: (registro) => registro?.id,
+            operacao: (connection) => crud.criarRegistro(tabela, dados, connection)
+          }),
           [`${tabela}:*`]
         );
         
@@ -121,7 +126,10 @@ function gerarController(tabela, campos, entidadeNome) {
         const id = req.params.id;
         
         await cacheMutation(
-          async () => crud.atualizarRegistro(tabela, id, req.body),
+          async () => executarOperacaoAuditada({
+            req, acao: ACOES.REGISTRO_EDITADO, entidade: tabela, entidadeId: Number(id),
+            operacao: (connection) => crud.atualizarRegistro(tabela, id, req.body, connection)
+          }),
           [`${tabela}:*`]
         );
         
@@ -137,7 +145,10 @@ function gerarController(tabela, campos, entidadeNome) {
         const id = req.params.id;
         
         await cacheMutation(
-          async () => crud.removerRegistro(tabela, id),
+          async () => executarOperacaoAuditada({
+            req, acao: ACOES.REGISTRO_DELETADO, entidade: tabela, entidadeId: Number(id),
+            operacao: (connection) => crud.removerRegistro(tabela, id, connection)
+          }),
           [`${tabela}:*`]
         );
         
