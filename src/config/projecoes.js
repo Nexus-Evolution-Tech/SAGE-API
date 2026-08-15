@@ -78,7 +78,7 @@ const declaracoes = {
   },
   Pessoa: {
     leitura: ['id', 'nome', 'foto', 'orgao_emissor_rg', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'data_nascimento', 'tipo', 'visivel', 'created_at', 'updated_at'],
-    escrita: ['nome', 'foto', 'orgao_emissor_rg', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'tipo', 'visivel'],
+    escrita: ['nome', 'orgao_emissor_rg', 'rg', 'cpf', 'telefone', 'email', 'unidade_id', 'qr_code', 'cartao_rfid', 'senha_acesso', 'data_nascimento', 'tipo', 'visivel'],
     segredo: ['senha_acesso']
   }
 };

@@ -36,7 +36,7 @@ async function exportarDados(outputPath) {
   // Catracas
   const [catracas] = await db.query(`
     SELECT nome AS 'Nome', modelo AS 'Modelo', endereco AS 'Endereço', porta AS 'Porta',
-           usuario AS 'Usuário', senha AS 'Senha', numero_serial AS 'Número Serial'
+           numero_serial AS 'Número Serial'
     FROM Dispositivo
   `);
   const wsCatracas = XLSX.utils.json_to_sheet(catracas);

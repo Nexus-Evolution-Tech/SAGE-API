@@ -25,6 +25,43 @@ const { paths } = require('../config/paths');
 const registrarSyncPendente = require('../services/sync');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
 
+function erroCaminhoFotoForaUploads() {
+  const erro = new Error('Caminho de foto fora de uploads');
+  erro.code = 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS';
+  return erro;
+}
+
+function estaDentroDeUploads(raizUploads, alvo) {
+  const relativo = path.relative(raizUploads, alvo);
+  return relativo === '' || (!relativo.startsWith(`..${path.sep}`) && relativo !== '..' && !path.isAbsolute(relativo));
+}
+
+function resolverPastaFotos(baseUploads = paths.uploads) {
+  const raizUploads = fs.realpathSync(baseUploads);
+  const pastaFotos = path.resolve(raizUploads, 'pessoas');
+  fs.mkdirSync(pastaFotos, { recursive: true });
+  const pastaReal = fs.realpathSync(pastaFotos);
+  if (!estaDentroDeUploads(raizUploads, pastaReal)) throw erroCaminhoFotoForaUploads();
+  return pastaReal;
+}
+
+function resolverFotoExistente(foto, baseUploads = paths.uploads) {
+  const raizUploads = fs.realpathSync(baseUploads);
+  const candidato = path.resolve(raizUploads, 'pessoas', String(foto));
+  if (!estaDentroDeUploads(raizUploads, candidato)) throw erroCaminhoFotoForaUploads();
+
+  try {
+    fs.lstatSync(candidato);
+    const caminhoReal = fs.realpathSync(candidato);
+    if (!estaDentroDeUploads(raizUploads, caminhoReal)) throw erroCaminhoFotoForaUploads();
+    return caminhoReal;
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    if (error.code === 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS') throw error;
+    throw erroCaminhoFotoForaUploads();
+  }
+}
+
 /**
  * Verifica se já existe uma pessoa com os documentos fornecidos
  */
@@ -170,13 +207,8 @@ async function uploadFotoPessoa(req, res) {
 
   // Caminho /pessoas
   const baseUploads = paths.uploads;
-  const pastaDestino = path.join(baseUploads, 'pessoas');
-
-  if (!fs.existsSync(pastaDestino)) {
-    fs.mkdirSync(pastaDestino, { recursive: true });
-  }
-
   try {
+    const pastaDestino = resolverPastaFotos(baseUploads);
     // Verificar se a pessoa existe
     const [rows] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [pessoa_id]);
     // console.log('Pessoa encontrada:', rows[0]);
@@ -193,10 +225,8 @@ async function uploadFotoPessoa(req, res) {
     const [fotoAtual] = await db.query('SELECT foto FROM Pessoa WHERE id = ?', [pessoa_id]);
     
     if (fotoAtual.length > 0 && fotoAtual[0].foto) {
-      const fotoAntigaCaminho = path.join(baseUploads, fotoAtual[0].foto);
-      if (fs.existsSync(fotoAntigaCaminho)) {
-        fs.unlinkSync(fotoAntigaCaminho);
-      }
+      const fotoAntigaCaminho = resolverFotoExistente(fotoAtual[0].foto, baseUploads);
+      if (fotoAntigaCaminho) fs.unlinkSync(fotoAntigaCaminho);
     }
 
     // Gerar nome único para a foto
@@ -218,6 +248,7 @@ async function uploadFotoPessoa(req, res) {
     });
 
   } catch (error) {
+    logger.error(`[PESSOA-FOTO] codigo=${error.code || 'UPLOAD_FALHOU'} pessoa_id=${pessoa_id}`);
     
     // Tentar remover arquivo temporário em caso de erro
     try {
@@ -229,7 +260,8 @@ async function uploadFotoPessoa(req, res) {
       logger.warn('[PESSOA-FOTO] codigo=ARQUIVO_TEMPORARIO_NAO_REMOVIDO');
     }
     
-    res.status(500).json({ message: 'Erro ao salvar a foto da pessoa' });
+    res.status(error.code === 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS' ? 400 : 500)
+      .json({ message: 'Erro ao salvar a foto da pessoa' });
   }
 }
 
@@ -250,11 +282,8 @@ async function removerFotoPessoa(req, res) {
 
     // Remover arquivo físico
     const baseUploads = paths.uploads;
-    const caminhoFoto = path.join(baseUploads, pessoa[0].foto);
-    
-    if (fs.existsSync(caminhoFoto)) {
-      fs.unlinkSync(caminhoFoto);
-    }
+    const caminhoFoto = resolverFotoExistente(pessoa[0].foto, baseUploads);
+    if (caminhoFoto) fs.unlinkSync(caminhoFoto);
 
     // Atualizar banco removendo referência da foto
     await db.query('UPDATE Pessoa SET foto = NULL WHERE id = ?', [pessoa_id]);
@@ -265,7 +294,9 @@ async function removerFotoPessoa(req, res) {
     });
 
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao remover a foto da pessoa' });
+    logger.error(`[PESSOA-FOTO] codigo=${error.code || 'REMOCAO_FALHOU'} pessoa_id=${pessoa_id}`);
+    res.status(error.code === 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS' ? 400 : 500)
+      .json({ message: 'Erro ao remover a foto da pessoa' });
   }
 }
 
@@ -273,5 +304,6 @@ module.exports = {
   criarPessoaCompleta,
   buscarPessoasPorTipo,
   uploadFotoPessoa,
-  removerFotoPessoa
+  removerFotoPessoa,
+  resolverFotoExistente
 };
