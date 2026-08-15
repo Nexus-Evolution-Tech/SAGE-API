@@ -30,7 +30,7 @@ function auditarCatraca(req, acao, dispositivoId, detalhe, resultado) {
 
 async function prepararBackupCatraca(dispositivo, objectType) {
   if (objectType) return deviceService.backupPorTipo(dispositivo, objectType);
-  await deviceService.gerarBackupCompletoCatraca(dispositivo); return deviceService.gerarBackupLogsCatraca(dispositivo);
+  const backup = await deviceService.gerarBackupCompletoCatraca(dispositivo); if (!backup || backup.erros || typeof backup.filePath !== 'string' || typeof backup.filename !== 'string' || !backup.summary || typeof backup.summary !== 'object') throw new Error('Backup completo inválido ou incompleto'); return deviceService.gerarBackupLogsCatraca(dispositivo);
 }
 
 const tabela = 'Dispositivo';
