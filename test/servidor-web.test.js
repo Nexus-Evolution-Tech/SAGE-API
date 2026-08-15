@@ -130,6 +130,7 @@ describe('F8.3b — painel servido pela API', () => {
       expect(profunda.body).toContain('SAGE painel');
       expect(health.status).toBe(200);
       expect(health.headers['content-type']).toContain('application/json');
+      expect(Object.keys(JSON.parse(health.body)).sort()).toEqual(['status', 'timestamp']);
       expect(ready).toMatchObject({
         status: 503,
         body: expect.stringContaining('database_unavailable')

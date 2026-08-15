@@ -7,6 +7,7 @@ const { cacheMutation, cacheQuery, CACHE_KEYS, CACHE_TTL } = require('../cache/h
 const logger = require('../config/logger');
 const db = require('../config/database');
 const ajustarFusoHorarioBrasil = require('../utils/ajustaFusoHorario');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const tabela = 'Acesso';
 const campos = ['id', 'pessoa_id', 'dispositivo_id', 'status', 'permitido', 'metodo_auth', 'data_hora', 'updated_at'];
@@ -70,7 +71,7 @@ const criar = async (req, res) => {
         res.status(201).json(acesso);
     } catch (error) {
         logger.error(`[ACCESS ERROR] ${error.message}`);
-        res.status(500).json({ message: 'Erro ao efetuar acesso', error: error.message });
+        responderErroInterno(res, error, 'Erro ao efetuar acesso');
     }
 };
 
@@ -108,7 +109,7 @@ const listar = async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error(`Erro ao listar acessos: ${error.message}`);
-        res.status(500).json({ message: 'Erro ao listar acessos', error: error.message });
+        responderErroInterno(res, error, 'Erro ao listar acessos');
     }
 };
 

@@ -16,6 +16,7 @@ const { avaliarPerdaDeLogs } = require('../services/protecaoLogs');
 const { paths, isInside } = require('../config/paths');
 const { projetarRegistro } = require('../config/projecoes');
 const backupBanco = require('../services/backupBanco');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 const {
   ACOES,
   validarAutor,
@@ -197,7 +198,7 @@ async function diagnosticoAcessos(req, res) {
     });
   } catch (error) {
     logger.error(`Erro no diagnóstico: ${error.message}`);
-    return res.status(500).json({ message: 'Erro no diagnóstico', error: error.message });
+    return responderErroInterno(res, error, 'Erro no diagnóstico');
   }
 }
 
@@ -229,7 +230,7 @@ async function logsInfo(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao obter logs-info: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao obter informações de logs', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao obter informações de logs');
   }
 }
 
@@ -382,7 +383,7 @@ async function zerarLogs(req, res) {
   } catch (error) {
     if (id != null) globalState.setZerandoDispositivo(id, false);
     logger.error(`Erro ao zerar logs: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao zerar logs', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao zerar logs');
   }
 }
 
@@ -409,7 +410,7 @@ async function listarObjetosCatraca(req, res) {
     return res.json({ objectType, data, total: data.length });
   } catch (error) {
     logger.error(`Erro ao listar objetos da catraca: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao listar objetos da catraca', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao listar objetos da catraca');
   }
 }
 
@@ -450,7 +451,7 @@ async function deletarObjetoCatraca(req, res) {
     return res.json({ message: `${objectType} removido na catraca`, changes: result.changes });
   } catch (error) {
     logger.error(`Erro ao deletar objeto na catraca: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao deletar objeto na catraca', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao deletar objeto na catraca');
   }
 }
 
@@ -460,7 +461,7 @@ async function listarTiposObjetosCatraca(req, res) {
     return res.json({ objectTypes: deviceService.OBJETOS_CATRACA_FERRAMENTAS });
   } catch (error) {
     logger.error(`Erro ao listar tipos de objetos: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao listar tipos', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao listar tipos');
   }
 }
 
@@ -490,7 +491,7 @@ async function backupPorTipo(req, res) {
       return res.status(400).json({ message: error.message });
     }
     logger.error(`Erro ao gerar backup por tipo: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao gerar backup', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao gerar backup');
   }
 }
 
@@ -540,7 +541,7 @@ async function zerarPorTipo(req, res) {
   } catch (error) {
     if (id != null && objectType === 'access_logs') globalState.setZerandoDispositivo(id, false);
     logger.error(`Erro ao zerar por tipo: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao zerar', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao zerar');
   }
 }
 
@@ -569,7 +570,7 @@ async function importFromCatraca(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao importar da catraca: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao importar da catraca', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao importar da catraca');
   }
 }
 
@@ -594,7 +595,7 @@ async function zerarTudo(req, res) {
     return res.json({ message: result.message || 'Catraca zerada.', summary: result.summary });
   } catch (error) {
     logger.error(`Erro ao zerar catraca: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao zerar catraca', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao zerar catraca');
   }
 }
 
@@ -675,7 +676,7 @@ async function comecarDoZero(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao começar do zero: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao começar do zero', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao começar do zero');
   }
 }
 
@@ -703,7 +704,7 @@ async function backupCompleto(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao gerar backup completo: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao gerar backup completo', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao gerar backup completo');
   }
 }
 
@@ -731,7 +732,7 @@ async function backupLogs(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao gerar backup de logs: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao gerar backup', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao gerar backup');
   }
 }
 
@@ -763,7 +764,7 @@ async function configurarMonitor(req, res) {
       message: `${error.message}`,
       type: 'error',
     });
-    return res.status(500).json({ message: 'Erro ao configurar Monitor', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao configurar Monitor');
   }
 }
 
@@ -804,7 +805,7 @@ async function toggleSync(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao alterar sincronização: ${error.message}`);
-    return res.status(500).json({ message: 'Erro ao alterar sincronização', error: error.message });
+    return responderErroInterno(res, error, 'Erro ao alterar sincronização');
   }
 }
 
@@ -834,7 +835,7 @@ async function criar(req, res) {
     });
   } catch (error) {
     logger.error(`Erro ao criar dispositivo: ${error.message}`);
-    res.status(500).json({ message: 'Erro ao criar dispositivo', error: error.message });
+    responderErroInterno(res, error, 'Erro ao criar dispositivo');
   }
 }
 
@@ -846,7 +847,7 @@ async function limparUsuarios(req, res){
     });
   } catch (error) {
     logger.error(`Erro ao remover usuários: ${error.message}`);
-    res.status(500).json({ message: 'Erro ao remover usuários', error: error.message });
+    responderErroInterno(res, error, 'Erro ao remover usuários');
   }
 }
 
@@ -883,7 +884,7 @@ module.exports = {
       });
       res.json({ cidrs: result.cidrs, found: result.found });
     } catch (error) {
-      res.status(500).json({ message: 'Erro ao descobrir dispositivos na rede', error: error.message });
+      responderErroInterno(res, error, 'Erro ao descobrir dispositivos na rede');
     }
   },
   async quickAdd(req, res) {
@@ -935,7 +936,7 @@ module.exports = {
         conectado: !!ok
       });
     } catch (error) {
-      res.status(500).json({ message: 'Erro ao criar dispositivo', error: error.message });
+      responderErroInterno(res, error, 'Erro ao criar dispositivo');
     }
   }
 }

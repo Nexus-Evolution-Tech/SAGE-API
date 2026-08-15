@@ -10,6 +10,7 @@ const redis = require('../config/redis');
 const logger = require('../config/logger');
 const db = require('../config/database');
 const { exige } = require('../middlewares/autorizacao');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 router.use('/monitoring', exige('ADMINISTRADOR'));
 
@@ -37,7 +38,7 @@ router.get('/monitoring/state', async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter state: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter state');
   }
 });
 
@@ -50,7 +51,7 @@ router.get('/monitoring/stats', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter stats: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter stats');
   }
 });
 
@@ -64,7 +65,7 @@ router.get('/monitoring/devices', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter devices: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter devices');
   }
 });
 
@@ -79,7 +80,7 @@ router.get('/monitoring/sync', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter sync: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter sync');
   }
 });
 
@@ -93,7 +94,7 @@ router.get('/monitoring/cache', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter cache info: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter cache info');
   }
 });
 
@@ -107,7 +108,7 @@ router.get('/monitoring/users', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter users: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter users');
   }
 });
 
@@ -122,7 +123,7 @@ router.post('/monitoring/cache/clear', async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao limpar cache: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao limpar cache');
   }
 });
 
@@ -137,7 +138,7 @@ router.get('/monitoring/slow-queries', (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter slow queries: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter slow queries');
   }
 });
 
@@ -182,7 +183,7 @@ router.get('/monitoring/sync-db', async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter status da fila DB: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter status da fila DB');
   }
 });
 
@@ -213,7 +214,7 @@ router.get('/sync-db', exige('ADMINISTRADOR'), async (req, res) => {
     });
   } catch (error) {
     logger.error(`Erro ao obter status da fila DB: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    responderErroInterno(res, error, 'Erro ao obter status da fila DB');
   }
 });
 

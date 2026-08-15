@@ -6,6 +6,7 @@
 
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const TOLERANCIA_ATRASO_MINUTOS = 15;
 
@@ -98,7 +99,7 @@ async function turmas(req, res) {
     res.json(Array.isArray(rows) ? rows : []);
   } catch (err) {
     logger.error('[RELATORIO] turmas:', err.message);
-    res.status(500).json({ message: 'Erro ao listar turmas', error: err.message });
+    responderErroInterno(res, err, 'Erro ao listar turmas');
   }
 }
 
@@ -650,7 +651,7 @@ async function resumo(req, res) {
     });
   } catch (err) {
     logger.error('[RELATORIO] resumo:', err.message);
-    res.status(500).json({ message: 'Erro ao gerar resumo', error: err.message });
+    responderErroInterno(res, err, 'Erro ao gerar resumo');
   }
 }
 
@@ -763,7 +764,7 @@ async function detalhes(req, res) {
     res.json({ dados: lista, total });
   } catch (err) {
     logger.error('[RELATORIO] detalhes:', err.message);
-    res.status(500).json({ message: 'Erro ao gerar detalhes', error: err.message });
+    responderErroInterno(res, err, 'Erro ao gerar detalhes');
   }
 }
 
@@ -808,7 +809,7 @@ async function backfillPresenca(req, res) {
     });
   } catch (err) {
     logger.error('[RELATORIO] backfillPresenca:', err.message);
-    res.status(500).json({ message: 'Erro ao fazer backfill', error: err.message });
+    responderErroInterno(res, err, 'Erro ao fazer backfill');
   }
 }
 
@@ -950,7 +951,7 @@ async function historicoPessoa(req, res) {
     });
   } catch (err) {
     logger.error('[RELATORIO] historicoPessoa:', err.message);
-    res.status(500).json({ message: 'Erro ao buscar histórico', error: err.message });
+    responderErroInterno(res, err, 'Erro ao buscar histórico');
   }
 }
 

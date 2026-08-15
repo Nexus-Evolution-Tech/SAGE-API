@@ -4,6 +4,7 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
 const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const DIAS_SEMANA = ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
 
@@ -47,7 +48,7 @@ async function listar(req, res) {
     res.json({ horarios, usar_horario_fixo });
   } catch (err) {
     logger.error('[FuncionarioHorario] listar:', err.message);
-    res.status(500).json({ message: 'Erro ao listar horários', error: err.message });
+    responderErroInterno(res, err, 'Erro ao listar horários');
   }
 }
 
@@ -116,7 +117,7 @@ async function salvar(req, res) {
     res.json(resposta);
   } catch (err) {
     logger.error('[FuncionarioHorario] salvar:', err.message);
-    res.status(500).json({ message: 'Erro ao salvar horários', error: err.message });
+    responderErroInterno(res, err, 'Erro ao salvar horários');
   }
 }
 

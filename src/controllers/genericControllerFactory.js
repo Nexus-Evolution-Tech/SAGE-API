@@ -7,6 +7,7 @@ const { cacheQuery, cacheMutation, CACHE_KEYS, CACHE_TTL } = require('../cache/h
 const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 const projecoes = require('../config/projecoes');
 const ERROS_ESCRITA = new Set(['ESCRITA_CHAVE_NAO_DECLARADA', 'ESCRITA_NENHUM_CAMPO_APLICAVEL']);
+const { responderErroInterno } = require('../utils/responderErroInterno');
 
 function capitalize(text) {
   if (!text) return '';
@@ -70,7 +71,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json(result);
       } catch (error) {
         logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
-        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
+        responderErroInterno(res, error, `Erro ao listar ${entidadeNome}`);
       }
     },
 
@@ -93,7 +94,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json(registros);
       } catch (error) {
         logger.error(`Erro ao listar ${entidadeNome}: ${error.message}`);
-        res.status(500).json({ message: `Erro ao listar ${entidadeNome}`, error: error.message });
+        responderErroInterno(res, error, `Erro ao listar ${entidadeNome}`);
       }
     },
 
@@ -127,7 +128,7 @@ function gerarController(tabela, campos, entidadeNome) {
           return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
         }
         logger.error(`Erro ao criar ${entidadeNome}: ${error.message}`);
-        res.status(500).json({ message: `Erro ao criar ${entidadeNome}`, error: error.message });
+        responderErroInterno(res, error, `Erro ao criar ${entidadeNome}`);
       }
     },
 
@@ -149,7 +150,7 @@ function gerarController(tabela, campos, entidadeNome) {
           return res.status(400).json({ message: error.message, chaves: error.chaves || [], ignorados: error.ignorados || [] });
         }
         logger.error(`Erro ao atualizar ${entidadeNome}: ${error.message}`);
-        res.status(500).json({ message: `Erro ao atualizar ${entidadeNome}`, error: error.message });
+        responderErroInterno(res, error, `Erro ao atualizar ${entidadeNome}`);
       }
     },
 
@@ -168,7 +169,7 @@ function gerarController(tabela, campos, entidadeNome) {
         res.json({ message: `${capitalize(entidadeNome)} ${getGeneroTexto(entidadeNome, 'removid')} com sucesso` });
       } catch (error) {
         logger.error(`Erro ao remover ${entidadeNome}: ${error.message}`);
-        res.status(500).json({ message: `Erro ao remover ${entidadeNome}`, error: error.message });
+        responderErroInterno(res, error, `Erro ao remover ${entidadeNome}`);
       }
     }
   };

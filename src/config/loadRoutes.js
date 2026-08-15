@@ -6,11 +6,17 @@ function loadRoutes(app, routesFolder = path.join(__dirname, '../routes')) {
   const routeFiles = files.filter(
     (file) => file.endsWith('Routes.js') && file !== 'genericRoutes.js'
   );
+  const failures = [];
   routeFiles.forEach((file) => {
     const routePath = path.join(routesFolder, file);
-    const route = require(routePath);
-    app.use('/', route);
+    try {
+      const route = require(routePath);
+      app.use('/', route);
+    } catch (error) {
+      failures.push({ file, error });
+    }
   });
+  routeFiles.failures = failures;
   return routeFiles;
 }
 
