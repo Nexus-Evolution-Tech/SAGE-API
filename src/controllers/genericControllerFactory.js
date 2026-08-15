@@ -34,10 +34,9 @@ function getGeneroTexto(classe, acao) {
 }
 
 function gerarController(tabela, campos, entidadeNome) {
-  const possuiProjecao = tabela === 'UnidadeEscolar' || tabela === 'Dispositivo';
-  if (possuiProjecao) projecoes.exigirProjecao(tabela);
-  const camposLeitura = possuiProjecao ? projecoes.colunasDeLeitura(tabela) : campos;
-  const projetar = (registro) => possuiProjecao ? projecoes.projetarRegistro(tabela, registro) : registro;
+  projecoes.exigirProjecao(tabela);
+  const camposLeitura = projecoes.colunasDeLeitura(tabela);
+  const projetar = (registro) => projecoes.projetarRegistro(tabela, registro);
 
   return {
     async listar(req, res) {
