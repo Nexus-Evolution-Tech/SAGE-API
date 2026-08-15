@@ -26,7 +26,7 @@ describeMySql('setup real registra o ledger de migrations (MySQL 8.4)', () => {
          FROM schema_migrations ORDER BY version`
     );
 
-    expect(ledger).toEqual(['0000', '0002', '0003'].map((version) => ({
+    expect(ledger).toEqual(['0000', '0002', '0003', '0004'].map((version) => ({
       version,
       status: 'applied',
       app_version: packageJson.version,
