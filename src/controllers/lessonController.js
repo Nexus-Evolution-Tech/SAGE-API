@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
 
 // Helper
 function parseId(id) {
@@ -75,6 +76,7 @@ const lessonController = {
     }
 
     try {
+      validarAutor(req?.user?.usuario_id);
       // Valida professor
       const [prof] = await db.query(
         `SELECT id FROM Pessoa WHERE id = ? AND tipo = 'PROFESSOR'`,
@@ -93,7 +95,11 @@ const lessonController = {
         return res.status(400).json({ message: 'Matéria inválida' });
       }
 
-      const [result] = await db.query(
+      const novaAula = await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_CRIADO, entidade: 'Aula',
+        entidadeId: (aula) => aula?.id,
+        operacao: async (connection) => {
+          const [result] = await connection.query(
         `
         INSERT INTO Aula
           (nome, professor_id, materia_id, sala_padrao_id, observacao)
@@ -106,9 +112,9 @@ const lessonController = {
           salaPadraoId,
           observacao || null
         ]
-      );
+          );
 
-      const [aula] = await db.query(
+          const [aula] = await connection.query(
         `
         SELECT
           id,
@@ -123,9 +129,12 @@ const lessonController = {
         WHERE id = ?
         `,
         [result.insertId]
-      );
+          );
+          return aula[0];
+        }
+      });
 
-      res.status(201).json(aula[0]);
+      res.status(201).json(novaAula);
     } catch (error) {
       logger.error(`Erro ao criar aula: ${error.message}`);
       res.status(500).json({ message: 'Erro ao criar aula' });
@@ -150,6 +159,7 @@ const lessonController = {
     salaPadraoId = parseId(salaPadraoId);
 
     try {
+      validarAutor(req?.user?.usuario_id);
       const campos = [];
       const valores = [];
 
@@ -198,10 +208,12 @@ const lessonController = {
 
       valores.push(id);
 
-      await db.query(
-        `UPDATE Aula SET ${campos.join(', ')} WHERE id = ?`,
-        valores
-      );
+      await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_EDITADO, entidade: 'Aula', entidadeId: Number(id),
+        operacao: (connection) => connection.query(
+          `UPDATE Aula SET ${campos.join(', ')} WHERE id = ?`, valores
+        )
+      });
 
       res.json({ message: 'Aula atualizada com sucesso' });
     } catch (error) {
@@ -217,10 +229,16 @@ const lessonController = {
     const { id } = req.params;
 
     try {
+      validarAutor(req?.user?.usuario_id);
       // Remove vínculos primeiro
-      await db.query(`DELETE FROM HorarioAula WHERE aula_id = ?`, [id]);
-
-      const [result] = await db.query(`DELETE FROM Aula WHERE id = ?`, [id]);
+      const result = await executarOperacaoAuditada({
+        req, acao: ACOES.REGISTRO_DELETADO, entidade: 'Aula', entidadeId: Number(id),
+        operacao: async (connection) => {
+          await connection.query(`DELETE FROM HorarioAula WHERE aula_id = ?`, [id]);
+          const [deleteResult] = await connection.query(`DELETE FROM Aula WHERE id = ?`, [id]);
+          return deleteResult;
+        }
+      });
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: 'Aula não encontrada' });
