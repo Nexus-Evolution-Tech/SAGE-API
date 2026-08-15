@@ -27,7 +27,7 @@ function responderErro(res, error) {
 
 async function criar(req, res) {
   try {
-    const usuario = await usuarioService.criarUsuario(req.body);
+    const usuario = await usuarioService.criarUsuario(req.body, req.user?.usuario_id);
     return res.status(201).json({ data: usuario });
   } catch (error) {
     return responderErro(res, error);
@@ -78,7 +78,7 @@ async function editar(req, res) {
   const id = idDaRota(req, res);
   if (id === undefined) return res;
   try {
-    const usuario = await usuarioService.atualizarUsuario(id, req.body);
+    const usuario = await usuarioService.atualizarUsuario(id, req.body, req.user?.usuario_id);
     return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
   } catch (error) {
     return responderErro(res, error);
@@ -90,7 +90,7 @@ async function desativar(req, res) {
   if (id === undefined) return res;
   if (!corpoDesativacaoVazio(req.body)) return responderErro(res, { code: 'USUARIO_DADOS_INVALIDOS' });
   try {
-    const usuario = await usuarioService.desativarUsuario(id);
+    const usuario = await usuarioService.desativarUsuario(id, req.user?.usuario_id);
     return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
   } catch (error) {
     return responderErro(res, error);
@@ -101,7 +101,7 @@ async function redefinirSenha(req, res) {
   const id = idDaRota(req, res);
   if (id === undefined) return res;
   try {
-    const usuario = await usuarioService.redefinirSenha(id, req.body);
+    const usuario = await usuarioService.redefinirSenha(id, req.body, req.user?.usuario_id);
     return usuario ? res.json({ data: usuario }) : responderErro(res, { code: 'USUARIO_NAO_ENCONTRADO' });
   } catch (error) {
     return responderErro(res, error);

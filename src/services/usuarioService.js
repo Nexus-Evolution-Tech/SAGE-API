@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { compararHash, hashSenha } = require('../utils/criptografia');
 const logger = require('../config/logger');
+const { ACOES, validarAutor, registrarAuditoria } = require('./auditoriaService');
 
 const LIMITE_FALHAS = 5;
 const BLOQUEIO_MS = 15 * 60 * 1000;
@@ -81,8 +82,9 @@ function projetarUsuario(usuario) {
   return Object.fromEntries(CAMPOS_USUARIO.map((campo) => [campo, usuario[campo]]));
 }
 
-async function criarUsuario(dados) {
+async function criarUsuario(dados, autorId) {
   if (!validarCriacao(dados)) throw new ErroUsuario('USUARIO_DADOS_INVALIDOS');
+  validarAutor(autorId);
 
   const connection = await db.getConnection();
   try {
@@ -102,12 +104,19 @@ async function criarUsuario(dados) {
     const [[usuario]] = await connection.query(
       `SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [resultado.insertId]
     );
+    await registrarAuditoria(connection, {
+      autorId,
+      acao: ACOES.USUARIO_CRIADO,
+      entidadeId: resultado.insertId,
+      detalhe: { pessoa_id: pessoaId, papel: dados.papel }
+    });
     await connection.commit();
     return projetarUsuario(usuario);
   } catch (error) {
     await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
     if (error.code === 'ER_DUP_ENTRY') throw new ErroUsuario('USUARIO_LOGIN_DUPLICADO');
     if (error.code === 'ER_NO_REFERENCED_ROW_2') throw new ErroUsuario('USUARIO_PESSOA_INVALIDA');
+    if (typeof error.code === 'string' && error.code.startsWith('AUDITORIA_')) throw error;
     if (typeof error.code === 'string' && error.code.startsWith('USUARIO_')) throw error;
     logger.error('[USUARIOS] codigo=CRIACAO_FALHOU');
     throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
@@ -128,9 +137,10 @@ async function buscarUsuarioPorId(id) {
   return usuario ? projetarUsuario(usuario) : undefined;
 }
 
-async function atualizarUsuario(id, dados) {
+async function atualizarUsuario(id, dados, autorId) {
   if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
   if (!validarEdicao(dados)) throw new ErroUsuario('USUARIO_DADOS_INVALIDOS');
+  validarAutor(autorId);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -152,12 +162,21 @@ async function atualizarUsuario(id, dados) {
     const [[usuario]] = await connection.query(
       `SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]
     );
+    await registrarAuditoria(connection, {
+      autorId,
+      acao: ACOES.USUARIO_EDITADO,
+      entidadeId: id,
+      detalhe: {
+        campos: Object.keys(dados).map((campo) => campo === 'nome_exibicao' ? 'exibicao' : campo)
+      }
+    });
     await connection.commit();
     return projetarUsuario(usuario);
   } catch (error) {
     await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
     if (error.code === 'ER_DUP_ENTRY') throw new ErroUsuario('USUARIO_LOGIN_DUPLICADO');
     if (error.code === 'ER_NO_REFERENCED_ROW_2') throw new ErroUsuario('USUARIO_PESSOA_INVALIDA');
+    if (typeof error.code === 'string' && error.code.startsWith('AUDITORIA_')) throw error;
     if (typeof error.code === 'string' && error.code.startsWith('USUARIO_')) throw error;
     logger.error('[USUARIOS] codigo=EDICAO_FALHOU');
     throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
@@ -166,8 +185,9 @@ async function atualizarUsuario(id, dados) {
   }
 }
 
-async function desativarUsuario(id) {
+async function desativarUsuario(id, autorId) {
   if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
+  validarAutor(autorId);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -178,10 +198,16 @@ async function desativarUsuario(id) {
     }
     await connection.query('UPDATE Usuario SET ativo = FALSE WHERE id = ?', [id]);
     const [[usuario]] = await connection.query(`SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]);
+    await registrarAuditoria(connection, {
+      autorId,
+      acao: ACOES.USUARIO_DESATIVADO,
+      entidadeId: id
+    });
     await connection.commit();
     return projetarUsuario(usuario);
   } catch (error) {
     await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
+    if (typeof error.code === 'string' && error.code.startsWith('AUDITORIA_')) throw error;
     logger.error('[USUARIOS] codigo=DESATIVACAO_FALHOU');
     throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
   } finally {
@@ -189,9 +215,10 @@ async function desativarUsuario(id) {
   }
 }
 
-async function redefinirSenha(id, dados) {
+async function redefinirSenha(id, dados, autorId) {
   if (!validarId(id)) throw new ErroUsuario('USUARIO_ID_INVALIDO');
   if (!validarRedefinicao(dados)) throw new ErroUsuario('USUARIO_SENHA_INVALIDA');
+  validarAutor(autorId);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -207,10 +234,16 @@ async function redefinirSenha(id, dados) {
       [senhaHash, id]
     );
     const [[usuario]] = await connection.query(`SELECT ${CAMPOS_USUARIO_SQL} FROM Usuario WHERE id = ?`, [id]);
+    await registrarAuditoria(connection, {
+      autorId,
+      acao: ACOES.SENHA_REDEFINIDA,
+      entidadeId: id
+    });
     await connection.commit();
     return projetarUsuario(usuario);
   } catch (error) {
     await connection.rollback().catch(() => logger.error('[USUARIOS] codigo=ROLLBACK_FALHOU'));
+    if (typeof error.code === 'string' && error.code.startsWith('AUDITORIA_')) throw error;
     logger.error('[USUARIOS] codigo=REDEFINICAO_SENHA_FALHOU');
     throw new ErroUsuario('USUARIOS_INDISPONIVEIS');
   } finally {
@@ -260,6 +293,11 @@ async function autenticar(login, senha) {
       'UPDATE Usuario SET falhas_login = 0, bloqueado_ate = NULL, ultimo_acesso = NOW() WHERE id = ?',
       [usuario.id]
     );
+    await registrarAuditoria(connection, {
+      autorId: usuario.id,
+      acao: ACOES.LOGIN_SUCESSO,
+      entidadeId: usuario.id
+    });
     await connection.commit();
     return { ok: true, usuario: projetarSessao(usuario) };
   } catch (error) {
