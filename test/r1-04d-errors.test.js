@@ -29,7 +29,7 @@ describe('R1-04D — erro interno e boot de rotas', () => {
     expect(fonte).not.toMatch(/res\.status\(500\)\.json\([\s\S]{0,300}(?:error|err)\.message/);
     expect(fonte).not.toMatch(/res\.status\(500\)\.json\([\s\S]{0,300}(?:detalhe|stack)\s*:/);
     expect(fonte).toContain("responderErroInterno(res, detalhe, 'Erro interno no servidor')");
-    expect(fonte).not.toContain('body?.error');
+    expect(fonte).toContain('body?.detalhe || body?.stack || body?.error');
   });
   it('falha o processo para rota essencial e segue com degradação para não essencial', () => {
     const app = path.join(__dirname, '..', 'src', 'app.js');

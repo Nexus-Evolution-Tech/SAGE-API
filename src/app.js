@@ -138,7 +138,7 @@ app.use((req, res, next) => {
   };
   res.json = (body) => {
     if (statusAtual === 500 && !res.locals?.sageErroInterno) {
-      const detalhe = body?.detalhe || body?.stack || { message: 'resposta 500 legada' };
+      const detalhe = body?.detalhe || body?.stack || body?.error || { message: 'resposta 500 legada' };
       return responderErroInterno(res, detalhe, 'Erro interno no servidor');
     }
     return jsonOriginal(body);
