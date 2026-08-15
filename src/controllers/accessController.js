@@ -1,5 +1,6 @@
 const gerarController = require('./genericControllerFactory');
 const { criarAcesso } = require('../services/accessService');
+const { ACOES, executarOperacaoAuditada } = require('../services/auditoriaService');
 const { emitToRoom } = require('../websocket/wsServer');
 const globalState = require('../state/globalState');
 const { cacheMutation, cacheQuery, CACHE_KEYS, CACHE_TTL } = require('../cache/helpers');
@@ -23,7 +24,11 @@ const criar = async (req, res) => {
     }
 
     try {
-        const acesso = await criarAcesso(req.body);
+        const acesso = await executarOperacaoAuditada({
+            req, acao: ACOES.REGISTRO_CRIADO, entidade: 'Acesso',
+            entidadeId: (resultado) => resultado?.acesso?.id,
+            operacao: (connection) => criarAcesso(req.body, connection)
+        });
         
         // Atualizar estatísticas
         if (acesso.acesso?.permitido) {

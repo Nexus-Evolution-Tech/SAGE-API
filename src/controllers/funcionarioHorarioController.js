@@ -3,6 +3,7 @@
  */
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { ACOES, executarOperacaoAuditada, validarAutor } = require('../services/auditoriaService');
 
 const DIAS_SEMANA = ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
 
@@ -53,6 +54,7 @@ async function listar(req, res) {
 /** PUT /funcionarios/:id/horario - substitui todos os horários do funcionário */
 async function salvar(req, res) {
   try {
+    validarAutor(req?.user?.usuario_id);
     const funcionarioId = Number(req.params.id);
     const { horarios = [], usar_horario_fixo } = req.body || {};
 
@@ -65,7 +67,10 @@ async function salvar(req, res) {
       return res.status(404).json({ message: 'Funcionário não encontrado' });
     }
 
-    await db.query('DELETE FROM FuncionarioHorario WHERE funcionario_id = ?', [funcionarioId]);
+    const resposta = await executarOperacaoAuditada({
+      req, acao: ACOES.REGISTRO_EDITADO, entidade: 'FuncionarioHorario', entidadeId: funcionarioId,
+      operacao: async (connection) => {
+        await connection.query('DELETE FROM FuncionarioHorario WHERE funcionario_id = ?', [funcionarioId]);
 
     for (const h of horarios) {
       const dia = (h.dia_semana || '').toUpperCase();
@@ -75,7 +80,7 @@ async function salvar(req, res) {
       const saida = toHoraSql(h.hora_saida);
       if (!entrada || !saida) continue;
 
-      await db.query(
+      await connection.query(
         `INSERT INTO FuncionarioHorario (funcionario_id, dia_semana, hora_entrada, hora_saida)
          VALUES (?, ?, ?, ?)`,
         [funcionarioId, dia, entrada, saida]
@@ -83,20 +88,20 @@ async function salvar(req, res) {
     }
 
     try {
-      const [prof] = await db.query('SELECT id FROM Professor WHERE id = ?', [funcionarioId]);
+      const [prof] = await connection.query('SELECT id FROM Professor WHERE id = ?', [funcionarioId]);
       if (prof && prof[0]) {
-        await db.query('UPDATE Professor SET usar_horario_fixo = ? WHERE id = ?', [!!usar_horario_fixo, funcionarioId]);
+        await connection.query('UPDATE Professor SET usar_horario_fixo = ? WHERE id = ?', [!!usar_horario_fixo, funcionarioId]);
       }
     } catch (e) {
       if (!e.message || !e.message.includes('usar_horario_fixo')) throw e;
     }
 
-    const [rows] = await db.query(
+    const [rows] = await connection.query(
       'SELECT id, dia_semana, hora_entrada, hora_saida FROM FuncionarioHorario WHERE funcionario_id = ?',
       [funcionarioId]
     );
 
-    res.json({
+    return {
       message: 'Horários salvos com sucesso',
       horarios: (rows || []).map((r) => ({
         id: r.id,
@@ -105,7 +110,10 @@ async function salvar(req, res) {
         hora_saida: r.hora_saida ? String(r.hora_saida).slice(0, 5) : null,
       })),
       usar_horario_fixo: !!usar_horario_fixo,
+    };
+      }
     });
+    res.json(resposta);
   } catch (err) {
     logger.error('[FuncionarioHorario] salvar:', err.message);
     res.status(500).json({ message: 'Erro ao salvar horários', error: err.message });

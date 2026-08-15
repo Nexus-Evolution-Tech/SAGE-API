@@ -507,11 +507,12 @@ async function sincronizarTodosAcessosMonitor() {
 }
 
 // Criar acesso manual
-async function criarAcesso(dados) {
+async function criarAcesso(dados, conexaoExterna = null) {
   let { pessoa_id, dispositivo_id, status, permitido, metodo_auth } = dados;
 
   // Pessoa existe?
-  const [pessoaResult] = await db.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
+  const executor = conexaoExterna || db;
+  const [pessoaResult] = await executor.query('SELECT * FROM Pessoa WHERE id = ? LIMIT 1', [pessoa_id]);
   const pessoa = pessoaResult[0];
   if (!pessoa) return { message: 'Pessoa não encontrada', error: 'PESSOA_INEXISTENTE' };
 
@@ -519,7 +520,7 @@ async function criarAcesso(dados) {
   const idadePessoa = calcularIdade(pessoa.data_nascimento || new Date());
 
   // Último acesso
-  const [ultimoAcessoResult] = await db.query(
+  const [ultimoAcessoResult] = await executor.query(
     'SELECT * FROM Acesso WHERE pessoa_id = ? ORDER BY data_hora DESC LIMIT 1',
     [pessoa.id]
   );
@@ -536,10 +537,11 @@ async function criarAcesso(dados) {
   permitido = true;
   let mensagem = `Acesso autorizado para ${pessoa.nome}`;
 
-  const conexao = await db.getConnection();
+  const controlaTransacao = !conexaoExterna;
+  const conexao = conexaoExterna || await db.getConnection();
   try {
     const agora = new Date();
-    await conexao.beginTransaction();
+    if (controlaTransacao) await conexao.beginTransaction();
     await conexao.query(
       `INSERT INTO Acesso (pessoa_id, dispositivo_id, status, permitido, metodo_auth, data_hora, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -547,13 +549,15 @@ async function criarAcesso(dados) {
     );
     const [acessoResult] = await conexao.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
     await verificarEAtribuirPresenca(pessoa_id, agora, conexao);
-    await conexao.commit();
+    if (controlaTransacao) await conexao.commit();
     return { message: mensagem, acesso: acessoResult[0] };
   } catch (erro) {
-    await conexao.rollback().catch((rollbackErro) => logger.error(`[ACCESS] Falha no rollback: ${rollbackErro.message}`));
+    if (controlaTransacao) {
+      await conexao.rollback().catch((rollbackErro) => logger.error(`[ACCESS] Falha no rollback: ${rollbackErro.message}`));
+    }
     throw erro;
   } finally {
-    conexao.release();
+    if (controlaTransacao) conexao.release();
   }
 }
 
