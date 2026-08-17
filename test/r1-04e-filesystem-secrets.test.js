@@ -83,8 +83,11 @@ describe('R1-04E - filesystem de fotos e segredos de catraca', () => {
 
     await peopleService.uploadFotoPessoa({ params: { id }, file: { filename: temporario } }, res);
 
-    expect(fs.readFileSync(antigo, 'utf8')).toBe('nova');
-    expect(db.query.mock.calls[2][1]).toEqual([`pessoa_${id}.png`, id]);
+    const novoNome = db.query.mock.calls[2][1][0];
+    expect(novoNome).toMatch(/^[a-f0-9]{64}\.png$/);
+    expect(db.query.mock.calls[2][1][1]).toBe(id);
+    expect(fs.readFileSync(path.join(fotoDir, novoNome), 'utf8')).toBe('nova');
+    expect(fs.existsSync(antigo)).toBe(false);
     expect(res.status).toHaveBeenCalledWith(200);
     fs.rmSync(antigo, { force: true });
   });

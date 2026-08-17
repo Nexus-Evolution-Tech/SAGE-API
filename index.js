@@ -10,6 +10,7 @@ async function iniciarServidor() {
   const redis = require('./src/config/redis');
   const { initWebSocket } = require('./src/websocket/wsServer');
   const globalState = require('./src/state/globalState');
+  const { migrarFotosExistentes } = require('./src/services/peopleService');
 
   const PORT = process.env.PORT || 3000;
   const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -22,6 +23,7 @@ async function iniciarServidor() {
   console.log('[BOOT] inicializando Redis...');
   await redis.initRedis();
   console.log('[BOOT] Redis inicializado');
+  await migrarFotosExistentes();
 
   // Iniciar servidor em 0.0.0.0 para aceitar conexões da rede (catraca, outros PCs)
   const HOST = process.env.HOST || '0.0.0.0';
