@@ -1,13 +1,19 @@
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
+const os = require('os');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { io: criarCliente } = require('socket.io-client');
 
+const SAGE_DATA_DIR = path.resolve(os.tmpdir(), `sage-r1-05f-websocket-proxy-${process.pid}`);
+fs.rmSync(SAGE_DATA_DIR, { recursive: true, force: true });
+process.env.SAGE_DATA_DIR = SAGE_DATA_DIR;
 const JWT_SECRET = process.env.JWT_SECRET || 'teste-r1-05f-websocket-32-caracteres';
 process.env.JWT_SECRET = JWT_SECRET;
 const websocket = require('../src/websocket/wsServer');
+
+afterAll(() => fs.rmSync(SAGE_DATA_DIR, { recursive: true, force: true }));
 
 function token(papel) {
   return jwt.sign({ usuario_id: 119, papel, emitido_em: new Date().toISOString() }, JWT_SECRET, {
