@@ -33,7 +33,7 @@ routerExtra.get('/config', autenticar, schoolController.getConfig);
 routerExtra.get('/unidade', autenticar, schoolController.obterUnidadeAtual);
 routerExtra.patch('/unidade', autenticar, schoolController.atualizarUnidadeAtual);
 routerExtra.patch('/unidade/trocar-senha', autenticar, schoolController.trocarSenha);
-routerExtra.post('/unidade/upload-logo', upload.single('logo'), autenticar, schoolController.uploadLogo);
+routerExtra.post('/unidade/upload-logo', autenticar, upload.single('logo'), schoolController.uploadLogo);
 
 // Login (público)
 routerExtra.post('/escolas/login/:id', preAutenticacao('obtenção de sessão'), schoolController.login);

@@ -1,6 +1,7 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
+const multer = require('multer');
+const { criarUploadSeguro, erroTipoArquivo } = require('../middlewares/uploadFoto');
 const autenticar = require('../middlewares/autorizacao').exige('ADMINISTRADOR');
 const { importarPlanilha } = require('../services/importService');
 const { exportarDados } = require('../services/exportService');
@@ -10,28 +11,33 @@ const { paths } = require('../config/paths');
 const { responderErroInterno } = require('../utils/responderErroInterno');
 
 const router = express.Router();
-// Configuração robusta de upload para evitar falhas silenciosas
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, paths.uploads);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.xlsx';
+    const ext = path.extname(file.originalname).toLowerCase() || '.xlsx';
     const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-    cb(null, `${base}_${Date.now()}${ext}`);
+    const nome = `${base}_${Date.now()}${ext}`;
+    req._sageUploadTempPath = path.join(paths.uploads, nome);
+    cb(null, nome);
   }
 });
 
-const upload = multer({
+const tiposPlanilha = new Map([
+  ['.xlsx', new Set(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])],
+  ['.xls', new Set(['application/vnd.ms-excel'])]
+]);
+const upload = criarUploadSeguro({
   storage,
-  limits: { fileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '25', 10) * 1024 * 1024 },
+  assinaturas: {
+    '.xlsx': Buffer.from('504b0304', 'hex'),
+    '.xls': Buffer.from('d0cf11e0a1b11ae1', 'hex')
+  },
   fileFilter: (req, file, cb) => {
-    const allowed = ['.xlsx', '.xls'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!allowed.includes(ext)) {
-      return cb(new Error(`Formato não suportado: ${ext}. Envie .xlsx/.xls`));
-    }
-    cb(null, true);
+    if (!tiposPlanilha.has(ext) || !tiposPlanilha.get(ext).has(file.mimetype)) return cb(erroTipoArquivo());
+    return cb(null, true);
   }
 });
 
@@ -46,16 +52,7 @@ router.get('/dados/planilha-modelo', autenticar, (req, res) => {
 // -------------------------------------------------------
 //  Importar planilha preenchida
 // -------------------------------------------------------
-// Middleware para lidar com erros do multer e evitar ERR_EMPTY_RESPONSE
-function handleUploadSingle(req, res, next) {
-  upload.single('planilha')(req, res, (err) => {
-    if (err) {
-      logger.error(`Falha no upload: ${err.message}`);
-      return res.status(400).json({ error: 'Falha no upload', detalhe: err.message });
-    }
-    next();
-  });
-}
+const handleUploadSingle = upload.single('planilha');
 
 router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) => {
   try {
@@ -73,6 +70,7 @@ router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) 
     const unidadeIdDefault = req.body.unidade_id ? Number(req.body.unidade_id) : 1;
     const resultado = await importarPlanilha(filePath, unidadeIdDefault);
 
+    req._sageUploadPreservar = true;
     res.json({ message: 'Importação concluída.', resultado });
   } catch (err) {
     logger.error(`Erro ao importar planilha: ${err.message}`);
@@ -82,6 +80,7 @@ router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) 
 
 // Rota de teste de upload para diagnosticar multipart (sem processar planilha)
 router.post('/dados/importar/ping', autenticar, handleUploadSingle, async (req, res) => {
+  req._sageUploadPreservar = true;
   res.json({ ok: true, file: req.file?.originalname, size: req.file?.size || 0 });
 });
 
