@@ -22,7 +22,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
   '': ['app.js'],
   cache: ['cacheKeys.js', 'helpers.js'],
   config: ['axios.js', 'database.js', 'env.js', 'loadRoutes.js', 'logger.js', 'paths.js',
-    'queryBuilder.js', 'redis.js', 'syncOrder.js', 'web.js'],
+    'projecoes.js', 'queryBuilder.js', 'redis.js', 'syncOrder.js', 'web.js'],
   controllers: ['accessController.js', 'accessSolicitationController.js', 'areaController.js',
     'classController.js', 'companyController.js', 'courseController.js', 'dataController.js',
     'deviceController.js', 'funcionarioHorarioController.js', 'genericControllerFactory.js',
@@ -39,7 +39,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
     'notificationRoutes.js', 'peopleRoutes.js', 'presenceRoutes.js', 'promocaoRoutes.js',
     'relatorioRoutes.js', 'roomRoutes.js', 'salaRoutes.js', 'schoolPhotoRoutes.js', 'schoolRoutes.js',
     'statusRoutes.js', 'subjectRoutes.js', 'usuarioRoutes.js'],
-  services: ['accessService.js', 'backupBanco.js', 'catracaImportService.js', 'controlIdService.js',
+  services: ['accessService.js', 'auditoriaService.js', 'backupBanco.js', 'catracaImportService.js', 'controlIdService.js',
     'deviceService.js', 'diagnostico.js', 'exportService.js', 'importService.js',
     'networkDiscoveryService.js', 'notificationService.js', 'peopleService.js', 'presenceService.js',
     'unidadeSingletonService.js', 'usuarioService.js',
@@ -48,7 +48,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
   state: ['globalState.js'],
   utils: ['ajustaFusoHorario.js', 'controlId-utils.js', 'converterPngBase64.js', 'criptografia.js',
     'generic-db-utils.js', 'gerarCardValue.js', 'gerarNumero8Digitos.js', 'jwt.js',
-    'people-db-utils.js', 'photo-user-utils.js', 'syncFlags.js', 'sync_catracas.js'],
+    'people-db-utils.js', 'photo-user-utils.js', 'responderErroInterno.js', 'syncFlags.js', 'sync_catracas.js'],
   websocket: ['wsServer.js']
 }).flatMap(([dir, names]) => names.map((name) => path.posix.join('src', dir, name))));
 
