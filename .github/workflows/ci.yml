@@ -195,3 +195,43 @@ jobs:
           if (-not (Get-ChildItem -LiteralPath $output -Filter '*.exe' -File)) {
             throw 'Nenhum instalador .exe foi produzido'
           }
+
+  contrato-websocket:
+    name: Contrato WebSocket (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      FRONTEND_PATH: ../web
+      JWT_SECRET: chave-de-ci-websocket-com-mais-de-32-caracteres
+      NODE_ENV: test
+      LOG_LEVEL: error
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@v4
+        with:
+          path: api
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: Nexus-Evolution-Tech/SAGE
+          ref: ${{ env.FRONTEND_REF }}
+          path: web
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Instalar dependências da API
+        run: npm ci
+        working-directory: api
+
+      - name: Executar contrato WebSocket e guard nginx
+        run: npx vitest run ci/r1-05f-websocket-proxy.test.js
+        working-directory: api
