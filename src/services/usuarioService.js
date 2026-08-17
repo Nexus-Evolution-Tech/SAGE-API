@@ -5,6 +5,8 @@ const { ACOES, validarAutor, registrarAuditoria } = require('./auditoriaService'
 
 const LIMITE_FALHAS = 5;
 const BLOQUEIO_MS = 15 * 60 * 1000;
+// Hash-isca com custo bcrypt 10: compara login inexistente sem revelar que a consulta não achou conta.
+const HASH_ISCA_LOGIN = '$2b$10$vkRBWopute2.Dld4/UYheev.g/.ZYAtRkP8c25dqQX2mV.dflbBgS';
 const CAMPOS_SESSAO = [
   'id', 'login', 'nome_exibicao', 'papel', 'ativo', 'pessoa_id',
   'precisa_trocar_senha', 'falhas_login', 'bloqueado_ate', 'ultimo_acesso'
@@ -262,7 +264,13 @@ async function autenticar(login, senha) {
     );
     const bloqueioExpirado = Boolean(usuario?.bloqueio_expirado);
     const bloqueado = Boolean(usuario?.bloqueado_ate && !bloqueioExpirado);
-    if (!usuario || !usuario.ativo || bloqueado) {
+    if (!usuario) {
+      await compararHash(typeof senha === 'string' ? senha : '', HASH_ISCA_LOGIN);
+      await connection.rollback();
+      return { ok: false, bloqueado: false };
+    }
+
+    if (!usuario.ativo || bloqueado) {
       await connection.rollback();
       return { ok: false, bloqueado };
     }
@@ -274,9 +282,7 @@ async function autenticar(login, senha) {
     }
 
     const falhasAnteriores = bloqueioExpirado ? 0 : Number(usuario.falhas_login || 0);
-    const senhaCorreta = typeof senha === 'string' && senha.length > 0
-      ? await compararHash(senha, usuario.senha_hash)
-      : false;
+    const senhaCorreta = await compararHash(typeof senha === 'string' ? senha : '', usuario.senha_hash);
     delete usuario.senha_hash;
     delete usuario.bloqueio_expirado;
     if (!senhaCorreta) {
