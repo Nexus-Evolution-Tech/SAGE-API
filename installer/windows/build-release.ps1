@@ -38,7 +38,9 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64') {
   throw 'O bundle final precisa ser produzido em Windows x64 nativo'
 }
-if (Get-ChildItem Env: | Where-Object Name -Like 'REACT_APP_*') {
+$allowedExternalReactApps = @('REACT_APP_SOCKET_PATH')
+$externalReactApps = Get-ChildItem Env: | Where-Object Name -Like 'REACT_APP_*'
+if ($externalReactApps | Where-Object { $allowedExternalReactApps -notcontains $_.Name }) {
   throw 'Variáveis REACT_APP_* externas são recusadas para preservar same-origin'
 }
 
@@ -74,7 +76,7 @@ try {
   Expand-Archive -LiteralPath $apiZip -DestinationPath $apiBuild
   Expand-Archive -LiteralPath $webZip -DestinationPath $webBuild
 
-  $allowedReactApps = @('REACT_APP_API_URL', 'REACT_APP_SOCKET_URL')
+  $allowedReactApps = @('REACT_APP_API_URL', 'REACT_APP_SOCKET_URL', 'REACT_APP_SOCKET_PATH')
   Get-ChildItem -LiteralPath $webBuild -Filter '.env*' -File | ForEach-Object {
     foreach ($line in Get-Content -LiteralPath $_.FullName) {
       if ($line -match 'REACT_APP_') {
