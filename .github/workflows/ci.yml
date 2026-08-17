@@ -233,5 +233,5 @@ jobs:
         working-directory: api
 
       - name: Executar contrato WebSocket e guard nginx
-        run: npx vitest run ci/r1-05f-websocket-proxy.test.js
+        run: npx vitest run --config ci/vitest.config.js
         working-directory: api
