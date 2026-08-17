@@ -84,7 +84,7 @@ describe('R1-05A — fail-closed no boot e guard do diagnóstico', () => {
   it('não inicia sem MONITOR_CALLBACK_TOKEN', async () => {
     const env = { ...process.env, NODE_ENV: 'test', SAGE_CONFIG_FILE: path.join(os.tmpdir(), `sage-missing-${process.pid}.env`) };
     delete env.MONITOR_CALLBACK_TOKEN;
-    const resultado = await execFileAsync(process.execPath, ['-e', "require('./src/config/env')"], {
+    const resultado = await execFileAsync(process.execPath, ['-e', "require('./src/app')"], {
       cwd: RAIZ, env
     }).then(() => null, (error) => error);
     expect(resultado).toBeTruthy();
