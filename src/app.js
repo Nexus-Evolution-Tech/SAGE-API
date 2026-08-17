@@ -137,7 +137,18 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 logger.info("Documentação Swagger disponível em: /docs");
 
 // Serve arquivos estáticos da pasta "upload"
-app.use("/uploads", express.static(paths.uploads));
+function bloquearFotosPessoaNoStatic(req, res, next) {
+  let caminho;
+  try {
+    caminho = decodeURIComponent(req.path).replace(/\\/g, '/');
+  } catch {
+    return res.status(404).end();
+  }
+  if (caminho === '/pessoas' || caminho.startsWith('/pessoas/')
+    || /^\/pessoa_\d+\.(?:png|jpe?g)$/i.test(caminho)) return res.status(404).end();
+  return next();
+}
+app.use("/uploads", bloquearFotosPessoaNoStatic, express.static(paths.uploads, { index: false }));
 logger.info("Arquivos estáticos disponíveis em: /uploads");
 
 // Algumas rotas do BrowserRouter também existem na API. Navegação HTML precisa vencer essas

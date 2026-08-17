@@ -21,6 +21,7 @@ const db = require('../config/database');
 const logger = require('../config/logger');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { paths } = require('../config/paths');
 const registrarSyncPendente = require('../services/sync');
 const gerarNumero8Digitos = require('../utils/gerarNumero8Digitos');
@@ -47,19 +48,34 @@ function resolverPastaFotos(baseUploads = paths.uploads) {
 
 function resolverFotoExistente(foto, baseUploads = paths.uploads) {
   const raizUploads = fs.realpathSync(baseUploads);
-  const candidato = path.resolve(raizUploads, 'pessoas', String(foto));
-  if (!estaDentroDeUploads(raizUploads, candidato)) throw erroCaminhoFotoForaUploads();
+  const referencia = String(foto).replace(/\\/g, '/').replace(/^pessoas\//i, '');
+  const pastaFotos = path.resolve(raizUploads, 'pessoas');
+  const candidato = path.resolve(pastaFotos, referencia);
+  if (!estaDentroDeUploads(raizUploads, candidato) || !estaDentroDeUploads(pastaFotos, candidato)) {
+    throw erroCaminhoFotoForaUploads();
+  }
 
   try {
     fs.lstatSync(candidato);
     const caminhoReal = fs.realpathSync(candidato);
-    if (!estaDentroDeUploads(raizUploads, caminhoReal)) throw erroCaminhoFotoForaUploads();
+    if (!estaDentroDeUploads(raizUploads, caminhoReal) || !estaDentroDeUploads(pastaFotos, caminhoReal)) {
+      throw erroCaminhoFotoForaUploads();
+    }
     return caminhoReal;
   } catch (error) {
     if (error.code === 'ENOENT') return null;
     if (error.code === 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS') throw error;
     throw erroCaminhoFotoForaUploads();
   }
+}
+
+function gerarNomeFotoOpaco(extensao, pastaDestino) {
+  const ext = ['.png', '.jpg', '.jpeg'].includes(extensao) ? extensao : '.png';
+  let nome;
+  do {
+    nome = `${crypto.randomBytes(32).toString('hex')}${ext}`;
+  } while (fs.existsSync(path.join(pastaDestino, nome)));
+  return nome;
 }
 
 /**
@@ -230,7 +246,7 @@ async function uploadFotoPessoa(req, res) {
     }
 
     // Gerar nome único para a foto
-    const novoNome = `pessoa_${pessoa_id}.png`;
+    const novoNome = gerarNomeFotoOpaco(path.extname(req.file.filename).toLowerCase(), pastaDestino);
     const antigoCaminho = path.join(baseUploads, req.file.filename);
     const novoCaminho = path.join(pastaDestino, novoNome);
 
@@ -300,10 +316,85 @@ async function removerFotoPessoa(req, res) {
   }
 }
 
+async function servirFotoPessoa(req, res, { database = db, baseUploads = paths.uploads } = {}) {
+  const pessoaId = req.params.id;
+  try {
+    const [pessoas] = await database.query('SELECT foto FROM Pessoa WHERE id = ?', [pessoaId]);
+    if (!pessoas.length || !pessoas[0].foto) return res.status(404).end();
+
+    const caminhoFoto = resolverFotoExistente(pessoas[0].foto, baseUploads);
+    if (!caminhoFoto) return res.status(404).end();
+
+    res.set('Cache-Control', 'private, no-store');
+    return res.sendFile(caminhoFoto, { cacheControl: false, lastModified: false }, (error) => {
+      if (error && !res.headersSent) res.status(error.statusCode === 404 ? 404 : 500).end();
+    });
+  } catch (error) {
+    if (error.code === 'PESSOA_FOTO_CAMINHO_FORA_UPLOADS') return res.status(404).end();
+    logger.error(`[PESSOA-FOTO] codigo=LEITURA_FALHOU pessoa_id=${pessoaId}`);
+    return res.status(500).json({ message: 'Erro ao ler a foto da pessoa' });
+  }
+}
+
+function nomeFotoOpaco(nome) {
+  return /^[a-f0-9]{64}\.(?:png|jpe?g)$/i.test(nome);
+}
+
+async function migrarFotosExistentes({ database = db, baseUploads = paths.uploads } = {}) {
+  const resultado = { migrados: 0, ignorados: 0, falhas: 0 };
+  let pessoas;
+  try {
+    [pessoas] = await database.query('SELECT id, foto FROM Pessoa WHERE foto IS NOT NULL AND foto <> ""');
+  } catch (error) {
+    logger.error('[PESSOA-FOTO] codigo=MIGRACAO_CONSULTA_FALHOU');
+    return { ...resultado, falhas: 1 };
+  }
+
+  const pastaDestino = resolverPastaFotos(baseUploads);
+  for (const pessoa of pessoas) {
+    try {
+      const origem = resolverFotoExistente(pessoa.foto, baseUploads);
+      if (!origem) {
+        logger.error(`[PESSOA-FOTO] codigo=MIGRACAO_ORIGEM_AUSENTE pessoa_id=${pessoa.id}`);
+        resultado.falhas++;
+        continue;
+      }
+      if (nomeFotoOpaco(path.basename(origem))) {
+        resultado.ignorados++;
+        continue;
+      }
+
+      const novoNome = gerarNomeFotoOpaco(path.extname(origem).toLowerCase(), pastaDestino);
+      const destino = path.join(pastaDestino, novoNome);
+      // A cÃ³pia mantÃ©m o original atÃ© o banco confirmar a nova referÃªncia.
+      fs.copyFileSync(origem, destino, fs.constants.COPYFILE_EXCL);
+      const [atualizacao] = await database.query(
+        'UPDATE Pessoa SET foto = ? WHERE id = ?', [novoNome, pessoa.id]
+      );
+      if (atualizacao && atualizacao.affectedRows !== undefined && atualizacao.affectedRows !== 1) {
+        throw new Error('Pessoa nÃ£o atualizada durante migraÃ§Ã£o');
+      }
+      try {
+        fs.unlinkSync(origem);
+      } catch (error) {
+        logger.error(`[PESSOA-FOTO] codigo=MIGRACAO_ORIGINAL_NAO_REMOVIDO pessoa_id=${pessoa.id}`);
+      }
+      resultado.migrados++;
+    } catch (error) {
+      logger.error(`[PESSOA-FOTO] codigo=MIGRACAO_FALHOU pessoa_id=${pessoa.id}`);
+      resultado.falhas++;
+    }
+  }
+  return resultado;
+}
+
 module.exports = {
   criarPessoaCompleta,
   buscarPessoasPorTipo,
   uploadFotoPessoa,
+  servirFotoPessoa,
+  migrarFotosExistentes,
+  gerarNomeFotoOpaco,
   removerFotoPessoa,
   resolverFotoExistente
 };

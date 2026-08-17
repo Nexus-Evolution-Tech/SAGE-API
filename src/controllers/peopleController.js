@@ -199,7 +199,7 @@ const getUrls = async (req, res) => {
     
     const urls = pessoas.map(pessoa => ({
       id: pessoa.id,
-      url: `${req.protocol}://${req.get('host')}/uploads/pessoas/${pessoa.foto}`,
+      url: `${req.protocol}://${req.get('host')}/pessoas/${pessoa.id}/foto`,
     }));
 
     res.json(urls);
@@ -211,11 +211,11 @@ const getUrls = async (req, res) => {
 // --- GET URL BY ID (Sem alterações) ---
 const getUrlById = async (req, res) => {
   const id = req.params.id;
-  const [pessoa] = await db.query('SELECT * FROM Pessoa WHERE id = ?', [id]);
-  if (!pessoa) {
+  const [pessoas] = await db.query('SELECT id FROM Pessoa WHERE id = ?', [id]);
+  if (!pessoas.length) {
       return res.status(404).json({ message: 'Pessoa não encontrada' });
   }
-const url = `${req.protocol}://${req.get('host')}/uploads/pessoas/${pessoa[0].foto}`;
+  const url = `${req.protocol}://${req.get('host')}/pessoas/${id}/foto`;
 
   res.json({ url: url });
 };
@@ -285,6 +285,7 @@ module.exports = {
   deletar,
   getUrls,
   getUrlById,
+  servirFotoPessoa: peopleService.servirFotoPessoa,
   uploadFoto,
   gerarQrCode,
   sincronizarBanco
