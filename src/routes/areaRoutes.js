@@ -5,6 +5,6 @@ const upload = require('../middlewares/uploadFoto');
 const autenticar = require('../middlewares/autorizacao').exige('SECRETARIA');
 
 const router = express.Router();
-router.post('/areas/upload/:id', upload.single('foto'), autenticar, areaController.uploadFoto);
+router.post('/areas/upload/:id', autenticar, upload.single('foto'), areaController.uploadFoto);
 router.use(gerarRotas(areaController, 'areas'));
 module.exports = router;

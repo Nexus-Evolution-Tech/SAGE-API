@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 const database = `sage_verif_r1_01b4_${process.pid}_teste`;
 const dataDir = path.join(os.tmpdir(), `sage-r1-01b4-${process.pid}`);
 const singletonCode = 'UNIDADE_ESCOLAR_SINGLETON_INVALIDA';
+const pngMinimo = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 process.env.DB_NAME = database;
 process.env.SAGE_DATA_DIR = dataDir;
@@ -52,7 +53,7 @@ function request(port, method, requestPath, body, token) {
 
 async function upload(port, token) {
   const form = new FormData();
-  form.append('logo', new Blob(['logo de teste'], { type: 'image/png' }), 'logo.png');
+  form.append('logo', new Blob([pngMinimo], { type: 'image/png' }), 'logo.png');
   const response = await fetch(`http://127.0.0.1:${port}/unidade/upload-logo`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },

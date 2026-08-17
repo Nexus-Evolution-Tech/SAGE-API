@@ -111,6 +111,10 @@ function nomesDeMetodos(route) {
   return Object.keys(route.methods || {}).filter((metodo) => route.methods[metodo]);
 }
 
+function ehMulter(handler) {
+  return handler?.isMulterMiddleware === true || handler?.name === 'multerMiddleware';
+}
+
 function coletarRotas(stack, prefixo = '', herdadas = [], rotas = []) {
   for (const layer of stack || []) {
     if (layer.route) {
@@ -150,6 +154,14 @@ function inspecionarArvoreExpress(app) {
   const falhas = [];
 
   for (const rota of rotas) {
+    const indiceAutorizacao = rota.handlers.findIndex(
+      (handler) => obterDeclaracaoAutorizacao(handler)?.tipo === 'papel'
+    );
+    rota.handlers.forEach((handler, indice) => {
+      if (ehMulter(handler) && (indiceAutorizacao < 0 || indice < indiceAutorizacao)) {
+        falhas.push(`${rota.metodo} ${rota.caminho}: multer deve vir depois da autorização`);
+      }
+    });
     if (rota.declaracoes.length !== 1) {
       falhas.push(`${rota.metodo} ${rota.caminho}: exige exatamente uma declaração`);
       continue;
