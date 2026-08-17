@@ -192,7 +192,7 @@ const login = async (req, res) => {
   try {
     const { usuario, senha } = req.body;
     const resultado = await autenticarUsuario(String(usuario || '').trim(), senha);
-    if (!resultado.ok) return res.status(resultado.bloqueado ? 429 : 401).json({ message: 'Credenciais inválidas' });
+    if (!resultado.ok) return res.status(401).json({ message: 'Credenciais inválidas' });
     const conta = resultado.usuario;
     const token = gerarToken({
       usuario_id: conta.id, papel: conta.papel, emitido_em: new Date().toISOString()

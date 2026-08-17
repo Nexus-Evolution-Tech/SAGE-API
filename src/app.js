@@ -3,6 +3,7 @@ assertSecurityConfiguration();
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
+const { rateLimit } = require('express-rate-limit');
 const loadRoutes = require("./config/loadRoutes");
 const { publica, assertArvoreExpress, instrumentarAplicacao } = require('./middlewares/autorizacao');
 const logger = require("./config/logger");
@@ -44,7 +45,23 @@ function serveSpaNavigation(req, res, next) {
   return res.sendFile(indexFile);
 }
 
-// Rate limiting removido em dev para evitar 429; se precisar em prod, reativar aqui.
+// Trinta tentativas por origem/minuto comportam uma tentativa por cada máquina de um
+// laboratório de 30 computadores, inclusive se a rede compartilhar uma origem. O bucket
+// continua isolado por socket: não há proxy confiável neste deployment.
+const LIMITE_PRE_AUTENTICACAO_POR_ORIGEM = 30;
+const JANELA_PRE_AUTENTICACAO_MS = 60 * 1000;
+const limitarPreAutenticacao = rateLimit({
+  windowMs: JANELA_PRE_AUTENTICACAO_MS,
+  limit: LIMITE_PRE_AUTENTICACAO_POR_ORIGEM,
+  keyGenerator: (req) => req.socket.remoteAddress,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({
+    message: 'Muitas tentativas. Tente novamente mais tarde.'
+  })
+});
+
+app.use(['/setup', '/escolas/login', '/escolas/recuperar-acesso'], limitarPreAutenticacao);
 
 // Compressão de respostas
 app.use(compression());
