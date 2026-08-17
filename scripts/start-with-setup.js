@@ -1,4 +1,5 @@
-require('../src/config/env');
+const { assertSecurityConfiguration } = require('../src/config/env');
+assertSecurityConfiguration();
 const { spawn } = require('child_process');
 
 const TRANSIENT_MYSQL_CODES = new Set([

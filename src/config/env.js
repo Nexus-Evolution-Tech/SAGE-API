@@ -21,6 +21,18 @@ const configFile = explicitConfigFile
 
 dotenv.config({ path: configFile, debug: false, quiet: true });
 
+function assertSecurityConfiguration() {
+  if (typeof process.env.MONITOR_CALLBACK_TOKEN !== 'string'
+    || process.env.MONITOR_CALLBACK_TOKEN.trim().length === 0) {
+    throw new Error('Configuração inválida para MONITOR_CALLBACK_TOKEN. Consulte .env.example.');
+  }
+  if (process.env.MONITOR_USE_PUSH === 'true'
+    && (typeof process.env.MONITOR_IP_WHITELIST !== 'string'
+      || process.env.MONITOR_IP_WHITELIST.split(',').map((ip) => ip.trim()).filter(Boolean).length === 0)) {
+    throw new Error('Configuração inválida para MONITOR_IP_WHITELIST quando MONITOR_USE_PUSH=true. Consulte .env.example.');
+  }
+}
+
 if (process.env.NODE_ENV === 'production' && !process.env.SAGE_DATA_DIR) {
   throw new Error('SAGE_DATA_DIR deve ser configurado em produção para guardar estado fora do release');
 }
@@ -73,4 +85,7 @@ const config = Object.freeze({
   })
 });
 
-module.exports = { appRoot, configFile, config, numericConfig, numericEnvironment, FIRST_RUN_BOOTSTRAP_LOCK };
+module.exports = {
+  appRoot, configFile, config, numericConfig, numericEnvironment,
+  FIRST_RUN_BOOTSTRAP_LOCK, assertSecurityConfiguration
+};
