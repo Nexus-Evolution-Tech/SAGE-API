@@ -18,6 +18,8 @@ process.env.JWT_SECRET = 'teste-r1-05b-jwt-secret-32-caracteres';
 const upload = require('../src/middlewares/uploadFoto');
 const { exige, inspecionarArvoreExpress } = require('../src/middlewares/autorizacao');
 const { paths } = require('../src/config/paths');
+const dataRoutes = require('../src/routes/dataRoutes');
+const uploadPlanilha = dataRoutes.stack.find((layer) => layer.route?.path === '/dados/importar/ping').route.stack[1].handle;
 
 const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
 
@@ -99,6 +101,13 @@ describe('R1-05B — upload fechado antes da gravação', () => {
     server = await iniciar(app);
     await expect(enviar(server, '/upload', 'foto')).resolves.toMatchObject({ status: 200 });
     expect(await temporarios()).toEqual([]);
+  });
+
+  it('limpa temporário após sucesso de planilha', async () => {
+    const app = express(); app.post('/planilha', uploadPlanilha, (_req, res) => res.sendStatus(200)); server = await iniciar(app);
+    const resposta = await enviar(server, '/planilha', 'planilha', Buffer.from('504b0304', 'hex'),
+      'dados.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(resposta.status).toBe(200); expect(await temporarios()).toEqual([]);
   });
 
   it('guard reprova multer antes da autorização', () => {

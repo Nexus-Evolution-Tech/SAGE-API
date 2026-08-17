@@ -70,7 +70,6 @@ router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) 
     const unidadeIdDefault = req.body.unidade_id ? Number(req.body.unidade_id) : 1;
     const resultado = await importarPlanilha(filePath, unidadeIdDefault);
 
-    req._sageUploadPreservar = true;
     res.json({ message: 'Importação concluída.', resultado });
   } catch (err) {
     logger.error(`Erro ao importar planilha: ${err.message}`);
@@ -80,7 +79,6 @@ router.post('/dados/importar', autenticar, handleUploadSingle, async (req, res) 
 
 // Rota de teste de upload para diagnosticar multipart (sem processar planilha)
 router.post('/dados/importar/ping', autenticar, handleUploadSingle, async (req, res) => {
-  req._sageUploadPreservar = true;
   res.json({ ok: true, file: req.file?.originalname, size: req.file?.size || 0 });
 });
 

@@ -57,9 +57,7 @@ function criarUploadSeguro({ storage, fileFilter, assinaturas }) {
     single(campo) {
       const parsear = parser.single(campo);
       function multerMiddleware(req, res, next) {
-        const limparAoTerminar = () => {
-          if (!req._sageUploadPreservar) limparTemporario(req);
-        };
+        const limparAoTerminar = () => limparTemporario(req);
         res.once('finish', limparAoTerminar);
         res.once('close', limparAoTerminar);
         parsear(req, res, (erro) => {
