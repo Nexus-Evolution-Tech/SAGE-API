@@ -22,7 +22,11 @@ function monitorCallbackAuth(req, res, next) {
   const token = process.env.MONITOR_CALLBACK_TOKEN;
   const whitelistRaw = process.env.MONITOR_IP_WHITELIST;
 
-  const providedToken = req.headers['x-monitor-token'];
+  // O header tem precedência para não permitir que uma query válida esconda um
+  // header inválido. Ambos os transportes usam a mesma comparação constante.
+  const providedToken = req.headers['x-monitor-token'] !== undefined
+    ? req.headers['x-monitor-token']
+    : req.query?.token;
   if (!tokenValido(providedToken, token)) {
     logger.warn('[MONITOR AUTH] Token inválido ou ausente');
     return res.status(401).json({ ok: false, error: 'Token inválido ou ausente' });

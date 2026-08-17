@@ -1,7 +1,7 @@
 /**
  * Rotas para receber notificações do Monitor da Control iD.
  * A catraca envia POST para estes endpoints quando há eventos (acessos, etc.).
- * Segurança: MONITOR_CALLBACK_TOKEN é obrigatório no boot; MONITOR_IP_WHITELIST é opcional (ver docs/SEGURANCA_CATRACA_E_MONITORAMENTO.md).
+ * Segurança: MONITOR_CALLBACK_TOKEN é obrigatório no boot; a whitelist é obrigatória no boot de push e opcional em polling.
  * Documentação: https://www.controlid.com.br/docs/access-api-pt/monitor/introducao-ao-monitor/
  */
 const express = require('express');
@@ -12,7 +12,7 @@ const { processarNotificacaoMonitorDao } = require('../services/accessService');
 const logger = require('../config/logger');
 
 // POST /api/notifications/dao — alterações em access_logs, templates, cards, alarm_logs
-// O token obrigatório vem somente no header X-Monitor-Token; a whitelist de IP é opcional.
+// O token obrigatório vem por X-Monitor-Token ou ?token=; o header vence. A whitelist é opcional em polling.
 router.post('/api/notifications/dao', autenticacaoPropria('monitorCallbackAuth'), monitorCallbackAuth, async (req, res) => {
   try {
     const payload = req.body || {};

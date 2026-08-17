@@ -26,6 +26,11 @@ function assertSecurityConfiguration() {
     || process.env.MONITOR_CALLBACK_TOKEN.trim().length === 0) {
     throw new Error('Configuração inválida para MONITOR_CALLBACK_TOKEN. Consulte .env.example.');
   }
+  if (process.env.MONITOR_USE_PUSH === 'true'
+    && (typeof process.env.MONITOR_IP_WHITELIST !== 'string'
+      || process.env.MONITOR_IP_WHITELIST.split(',').map((ip) => ip.trim()).filter(Boolean).length === 0)) {
+    throw new Error('Configuração inválida para MONITOR_IP_WHITELIST quando MONITOR_USE_PUSH=true. Consulte .env.example.');
+  }
 }
 
 if (process.env.NODE_ENV === 'production' && !process.env.SAGE_DATA_DIR) {
