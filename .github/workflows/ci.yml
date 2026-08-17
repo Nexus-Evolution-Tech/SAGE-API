@@ -60,6 +60,7 @@ jobs:
       DB_PASSWORD: senha_de_ci
       DB_NAME: sage_ci_teste
       JWT_SECRET: chave_de_ci_com_mais_de_32_caracteres_aleatorios
+      MONITOR_CALLBACK_TOKEN: chave_de_ci_monitor_callback_32_caracteres
       NODE_ENV: test
       LOG_LEVEL: error
       REQUIRE_TEST_DB: 'true'
