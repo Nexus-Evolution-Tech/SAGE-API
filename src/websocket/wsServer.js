@@ -5,8 +5,45 @@
 
 const { Server } = require('socket.io');
 const logger = require('../config/logger');
+const { verificarToken } = require('../utils/jwt');
 
 let io = null;
+
+const PAPEIS_PERMITIDOS = {
+  acessos: new Set(['ADMINISTRADOR', 'SECRETARIA']),
+  dispositivos: new Set(['ADMINISTRADOR', 'SECRETARIA']),
+  sync: new Set(['ADMINISTRADOR']),
+  stats: new Set(['ADMINISTRADOR', 'SECRETARIA'])
+};
+
+const CAMPOS_EVENTOS = {
+  'acesso:novo': ['pessoa_id', 'pessoa_nome', 'dispositivo_id', 'status', 'permitido', 'data_hora'],
+  'stats:update': ['acessos_hoje', 'acessos_negados_hoje', 'pessoas_ativas', 'catracas_online', 'catracas_offline']
+};
+
+function projetarEvento(event, data) {
+  const campos = CAMPOS_EVENTOS[event];
+  if (!campos || !data || typeof data !== 'object') return data;
+  return Object.fromEntries(campos.filter((campo) => Object.hasOwn(data, campo)).map((campo) => [campo, data[campo]]));
+}
+
+function autorizarSala(socket, sala) {
+  const papeis = PAPEIS_PERMITIDOS[sala];
+  if (papeis?.has(socket.userRole)) return true;
+
+  socket.emit('subscribe:error', {
+    sala,
+    codigo: 'WS_SALA_NAO_AUTORIZADA'
+  });
+  return false;
+}
+
+function entrarNaSalaAutorizada(socket, sala) {
+  if (!autorizarSala(socket, sala)) return false;
+  socket.join(sala);
+  logger.debug(`[WS] ${socket.id} inscrito em '${sala}'`);
+  return true;
+}
 
 /**
  * Inicializar Socket.io anexado ao servidor HTTP
@@ -24,31 +61,17 @@ function initWebSocket(server) {
     maxHttpBufferSize: 1e7 // 10MB
   });
 
-  // Middleware de autenticação (opcional)
+  // O canal carrega presença e estado operacional; sem identidade ele não existe.
   io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-    
-    if (!token) {
-      // Permitir conexões sem token por enquanto (para desenvolvimento)
-      socket.userId = null;
-      return next();
-    }
+    const token = socket.handshake?.auth?.token;
+    if (typeof token !== 'string' || token.trim() === '') return next(new Error('Autenticação obrigatória'));
 
-    try {
-      const { verificarToken } = require('../utils/jwt');
-      const payload = verificarToken(token);
-      
-      if (payload) {
-        socket.userId = payload.id;
-        socket.userRole = payload.role;
-        return next();
-      } else {
-        return next(new Error('Token inválido'));
-      }
-    } catch (error) {
-      logger.debug(`WS auth error: ${error.message}`);
-      return next(new Error('Autenticação falhou'));
-    }
+    const payload = verificarToken(token);
+    if (!payload) return next(new Error('Token inválido'));
+
+    socket.userId = payload.usuario_id;
+    socket.userRole = payload.papel;
+    return next();
   });
 
   // Connection handler
@@ -56,25 +79,10 @@ function initWebSocket(server) {
     logger.info(`[WS] Usuário conectado: ${socket.id} (userId: ${socket.userId})`);
 
     // Namespaces de eventos
-    socket.on('subscribe:acessos', () => {
-      socket.join('acessos');
-      logger.debug(`[WS] ${socket.id} inscrito em 'acessos'`);
-    });
-
-    socket.on('subscribe:dispositivos', () => {
-      socket.join('dispositivos');
-      logger.debug(`[WS] ${socket.id} inscrito em 'dispositivos'`);
-    });
-
-    socket.on('subscribe:sync', () => {
-      socket.join('sync');
-      logger.debug(`[WS] ${socket.id} inscrito em 'sync'`);
-    });
-
-    socket.on('subscribe:stats', () => {
-      socket.join('stats');
-      logger.debug(`[WS] ${socket.id} inscrito em 'stats'`);
-    });
+    socket.on('subscribe:acessos', () => entrarNaSalaAutorizada(socket, 'acessos'));
+    socket.on('subscribe:dispositivos', () => entrarNaSalaAutorizada(socket, 'dispositivos'));
+    socket.on('subscribe:sync', () => entrarNaSalaAutorizada(socket, 'sync'));
+    socket.on('subscribe:stats', () => entrarNaSalaAutorizada(socket, 'stats'));
 
     // Heartbeat para manter conexão viva
     socket.on('ping', () => {
@@ -102,7 +110,7 @@ function emitToRoom(room, event, data) {
   if (io) {
     io.to(room).emit(event, {
       timestamp: new Date().toISOString(),
-      data
+      data: projetarEvento(event, data)
     });
     logger.debug(`[WS] Emitido '${event}' para room '${room}'`);
   }
