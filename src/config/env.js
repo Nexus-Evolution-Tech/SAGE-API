@@ -21,6 +21,11 @@ const configFile = explicitConfigFile
 
 dotenv.config({ path: configFile, debug: false, quiet: true });
 
+if (typeof process.env.MONITOR_CALLBACK_TOKEN !== 'string'
+  || process.env.MONITOR_CALLBACK_TOKEN.trim().length === 0) {
+  throw new Error('Configuração inválida para MONITOR_CALLBACK_TOKEN. Consulte .env.example.');
+}
+
 if (process.env.NODE_ENV === 'production' && !process.env.SAGE_DATA_DIR) {
   throw new Error('SAGE_DATA_DIR deve ser configurado em produção para guardar estado fora do release');
 }
