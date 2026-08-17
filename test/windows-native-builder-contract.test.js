@@ -26,7 +26,7 @@ describe('contrato do builder nativo Windows', () => {
   it('recusa configuração externa do CRA para manter same-origin', () => {
     const script = fs.readFileSync(SCRIPT, 'utf8');
     expect(script).toContain("Where-Object Name -Like 'REACT_APP_*'");
-    expect(script).toContain("@('REACT_APP_API_URL', 'REACT_APP_SOCKET_URL')");
+    expect(script).toContain("@('REACT_APP_API_URL', 'REACT_APP_SOCKET_URL', 'REACT_APP_SOCKET_PATH')");
     expect(script).toContain('Remove-Item -LiteralPath $_.FullName -Force');
     expect(script).not.toMatch(/DB_PASSWORD|JWT_SECRET|MONITOR_CALLBACK_TOKEN/);
   });
