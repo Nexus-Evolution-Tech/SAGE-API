@@ -224,7 +224,7 @@ jobs:
             $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
           })
           foreach ($process in $remainingMysql) { Stop-Process -Id $process.ProcessId -Force }
-          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+          for ($mysqlAttempt = 0; $mysqlAttempt -lt 20; $mysqlAttempt++) {
             $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
               $_.ExecutablePath -and $_.ExecutablePath.Equals(
                 $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
@@ -239,11 +239,11 @@ jobs:
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           $stateOwnership = Join-Path $env:RUNNER_TEMP "sage-state-owned-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           if (Test-Path -LiteralPath $stateOwnership) {
-            for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $state); $attempt++) {
+            for ($stateAttempt = 0; $stateAttempt -lt 20 -and (Test-Path -LiteralPath $state); $stateAttempt++) {
               try {
                 Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction Stop
               } catch {
-                if ($attempt -eq 19) { throw }
+                if ($stateAttempt -eq 19) { throw }
                 Start-Sleep -Milliseconds 500
               }
             }
@@ -578,7 +578,7 @@ jobs:
             $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
           })
           foreach ($process in $remainingMysql) { Stop-Process -Id $process.ProcessId -Force }
-          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+          for ($mysqlAttempt = 0; $mysqlAttempt -lt 20; $mysqlAttempt++) {
             $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
               $_.ExecutablePath -and $_.ExecutablePath.Equals(
                 $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
