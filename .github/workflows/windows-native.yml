@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall, agent/f8-uninstall]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall, agent/f8-uninstall, wp/r1-122-windows-mysql-smoke-20260826]
 
 permissions:
   contents: read
@@ -74,7 +74,8 @@ jobs:
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
             test/windows-services-contract.test.js test/windows-firewall-contract.test.js `
             test/windows-uninstall-contract.test.js test/start-with-setup.test.js `
-            test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
+            test/windows-ci-contract.test.js test/windows-mysql-smoke-contract.test.js `
+            test/backup-maintenance-credential.test.js `
             test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
           npm audit --omit=dev --audit-level=high
@@ -139,12 +140,21 @@ jobs:
             throw 'Bootstrap MySQL preservou credencial root após sucesso'
           }
 
-          $myIni = Join-Path $config 'mysql-smoke.ini'
+          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $mysqlSmokeDir) {
+            throw 'Diretório do fixture MySQL já existe'
+          }
+          New-Item -ItemType Directory -Path $mysqlSmokeDir | Out-Null
+          $binlogDir = Join-Path $mysqlSmokeDir 'binlog'
+          New-Item -ItemType Directory -Path $binlogDir | Out-Null
+          $myIni = Join-Path $mysqlSmokeDir 'mysql-smoke.ini'
           $mysqlRoot = Join-Path $output 'runtime\mysql'
           $data = (Join-Path $state 'mysql\data').Replace('\', '/')
           $base = $mysqlRoot.Replace('\', '/')
+          $binlog = (Join-Path $binlogDir 'sage-smoke-bin').Replace('\', '/')
           [IO.File]::WriteAllLines($myIni, @(
             '[mysqld]', "basedir=$base", "datadir=$data", 'port=3307',
+            "log-bin=$binlog", 'log-bin-trust-function-creators=1', 'server-id=122',
             'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve'
           ), [Text.UTF8Encoding]::new($false))
           $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'
@@ -194,6 +204,14 @@ jobs:
             Pop-Location
             Remove-Item Env:SAGE_CONFIG_FILE, Env:SAGE_DATA_DIR, Env:MYSQLDUMP_PATH, Env:MYSQL_PATH
           }
+          $mysql = Join-Path $mysqlRoot 'bin\mysql.exe'
+          $binaryLogging = @(& $mysql "--defaults-extra-file=$maintenance" --batch --skip-column-names -e `
+            'SELECT @@GLOBAL.log_bin = 1, @@GLOBAL.log_bin_trust_function_creators = 1;' 2>$null)
+          if ($LASTEXITCODE -ne 0 -or (@($binaryLogging) -join "`n").Trim() -ne "1`t1") {
+            throw 'Fixture MySQL não preservou binary logging ou confiança restrita'
+          }
+          $binlogFiles = @(Get-ChildItem -LiteralPath $binlogDir -Filter 'sage-smoke-bin.*' -File -ErrorAction SilentlyContinue)
+          if ($binlogFiles.Count -eq 0) { throw 'Fixture MySQL não produziu binary log' }
           Stop-Service SAGE-MySQL-Smoke
           & $mysqld --remove SAGE-MySQL-Smoke
           if ($LASTEXITCODE -ne 0) { throw 'Serviço temporário MySQL não foi removido' }
@@ -210,6 +228,10 @@ jobs:
           }
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
+          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $mysqlSmokeDir) {
+            Remove-Item -LiteralPath $mysqlSmokeDir -Recurse -Force
+          }
 
       - name: Provar serviços privados e recuperação
         shell: powershell
