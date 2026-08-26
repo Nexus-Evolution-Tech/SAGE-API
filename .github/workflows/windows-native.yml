@@ -74,7 +74,8 @@ jobs:
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
             test/windows-services-contract.test.js test/windows-firewall-contract.test.js `
             test/windows-uninstall-contract.test.js test/start-with-setup.test.js `
-            test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
+            test/windows-ci-contract.test.js test/windows-acl-smoke-contract.test.js `
+            test/backup-maintenance-credential.test.js `
             test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
           npm audit --omit=dev --audit-level=high
