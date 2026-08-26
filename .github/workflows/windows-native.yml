@@ -8,7 +8,7 @@ on:
         required: true
         default: e8c5131e1d155e2bcf8d7c58ffefb4e81677407f
   push:
-    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall, agent/f8-uninstall]
+    branches: [agent/f8-windows-native-builder, agent/f8-mysql-bootstrap, agent/f8-windows-services, agent/f8-firewall, agent/f8-uninstall, wp/r1-47-windows-acl-smoke-20260826]
 
 permissions:
   contents: read
@@ -74,7 +74,8 @@ jobs:
             test/windows-initialize-state-contract.test.js test/windows-mysql-bootstrap-contract.test.js `
             test/windows-services-contract.test.js test/windows-firewall-contract.test.js `
             test/windows-uninstall-contract.test.js test/start-with-setup.test.js `
-            test/windows-ci-contract.test.js test/backup-maintenance-credential.test.js `
+            test/windows-ci-contract.test.js test/windows-acl-smoke-contract.test.js `
+            test/backup-maintenance-credential.test.js `
             test/contrato-diretorios.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Contratos Windows falharam' }
           npm audit --omit=dev --audit-level=high
@@ -128,7 +129,14 @@ jobs:
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'sage-release-smoke'
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
+          $stateOwnership = Join-Path $env:RUNNER_TEMP "sage-state-owned-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $stateOwnership) {
+            throw 'Marcador de posse do estado do smoke já existe'
+          }
           if (Test-Path -LiteralPath $state) { throw 'Runner não está limpo para o smoke MySQL' }
+          $ownershipStream = [IO.File]::Open($stateOwnership, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::Write, [IO.FileShare]::None)
+          $ownershipStream.Dispose()
           & (Join-Path $output 'service\initialize-mysql.ps1')
           if (-not $?) { throw 'Bootstrap MySQL falhou' }
           $config = Join-Path $state 'config'
@@ -202,14 +210,51 @@ jobs:
         if: always()
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
+          $mysqlExecutable = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
+          $mysqlIni = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\config\mysql-smoke.ini'
           $service = Get-Service SAGE-MySQL-Smoke -ErrorAction SilentlyContinue
           if ($null -ne $service) {
             if ($service.Status -ne 'Stopped') { Stop-Service SAGE-MySQL-Smoke -Force }
-            $mysqld = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
-            if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGE-MySQL-Smoke }
+            if (Test-Path -LiteralPath $mysqlExecutable) { & $mysqlExecutable --remove SAGE-MySQL-Smoke }
           }
+          $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.ExecutablePath -and $_.ExecutablePath.Equals(
+              $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
+            ) -and $_.CommandLine -and
+            $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
+          })
+          foreach ($process in $remainingMysql) { Stop-Process -Id $process.ProcessId -Force }
+          for ($mysqlAttempt = 0; $mysqlAttempt -lt 20; $mysqlAttempt++) {
+            $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
+              $_.ExecutablePath -and $_.ExecutablePath.Equals(
+                $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
+              ) -and $_.CommandLine -and
+              $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
+            })
+            if ($remainingMysql.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+          }
+          if ($remainingMysql.Count -ne 0) { throw 'Processo MySQL descartável não encerrou' }
+
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
-          if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
+          $stateOwnership = Join-Path $env:RUNNER_TEMP "sage-state-owned-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $stateOwnership) {
+            for ($stateAttempt = 0; $stateAttempt -lt 20 -and (Test-Path -LiteralPath $state); $stateAttempt++) {
+              try {
+                Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction Stop
+              } catch {
+                if ($stateAttempt -eq 19) { throw }
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if (Test-Path -LiteralPath $state) {
+              throw 'Estado do smoke permaneceu após a limpeza'
+            }
+            Remove-Item -LiteralPath $stateOwnership -Force -ErrorAction Stop
+          } elseif (Test-Path -LiteralPath $state) {
+            throw 'Estado SAGE preexistente não pertence ao smoke; preservado'
+          }
 
       - name: Provar serviços privados e recuperação
         shell: powershell
@@ -218,10 +263,72 @@ jobs:
           $program = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           if (Test-Path -LiteralPath $program) { throw 'Program Files não está limpo para o smoke' }
+          $stateOwnership = Join-Path $env:RUNNER_TEMP "sage-state-owned-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $stateOwnership) {
+            throw 'Marcador de posse do estado anterior não foi descartado'
+          }
+          if (Test-Path -LiteralPath $state) {
+            throw 'Estado SAGE não está ausente antes do provisionamento'
+          }
+          $ownershipStream = [IO.File]::Open($stateOwnership, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::Write, [IO.FileShare]::None)
+          $ownershipStream.Dispose()
           Copy-Item -LiteralPath $output -Destination $program -Recurse
           $provision = Join-Path $program 'service\provision-services.ps1'
           & $provision
           if (-not $?) { throw 'Primeiro provisionamento dos serviços falhou' }
+
+          $systemSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+          $adminsSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+          $requiredSidValues = @($systemSid.Value, $adminsSid.Value)
+          $serviceSidValues = @(@('SAGEAPI', 'SAGEMySQL') | ForEach-Object {
+            try {
+              [Security.Principal.NTAccount]::new('NT SERVICE', $_).Translate(
+                [Security.Principal.SecurityIdentifier]
+              ).Value
+            } catch { throw 'SID de serviço SAGE não pôde ser resolvido' }
+          })
+          $allowedSidValues = @($requiredSidValues) + @($serviceSidValues)
+          function Assert-SmokePrivateAcl {
+            param([string]$Path, [string]$Label)
+            $acl = Get-Acl -LiteralPath $Path
+            if (-not $acl.AreAccessRulesProtected) { throw "ACL herdada: $Label" }
+            $rules = @($acl.GetAccessRules($true, $true,
+              [Security.Principal.SecurityIdentifier]))
+            if ($rules.Count -eq 0) { throw "ACL sem regras: $Label" }
+            $seen = @{}
+            $forbiddenServiceRights = [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+              [Security.AccessControl.FileSystemRights]::TakeOwnership
+            foreach ($rule in $rules) {
+              $sid = $rule.IdentityReference.Value
+              if ($rule.IsInherited -or $allowedSidValues -notcontains $sid -or
+                  $rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
+                  ($requiredSidValues -contains $sid -and
+                    ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+                      [Security.AccessControl.FileSystemRights]::FullControl) -or
+                  ($serviceSidValues -contains $sid -and
+                    ($rule.FileSystemRights -band $forbiddenServiceRights))) {
+                throw "ACL não autorizada: $Label"
+              }
+              $seen[$sid] = $true
+            }
+            foreach ($sid in $requiredSidValues) {
+              if (-not $seen.ContainsKey($sid)) { throw "ACL obrigatória ausente: $Label" }
+            }
+          }
+          $criticalAclPaths = [ordered]@{
+            raiz = $state
+            config = Join-Path $state 'config'
+            'config/sage.env' = Join-Path $state 'config\sage.env'
+            'config/maintenance.env' = Join-Path $state 'config\maintenance.env'
+            'config/maintenance-client.cnf' = Join-Path $state 'config\maintenance-client.cnf'
+            'config/shutdown-client.cnf' = Join-Path $state 'config\shutdown-client.cnf'
+            'config/mysql.ini' = Join-Path $state 'config\mysql.ini'
+          }
+          foreach ($entry in $criticalAclPaths.GetEnumerator()) {
+            Assert-SmokePrivateAcl $entry.Value $entry.Key
+          }
+          Write-Host 'Evidência ACL privada confirmada na raiz e nos arquivos críticos.'
 
           $release = Get-Content -LiteralPath (Join-Path $program 'release.json') -Raw | ConvertFrom-Json
           $config = Join-Path $state 'config'
@@ -416,6 +523,7 @@ jobs:
         if: always()
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
           $program = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'SAGE'
           $firewall = Get-NetFirewallRule -PolicyStore PersistentStore -Name SAGE-API-LAN `
             -ErrorAction SilentlyContinue | Where-Object Group -CEQ 'SAGE'
@@ -461,13 +569,40 @@ jobs:
             }
           }
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
-          for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $state); $attempt++) {
-            try {
-              Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction Stop
-            } catch {
-              if ($attempt -eq 19) { throw }
-              Start-Sleep -Milliseconds 500
+          $stateOwnership = Join-Path $env:RUNNER_TEMP "sage-state-owned-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $mysqlExecutable = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
+          $mysqlIni = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\config\mysql-smoke.ini'
+          $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.ExecutablePath -and $_.ExecutablePath.Equals(
+              $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
+            ) -and $_.CommandLine -and
+            $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
+          })
+          foreach ($process in $remainingMysql) { Stop-Process -Id $process.ProcessId -Force }
+          for ($mysqlAttempt = 0; $mysqlAttempt -lt 20; $mysqlAttempt++) {
+            $remainingMysql = @(Get-CimInstance Win32_Process | Where-Object {
+              $_.ExecutablePath -and $_.ExecutablePath.Equals(
+                $mysqlExecutable, [StringComparison]::OrdinalIgnoreCase
+              ) -and $_.CommandLine -and
+              $_.CommandLine.IndexOf($mysqlIni, [StringComparison]::OrdinalIgnoreCase) -ge 0
+            })
+            if ($remainingMysql.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+          }
+          if ($remainingMysql.Count -ne 0) { throw 'Processo MySQL descartável não encerrou' }
+          if (Test-Path -LiteralPath $stateOwnership) {
+            for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $state); $attempt++) {
+              try {
+                Remove-Item -LiteralPath $state -Recurse -Force -ErrorAction Stop
+              } catch {
+                if ($attempt -eq 19) { throw }
+                Start-Sleep -Milliseconds 500
+              }
             }
+            if (Test-Path -LiteralPath $state) { throw 'Estado do smoke não foi removido' }
+            Remove-Item -LiteralPath $stateOwnership -Force -ErrorAction Stop
+          } elseif (Test-Path -LiteralPath $state) {
+            throw 'Estado SAGE preexistente não pertence ao smoke; preservado'
           }
 
       - name: Descartar protótipo
