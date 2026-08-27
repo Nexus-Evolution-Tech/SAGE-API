@@ -42,8 +42,9 @@ O bootstrap usa autenticação root efêmera por shared memory; não usa `--skip
 nem qualquer modo que desative autenticação. O boot final é TCP autenticado normalmente.
 
 O schema é provisionado pelo entrypoint existente `scripts/setup-database.js`, com
-`SAGE_ALLOW_FIRST_RUN_ONBOARDING=true` e banco descartável. O helper confirma `mysqladmin
-ping`, listener único no loopback, versão/porta/datadir/tmpdir/configuração efetiva, tabelas
+`SAGE_ALLOW_FIRST_RUN_ONBOARDING=true` e banco descartável. O helper confirma consulta
+autenticada `SELECT 1` pelo cliente configurado, listener único no loopback,
+versão/porta/datadir/tmpdir/configuração efetiva, tabelas
 essenciais, ausência de linhas nas entidades de domínio e `SHOW GRANTS` sem `SUPER`/`GRANT
 OPTION`. Qualquer pré-requisito ou verificação falha com exit diferente de zero; não há skip.
 
