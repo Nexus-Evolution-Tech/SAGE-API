@@ -163,7 +163,12 @@ if ($null -ne $mysqlService) {
 $apiService = Get-ServiceRecord 'SAGEAPI'
 if ($null -ne $apiService) { Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw) }
 
-# Registrar primeiro torna os SIDs NT SERVICE traduzíveis ao validar um ProgramData preservado.
+# A primeira passagem protege o estado antes de qualquer registro no SCM.
+& (Join-Path $PSScriptRoot 'initialize-state.ps1')
+if (-not $?) { throw 'Estado privado falhou antes do registro dos serviços' }
+foreach ($directory in @($dataRoot, $configRoot)) { Assert-RegularPath $directory $false }
+foreach ($file in @($mysqlIni, $maintenanceClient)) { Assert-RegularPath $file $true }
+
 if ($null -eq $mysqlService) {
   Invoke-NativeChecked $mysqlWinsw @('install')
   $mysqlService = Get-ServiceRecord 'SAGEMySQL'
