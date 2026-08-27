@@ -31,6 +31,24 @@ async function fixture() {
 }
 
 describe('montagem segura do payload da API', () => {
+  it('reconhece e copia os módulos do onboarding R2-02A', async () => {
+    const onboardingFiles = [
+      'src/controllers/assistentePrimeiraExecucaoController.js',
+      'src/routes/assistentePrimeiraExecucaoRoutes.js',
+      'src/services/assistentePrimeiraExecucaoService.js'
+    ];
+    expect(SOURCE_FILES).toEqual(expect.arrayContaining(onboardingFiles));
+    const source = await fixture();
+    const destination = `${source}-payload`;
+    tempDirs.push(destination);
+
+    await assembleApiPayload(source, destination);
+
+    await Promise.all(onboardingFiles.map((file) => expect(
+      fs.readFile(path.join(destination, file), 'utf8')
+    ).resolves.toBe(`fixture:${file}`)));
+  });
+
   it('copia somente runtime, migrations e modelos vazios por allowlist', async () => {
     expect(SOURCE_FILES).toContain('src/middlewares/autorizacao.js');
     const source = await fixture();
