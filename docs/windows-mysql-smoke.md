@@ -63,3 +63,38 @@ if ($LASTEXITCODE -ne 0) { throw 'Cleanup da fixture falhou; não apagar manualm
 A única evidência esperada é a linha `evidence=R2-02-precond`, com commit, sistema, versão,
 porta, bind, caminhos classificados como `fixture`, readiness, schema, privilégios e contagem
 de entidades. Não redirecione credenciais nem publique conteúdo bruto dos logs.
+## KeepAlive para npm start, API e Playwright
+
+`Run` continua sendo a precondicao descartavel atual: valida o banco e encerra o MySQL no
+`finally`. Para manter o MySQL autenticado em background durante `npm start`, a API e os testes
+Playwright, use `KeepAlive` em um FixtureRoot novo:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$fixtureRoot = Join-Path $env:TEMP ('sage-r2-02-mysql-' + [guid]::NewGuid().ToString('N'))
+$mysqlRoot = 'C:\SAGE-WS\mysql-runtime\mysql-8.4.11-winx64'
+$node = (Get-Command node.exe -ErrorAction Stop).Source
+& .\test\support\windows-mysql-fixture.ps1 -Action KeepAlive -FixtureRoot $fixtureRoot `
+  -MysqlRoot $mysqlRoot -ApiRepository (Get-Location).Path -NodeExecutable $node -Commit (git rev-parse HEAD)
+if ($LASTEXITCODE -ne 0) { throw 'KeepAlive MySQL/schema falhou' }
+
+$state = Get-Content (Join-Path $fixtureRoot 'fixture-state.json') -Raw | ConvertFrom-Json
+$credentialLines = Get-Content -LiteralPath $state.credentialFile
+$credentials = @{}
+foreach ($line in $credentialLines) {
+  if ($line -match '^(user|password)=(.*)$') { $credentials[$matches[1]] = $matches[2] }
+}
+$env:DB_HOST = '127.0.0.1'; $env:DB_PORT = "$($state.port)"; $env:DB_USER = $credentials.user
+$env:DB_PASSWORD = $credentials.password; $env:DB_NAME = 'sage'
+Write-Host "connection=$($env:DB_HOST):$($env:DB_PORT) database=$($env:DB_NAME) user=$($env:DB_USER)"
+```
+
+A fixture publica somente a conexao; a senha permanece em `maintenance-client.cnf` dentro do
+`FixtureRoot` e nao aparece no estado nem na saida. Mantenha este PowerShell aberto para a API e
+execute Playwright em um shell que carregue as mesmas variaveis sem imprimir `$env:DB_PASSWORD`.
+Depois de parar API e Playwright, a limpeza explicita prova processo, listener e diretorios ausentes:
+
+```powershell
+& .\test\support\windows-mysql-fixture.ps1 -Action Cleanup -FixtureRoot $fixtureRoot
+if ($LASTEXITCODE -ne 0) { throw 'Cleanup KeepAlive falhou; estado nao deve ser apagado manualmente' }
+```
