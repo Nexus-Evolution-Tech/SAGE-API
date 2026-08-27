@@ -21,6 +21,10 @@ describe('smoke Windows do estado ACL', () => {
     expect(services.indexOf("if (Test-Path -LiteralPath $state) {")).toBeLessThan(
       services.indexOf('& $provision')
     );
+    expect(services.indexOf("$stateInitializer = Join-Path $output 'service\\initialize-state.ps1'")).toBeLessThan(
+      services.indexOf('& $provision')
+    );
+    expect(services).toContain('Inicialização protegida do estado falhou');
     expect(services).toContain('[IO.FileMode]::CreateNew');
     expect(services).toContain('Processo MySQL descartável não encerrou');
   });

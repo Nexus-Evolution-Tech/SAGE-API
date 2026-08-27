@@ -295,6 +295,9 @@ jobs:
           $ownershipStream = [IO.File]::Open($stateOwnership, [IO.FileMode]::CreateNew,
             [IO.FileAccess]::Write, [IO.FileShare]::None)
           $ownershipStream.Dispose()
+          $stateInitializer = Join-Path $output 'service\initialize-state.ps1'
+          & $stateInitializer
+          if (-not $?) { throw 'Inicialização protegida do estado falhou' }
           Copy-Item -LiteralPath $output -Destination $program -Recurse
           $provision = Join-Path $program 'service\provision-services.ps1'
           & $provision
