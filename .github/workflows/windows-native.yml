@@ -125,6 +125,17 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'bcrypt Windows do layout não carregou' }
           } finally { Pop-Location }
 
+      - name: Provar precondição descartável MySQL/schema R2-02
+        working-directory: api
+        shell: powershell
+        run: |
+          $fixture = Join-Path $env:GITHUB_WORKSPACE 'api\test\support\windows-mysql-fixture.ps1'
+          $mysqlRoot = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql'
+          $node = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\node\node.exe'
+          & $fixture -MysqlRoot $mysqlRoot -ApiRepository (Join-Path $env:GITHUB_WORKSPACE 'api') `
+            -NodeExecutable $node -Commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Precondição MySQL/schema R2-02 falhou' }
+
       - name: Provar bootstrap privado do MySQL
         shell: powershell
         run: |
