@@ -334,7 +334,7 @@ jobs:
           $effectiveValues = @($effective[0].Trim() -split "`t")
           $expectedData = [IO.Path]::GetFullPath($fixtureData).TrimEnd('\')
           $expectedTmp = [IO.Path]::GetFullPath($fixtureTmp).TrimEnd('\')
-          $actualData = $effectiveValues[0].Replace('/', '\').TrimEnd('\')
+          $actualData = $effectiveValues[0].Replace('/', '\').Replace('\\', '\').TrimEnd('\')
           $actualTmp = $effectiveValues[1].Replace('/', '\').TrimEnd('\')
           Write-Host "MySQL efetivo: datadir=$actualData tmpdir=$actualTmp log_bin=$($effectiveValues[2]) trust=$($effectiveValues[3]) port=$($effectiveValues[4]) bind=$($effectiveValues[5])"
           if ($effectiveValues.Count -ne 6 -or
