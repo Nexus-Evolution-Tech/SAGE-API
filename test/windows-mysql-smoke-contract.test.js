@@ -3,10 +3,14 @@ const path = require('path');
 
 const WORKFLOW = path.join(__dirname, '..', '.github', 'workflows', 'windows-native.yml');
 const INITIALIZER = path.join(__dirname, '..', 'installer', 'windows', 'initialize-mysql.ps1');
+const FIXTURE = path.join(__dirname, 'support', 'windows-mysql-fixture.ps1');
+const RUNBOOK = path.join(__dirname, '..', 'docs', 'windows-mysql-smoke.md');
 
 describe('fixture do smoke MySQL restrito no Windows', () => {
   const source = fs.readFileSync(WORKFLOW, 'utf8');
   const initializer = fs.readFileSync(INITIALIZER, 'utf8');
+  const fixture = fs.readFileSync(FIXTURE, 'utf8');
+  const runbook = fs.readFileSync(RUNBOOK, 'utf8');
   const bootstrap = source.slice(
     source.indexOf('Provar bootstrap privado do MySQL'),
     source.indexOf('Descartar estado do smoke MySQL')
@@ -144,5 +148,50 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(services).not.toMatch(/datadir=\$\{?state\}?|datadir=.*CommonApplicationData/i);
     expect(services).not.toMatch(/skip-log-bin|log[-_]bin\s*=\s*0/i);
     expect(services).not.toMatch(/SET\s+GLOBAL\s+log[-_]bin[-_]trust[-_]function[-_]creators/i);
+  });
+  it('executa a precondição descartável também no workflow nativo', () => {
+    expect(source).toContain('Provar precondição descartável MySQL/schema R2-02');
+    expect(source).toContain('test\\support\\windows-mysql-fixture.ps1');
+    expect(source).toContain('-Commit $env:GITHUB_SHA');
+    expect(source).not.toContain('ubuntu-latest');
+    expect(fixture).toContain('scripts\\setup-database.js');
+    expect(fixture).toContain('SAGE_ALLOW_FIRST_RUN_ONBOARDING');
+    expect(fixture).not.toContain('--skip-grant-tables');
+  });
+
+  it('guarda isolamento, readiness, schema, privilégio restrito e cleanup', () => {
+    expect(fixture).toContain('Assert-TemporaryPath');
+    expect(fixture).toContain('New-AvailablePort');
+    expect(fixture).toContain('Assert-PortAvailable $port');
+    expect(fixture).toContain("$client.Connect('127.0.0.1', $Port)");
+    expect(fixture).toContain('Get-FixtureProcesses');
+    expect(fixture).toContain('Get-FixtureListeners');
+    expect(fixture).toContain('Invoke-AuthenticatedShutdown');
+    expect(fixture).toContain('Stop-FixtureServer $Root $MysqlPath $Parent');
+    expect(fixture).toContain("GRANT SHUTDOWN ON *.* TO 'sage_maintenance'");
+    expect(fixture).toContain('OwningProcess');
+    expect(fixture).toContain('ExecutablePath');
+    expect(fixture).toContain('CommandLine');
+    expect(fixture).toContain('log-bin-trust-function-creators=1');
+    expect(fixture).toContain('bind-address=127.0.0.1');
+    expect(fixture).toContain('Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1');
+    expect(fixture).toContain('information_schema.TABLES');
+    expect(fixture).toContain('SHOW GRANTS;');
+    expect(fixture).toContain('SUPER|GRANT OPTION');
+    expect(fixture).toContain('password=$maintenanceSecret');
+    expect(fixture).toContain('finally');
+    expect(fixture).toContain('Remove-Item -LiteralPath $Root -Recurse -Force');
+    expect(fixture).toContain('service-absent process=0 listener=0');
+    const cleanupStart = fixture.indexOf('function Cleanup-Fixture');
+    const cleanupEnd = fixture.indexOf('function New-AvailablePort');
+    expect(fixture.slice(cleanupStart, cleanupEnd)).not.toContain('Get-NetTCPConnection');
+  });
+
+  it('documenta Windows 11 x64, Ubuntu N/A e evidência sanitizada', () => {
+    expect(runbook).toContain('Windows 11 x64');
+    expect(runbook).toContain('Ubuntu é N/A neste ciclo');
+    expect(runbook).toContain('npm ci --ignore-scripts');
+    expect(runbook).toContain('evidence=R2-02-precond');
+    expect(runbook).toContain('Não redirecione credenciais');
   });
 });
