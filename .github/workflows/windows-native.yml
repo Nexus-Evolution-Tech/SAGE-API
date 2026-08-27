@@ -522,11 +522,39 @@ jobs:
           foreach ($sentinel in $sentinels) {
             $sentinelHashes[$sentinel] = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
           }
-          $apiBeforeUninstall = Get-Service SAGEAPI -ErrorAction SilentlyContinue
-          if ($null -eq $apiBeforeUninstall) { throw 'SAGEAPI não foi criado para o teste de desinstalação' }
-          if ($apiBeforeUninstall.Status -ne 'Stopped') { Stop-Service SAGEAPI -Force }
-          & (Join-Path ([Environment]::SystemDirectory) 'sc.exe') delete SAGEAPI | Out-Null
+          $apiWinsw = Join-Path $program 'service\SAGE-API.exe'
+          $apiPathNames = @("`"$apiWinsw`"", $apiWinsw)
+          $apiBeforeUninstall = Get-CimInstance Win32_Service -Filter "Name='SAGEAPI'"
+          if ($null -eq $apiBeforeUninstall -or
+              $apiPathNames -notcontains $apiBeforeUninstall.PathName.Trim()) {
+            throw 'SAGEAPI não foi criado pelo smoke'
+          }
+          $apiBeforeUninstallService = Get-Service SAGEAPI -ErrorAction SilentlyContinue
+          if ($null -eq $apiBeforeUninstallService) { throw 'SAGEAPI não foi criado para o teste de desinstalação' }
+          if ($apiBeforeUninstallService.Status -ne 'Stopped') { Stop-Service SAGEAPI -Force }
+          $apiBeforeUninstallService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(120))
+          if ((Get-Service SAGEAPI).Status -ne 'Stopped') { throw 'SAGEAPI não ficou parado' }
+          $sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
+          & $sc delete SAGEAPI | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Não foi possível simular serviço marcado para exclusão' }
+          $apiDeleteConfirmed = $false
+          $attempt = 0
+          while ($attempt -lt 20) {
+            $apiQuery = @(& $sc query SAGEAPI 2>&1)
+            $apiQueryText = $apiQuery -join "`n"
+            if ($LASTEXITCODE -ne 0 -and $apiQueryText -match '1060|1072|MARKED FOR DELETE|MARKED FOR DELETION') {
+              $apiDeleteConfirmed = $true
+              break
+            }
+            $apiAfterDelete = Get-CimInstance Win32_Service -Filter "Name='SAGEAPI'"
+            if ($null -eq $apiAfterDelete) {
+              $apiDeleteConfirmed = $true
+              break
+            }
+            Start-Sleep -Milliseconds 250
+            $attempt++
+          }
+          if (-not $apiDeleteConfirmed) { throw 'Registro SAGEAPI não ficou ausente ou marcado para exclusão' }
           & (Join-Path $program 'service\uninstall-services.ps1')
           if (-not $?) { throw 'Desinstalação dos serviços falhou' }
           if ((Get-Service SAGEAPI -ErrorAction SilentlyContinue) -or

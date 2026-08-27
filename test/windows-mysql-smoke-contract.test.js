@@ -76,9 +76,22 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(services).toContain('SAGEMySQL efetivo não está em execução');
     expect(services).toContain('Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1');
     expect(services).toContain('Stop-Service SAGEAPI -Force');
+    expect(services).toContain('Get-CimInstance Win32_Service -Filter "Name=\'SAGEAPI\'"');
+    expect(services).toContain("$apiPathNames -notcontains $apiBeforeUninstall.PathName.Trim()");
+    expect(services).toContain("$apiBeforeUninstallService.WaitForStatus('Stopped'");
+    expect(services).toContain('& $sc delete SAGEAPI');
+    expect(services).toContain('$apiDeleteConfirmed = $false');
+    expect(services).toContain('1060|1072|MARKED FOR DELETE|MARKED FOR DELETION');
+    expect(services).toContain('Registro SAGEAPI não ficou ausente ou marcado para exclusão');
     expect(services.indexOf('Stop-Service SAGEAPI -Force')).toBeLessThan(
-      services.indexOf("sc.exe') delete SAGEAPI")
+      services.indexOf('& $sc delete SAGEAPI')
     );
+    const firstUninstall = services.indexOf("service\\uninstall-services.ps1')");
+    const teardownBeforeUninstall = services.slice(services.indexOf('$sentinels'), firstUninstall);
+    expect(teardownBeforeUninstall).not.toContain('Stop-Service SAGEMySQL');
+    expect(teardownBeforeUninstall).not.toContain('mysqlWinsw uninstall');
+    expect(teardownBeforeUninstall).not.toContain('--remove SAGEMySQL');
+    expect(firstUninstall).toBeGreaterThan(services.indexOf('$apiDeleteConfirmed = $false'));
   });
 
   it('prova grants da conta efetiva e nega privilégios amplos', () => {
