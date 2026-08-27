@@ -147,15 +147,23 @@ jobs:
           New-Item -ItemType Directory -Path $mysqlSmokeDir | Out-Null
           $binlogDir = Join-Path $mysqlSmokeDir 'binlog'
           New-Item -ItemType Directory -Path $binlogDir | Out-Null
+          $fixtureData = Join-Path $mysqlSmokeDir 'data'
+          Copy-Item -LiteralPath (Join-Path $state 'mysql\data') -Destination $fixtureData -Recurse
+          $fixtureTmp = Join-Path $mysqlSmokeDir 'tmp'
+          New-Item -ItemType Directory -Path $fixtureTmp | Out-Null
+          $fixtureLog = Join-Path $mysqlSmokeDir 'mysql-error.log'
           $myIni = Join-Path $mysqlSmokeDir 'mysql-smoke.ini'
           $mysqlRoot = Join-Path $output 'runtime\mysql'
-          $data = (Join-Path $state 'mysql\data').Replace('\', '/')
+          $data = $fixtureData.Replace('\', '/')
+          $tmp = $fixtureTmp.Replace('\', '/')
           $base = $mysqlRoot.Replace('\', '/')
           $binlog = (Join-Path $binlogDir 'sage-smoke-bin').Replace('\', '/')
+          $errorLog = $fixtureLog.Replace('\', '/')
           [IO.File]::WriteAllLines($myIni, @(
-            '[mysqld]', "basedir=$base", "datadir=$data", 'port=3307',
+            '[mysqld]', "basedir=$base", "datadir=$data", "tmpdir=$tmp", 'port=3307',
             "log-bin=$binlog", 'log-bin-trust-function-creators=1', 'server-id=122',
-            'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve'
+            'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve',
+            'local-infile=OFF', 'innodb-flush-log-at-trx-commit=1', "log-error=$errorLog"
           ), [Text.UTF8Encoding]::new($false))
           $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'
           & $mysqld --install-manual SAGE-MySQL-Smoke "--defaults-file=$myIni"
@@ -226,9 +234,27 @@ jobs:
             $mysqld = Join-Path $env:RUNNER_TEMP 'sage-release-smoke\runtime\mysql\bin\mysqld.exe'
             if (Test-Path -LiteralPath $mysqld) { & $mysqld --remove SAGE-MySQL-Smoke }
           }
+          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $fixtureProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.CommandLine -and $mysqlSmokeDir -and
+            $_.CommandLine -match [regex]::Escape($mysqlSmokeDir)
+          })
+          foreach ($process in $fixtureProcesses) { Stop-Process -Id $process.ProcessId -Force }
+          $attempt = 0
+          while ($attempt -lt 20) {
+            $fixtureProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+              $_.CommandLine -and $_.CommandLine -match [regex]::Escape($mysqlSmokeDir)
+            })
+            if ($fixtureProcesses.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+            $attempt++
+          }
+          if ($fixtureProcesses.Count -ne 0) { throw 'Processo residual do fixture MySQL não encerrou' }
+          $binlogDir = Join-Path $mysqlSmokeDir 'binlog'
+          foreach ($binlog in @(Get-ChildItem -LiteralPath $binlogDir -Filter 'sage-smoke-bin.*' -File `
+            -ErrorAction SilentlyContinue)) { Remove-Item -LiteralPath $binlog.FullName -Force }
           $state = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'SAGE'
           if (Test-Path -LiteralPath $state) { Remove-Item -LiteralPath $state -Recurse -Force }
-          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           if (Test-Path -LiteralPath $mysqlSmokeDir) {
             Remove-Item -LiteralPath $mysqlSmokeDir -Recurse -Force
           }
@@ -242,8 +268,98 @@ jobs:
           if (Test-Path -LiteralPath $program) { throw 'Program Files não está limpo para o smoke' }
           Copy-Item -LiteralPath $output -Destination $program -Recurse
           $provision = Join-Path $program 'service\provision-services.ps1'
+          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $mysqlSmokeDir) {
+            throw 'Diretório do fixture MySQL já existe'
+          }
+          New-Item -ItemType Directory -Path $mysqlSmokeDir | Out-Null
+          $binlogDir = Join-Path $mysqlSmokeDir 'binlog'
+          New-Item -ItemType Directory -Path $binlogDir | Out-Null
+          $fixtureData = Join-Path $mysqlSmokeDir 'data'
+          $fixtureTmp = Join-Path $mysqlSmokeDir 'tmp'
+          New-Item -ItemType Directory -Path $fixtureTmp | Out-Null
+          $fixtureLog = Join-Path $mysqlSmokeDir 'mysql-error.log'
+
+          $stateInitializer = Join-Path $output 'service\initialize-state.ps1'
+          & $stateInitializer
+          if (-not $?) { throw 'Inicialização protegida do estado falhou' }
+          $bootstrapInitializer = Join-Path $output 'service\initialize-mysql.ps1'
+          & $bootstrapInitializer
+          if (-not $?) { throw 'Preparação das contas do fixture MySQL falhou' }
+          $stateData = Join-Path $state 'mysql\data'
+          Copy-Item -LiteralPath $stateData -Destination $fixtureData -Recurse
+          Remove-Item -LiteralPath $stateData -Recurse -Force
+          New-Item -ItemType Directory -Path $stateData | Out-Null
+
+          $mysqlRoot = Join-Path $program 'runtime\mysql'
+          $mysqlServiceIni = Join-Path $mysqlSmokeDir 'mysql-service.ini'
+          $data = $fixtureData.Replace('\', '/')
+          $tmp = $fixtureTmp.Replace('\', '/')
+          $base = $mysqlRoot.Replace('\', '/')
+          $binlog = (Join-Path $binlogDir 'sage-smoke-bin').Replace('\', '/')
+          $errorLog = $fixtureLog.Replace('\', '/')
+          [IO.File]::WriteAllLines($mysqlServiceIni, @(
+            '[mysqld]', "basedir=$base", "datadir=$data", "tmpdir=$tmp", 'port=3307',
+            "log-bin=$binlog", 'log-bin-trust-function-creators=1', 'server-id=122',
+            'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve',
+            'local-infile=OFF', 'innodb-flush-log-at-trx-commit=1', "log-error=$errorLog"
+          ), [Text.UTF8Encoding]::new($false))
+          $icacls = Join-Path ([Environment]::SystemDirectory) 'icacls.exe'
+          & $icacls $mysqlSmokeDir '/grant:r' 'NT AUTHORITY\LOCAL SERVICE:(OI)(CI)M' '/T' '/C' | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'ACL mínima do fixture MySQL falhou' }
+          $mysqlXmlPath = Join-Path $program 'service\SAGE-MySQL.xml'
+          $mysqlXml = [xml][IO.File]::ReadAllText($mysqlXmlPath)
+          $mysqlXml.service.arguments = '--defaults-file="' + $mysqlServiceIni + '" --console'
+          $mysqlXml.Save($mysqlXmlPath)
           & $provision
           if (-not $?) { throw 'Primeiro provisionamento dos serviços falhou' }
+
+          $mysqlServiceRecord = Get-CimInstance Win32_Service -Filter "Name='SAGEMySQL'"
+          if ($null -eq $mysqlServiceRecord -or
+              $mysqlServiceRecord.StartName -ne 'NT AUTHORITY\LocalService') {
+            throw 'SAGEMySQL efetivo não usa LocalService'
+          }
+          $effectiveXml = [IO.File]::ReadAllText($mysqlXmlPath)
+          if ($effectiveXml -notmatch [regex]::Escape($mysqlServiceIni) -or
+              $effectiveXml -match '(?i)log[-_]bin|trust[-_]function[-_]creators') {
+            throw 'XML efetivo do SAGEMySQL não está confinado ao fixture'
+          }
+          $mysql = Join-Path $program 'runtime\mysql\bin\mysql.exe'
+          $maintenance = Join-Path $state 'config\maintenance-client.cnf'
+          $effective = @(& $mysql "--defaults-extra-file=$maintenance" --batch --skip-column-names -e `
+            'SELECT @@GLOBAL.datadir, @@GLOBAL.tmpdir, @@GLOBAL.log_bin = 1, @@GLOBAL.log_bin_trust_function_creators = 1, @@GLOBAL.port, @@GLOBAL.bind_address;' 2>$null)
+          if ($LASTEXITCODE -ne 0 -or $effective.Count -ne 1) {
+            throw 'Não foi possível ler as variáveis efetivas do SAGEMySQL'
+          }
+          $effectiveValues = @($effective[0].Trim() -split "`t")
+          $expectedData = [IO.Path]::GetFullPath($fixtureData).TrimEnd('\')
+          $expectedTmp = [IO.Path]::GetFullPath($fixtureTmp).TrimEnd('\')
+          $actualData = $effectiveValues[0].Replace('/', '\').TrimEnd('\')
+          $actualTmp = $effectiveValues[1].Replace('/', '\').TrimEnd('\')
+          if ($effectiveValues.Count -ne 6 -or
+              $actualData -ine $expectedData -or $actualTmp -ine $expectedTmp -or
+              $effectiveValues[2] -ne '1' -or $effectiveValues[3] -ne '1' -or
+              $effectiveValues[4] -ne '3307' -or $effectiveValues[5] -ne '127.0.0.1') {
+            throw 'Variáveis efetivas do SAGEMySQL divergem do fixture'
+          }
+          $mysqlProcesses = @(Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
+            Where-Object { $_.CommandLine -and $_.CommandLine -match [regex]::Escape($mysqlServiceIni) })
+          if ($mysqlProcesses.Count -ne 1) { throw 'Processo efetivo do SAGEMySQL não usa o INI temporário' }
+          $maintenanceGrants = @(& $mysql "--defaults-extra-file=$maintenance" --batch --skip-column-names `
+            -e 'SHOW GRANTS;' 2>$null)
+          $maintenanceGrantText = $maintenanceGrants -join "`n"
+          if ($LASTEXITCODE -ne 0 -or $maintenanceGrantText -notmatch '(?i)sage_maintenance' -or
+              $maintenanceGrantText -match '(?i)\bSUPER\b|GRANT OPTION|GRANT ALL PRIVILEGES ON \*\.\*') {
+            throw 'sage_maintenance possui privilégio amplo'
+          }
+          $persistentIni = Join-Path $state 'config\mysql.ini'
+          $persistentText = [IO.File]::ReadAllText($persistentIni)
+          if ($persistentText -match '(?i)log[-_]bin|trust[-_]function[-_]creators|RUNNER_TEMP') {
+            throw 'Configuração persistente recebeu opção exclusiva do smoke'
+          }
+          if (Test-Path -LiteralPath (Join-Path $state 'config\mysql-bootstrap-client.cnf')) {
+            throw 'Credencial root persistiu após a preparação do fixture'
+          }
 
           $release = Get-Content -LiteralPath (Join-Path $program 'release.json') -Raw | ConvertFrom-Json
           $config = Join-Path $state 'config'
@@ -264,6 +380,9 @@ jobs:
             Remove-Item Env:SAGE_INITIAL_ADMIN_LOGIN, Env:SAGE_INITIAL_ADMIN_PASSWORD, `
               Env:SAGE_INITIAL_SCHOOL_NAME, Env:SAGE_CONFIG_FILE
           }
+          $binlogFiles = @(Get-ChildItem -LiteralPath $binlogDir -Filter 'sage-smoke-bin.*' -File `
+            -ErrorAction SilentlyContinue)
+          if ($binlogFiles.Count -eq 0) { throw 'SAGEMySQL efetivo não produziu binary log' }
 
           & $provision -StartApi
           if (-not $?) { throw 'Ativação dos serviços falhou' }
@@ -474,6 +593,25 @@ jobs:
             Start-Sleep -Milliseconds 250
           }
           if ($remaining.Count -ne 0) { throw 'Processo residual do SAGE não encerrou' }
+          $mysqlSmokeDir = Join-Path $env:RUNNER_TEMP "sage-mysql-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $fixtureProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.CommandLine -and $_.CommandLine -match [regex]::Escape($mysqlSmokeDir)
+          })
+          foreach ($process in $fixtureProcesses) { Stop-Process -Id $process.ProcessId -Force }
+          if (@(Get-CimInstance Win32_Process | Where-Object {
+                $_.CommandLine -and $_.CommandLine -match [regex]::Escape($mysqlSmokeDir)
+              }).Count -ne 0) {
+            throw 'Processo residual do fixture MySQL não encerrou'
+          }
+          $binlogDir = Join-Path $mysqlSmokeDir 'binlog'
+          foreach ($binlog in @(Get-ChildItem -LiteralPath $binlogDir -Filter 'sage-smoke-bin.*' -File `
+            -ErrorAction SilentlyContinue)) { Remove-Item -LiteralPath $binlog.FullName -Force }
+          if (Test-Path -LiteralPath $mysqlSmokeDir) {
+            Remove-Item -LiteralPath $mysqlSmokeDir -Recurse -Force
+          }
+          if (Test-Path -LiteralPath $mysqlSmokeDir) {
+            throw 'Fixture MySQL temporário não foi removido'
+          }
           for ($attempt = 0; $attempt -lt 20 -and (Test-Path -LiteralPath $program); $attempt++) {
             try {
               Remove-Item -LiteralPath $program -Recurse -Force -ErrorAction Stop
