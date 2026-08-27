@@ -522,6 +522,9 @@ jobs:
           foreach ($sentinel in $sentinels) {
             $sentinelHashes[$sentinel] = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash
           }
+          $apiBeforeUninstall = Get-Service SAGEAPI -ErrorAction SilentlyContinue
+          if ($null -eq $apiBeforeUninstall) { throw 'SAGEAPI não foi criado para o teste de desinstalação' }
+          if ($apiBeforeUninstall.Status -ne 'Stopped') { Stop-Service SAGEAPI -Force }
           & (Join-Path ([Environment]::SystemDirectory) 'sc.exe') delete SAGEAPI | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Não foi possível simular serviço marcado para exclusão' }
           & (Join-Path $program 'service\uninstall-services.ps1')

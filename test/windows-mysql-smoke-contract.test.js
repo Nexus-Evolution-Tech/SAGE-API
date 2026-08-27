@@ -75,6 +75,10 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(services).toContain('Variáveis efetivas do SAGEMySQL divergem do fixture');
     expect(services).toContain('SAGEMySQL efetivo não está em execução');
     expect(services).toContain('Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1');
+    expect(services).toContain('Stop-Service SAGEAPI -Force');
+    expect(services.indexOf('Stop-Service SAGEAPI -Force')).toBeLessThan(
+      services.indexOf("sc.exe') delete SAGEAPI")
+    );
   });
 
   it('prova grants da conta efetiva e nega privilégios amplos', () => {
