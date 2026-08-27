@@ -68,7 +68,7 @@ it('2. migration cria estrutura e restringe escopo a uma linha', async () => {
   const [[tabela]] = await banco.pool.query('SHOW CREATE TABLE onboarding_state');
   const ddl = Object.values(tabela).join(' ');
   expect(ddl).toMatch(/PRIMARY KEY \(`id`\)/i);
-  expect(ddl).toMatch(/CHECK \(`id` = 1\)/i);
+  expect(ddl).toMatch(/CHECK\s+\(\s*\(?\s*`id`\s*=\s*1\s*\)?\s*\)/i);
   expect(ddl).not.toMatch(/school_id|cpf|senha|token|endereco/i);
   await expect(banco.pool.query('INSERT INTO onboarding_state (id, completed_steps) VALUES (2, JSON_ARRAY())')).rejects.toThrow();
   await banco.pool.query('INSERT INTO onboarding_state (id, completed_steps) VALUES (1, JSON_ARRAY())');
@@ -84,7 +84,7 @@ it('3. primeiro resume inicia o passo um e incrementa uma vez', async () => {
 it('4. repetição idempotente preserva a linha e a versão', async () => {
   const primeira = await retomar('escola-conta-administrador', 0);
   const segunda = await retomar('escola-conta-administrador', 1);
-  const [[estado]] = await banco.pool.query('SELECT COUNT(*) AS linhas, version FROM onboarding_state WHERE id = 1');
+  const [[estado]] = await banco.pool.query('SELECT COUNT(*) AS linhas, MAX(version) AS version FROM onboarding_state WHERE id = 1');
   expect(segunda).toEqual(primeira);
   expect(estado).toEqual({ linhas: 1, version: 1 });
 });
@@ -113,7 +113,7 @@ it('7. concorrência com a mesma versão aceita no máximo uma escrita', async (
     retomar('escola-conta-administrador', 0), retomar('escola-conta-administrador', 0)
   ]);
   expect(respostas.filter(({ status }) => status === 200)).toHaveLength(1);
-  const [[estado]] = await banco.pool.query('SELECT COUNT(*) AS linhas, version FROM onboarding_state');
+  const [[estado]] = await banco.pool.query('SELECT COUNT(*) AS linhas, MAX(version) AS version FROM onboarding_state');
   expect(estado).toEqual({ linhas: 1, version: 1 });
 });
 
