@@ -237,3 +237,4 @@ GRANT ALL PRIVILEGES ON sage.* TO 'sage_maintenance'@'127.0.0.1';
   if ($server) { $server.Dispose() }
   Write-Host 'cleanup=service-absent process=0 listener=0 datadir=0 tmpdir=0 logs=0'
 }
+$global:LASTEXITCODE = 0

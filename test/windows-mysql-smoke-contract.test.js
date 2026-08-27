@@ -156,6 +156,7 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(source).not.toContain('ubuntu-latest');
     expect(fixture).toContain('scripts\\setup-database.js');
     expect(fixture).toContain('SAGE_ALLOW_FIRST_RUN_ONBOARDING');
+    expect(fixture).toContain('$global:LASTEXITCODE = 0');
     expect(fixture).not.toContain('--skip-grant-tables');
   });
 
