@@ -343,9 +343,15 @@ jobs:
               $effectiveValues[4] -ne '3307' -or $effectiveValues[5] -ne '127.0.0.1') {
             throw 'Variáveis efetivas do SAGEMySQL divergem do fixture'
           }
-          $mysqlProcesses = @(Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" |
-            Where-Object { $_.CommandLine -and $_.CommandLine -match [regex]::Escape($mysqlServiceIni) })
-          if ($mysqlProcesses.Count -ne 1) { throw 'Processo efetivo do SAGEMySQL não usa o INI temporário' }
+          $mysqlServiceRuntime = Get-Service SAGEMySQL -ErrorAction SilentlyContinue
+          if ($null -eq $mysqlServiceRuntime -or $mysqlServiceRuntime.Status -ne 'Running') {
+            throw 'SAGEMySQL efetivo não está em execução'
+          }
+          $mysqlListener = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 `
+            -LocalPort 3307 -ErrorAction SilentlyContinue)
+          if ($mysqlListener.Count -ne 1) {
+            throw 'SAGEMySQL efetivo não expôs somente o listener do fixture'
+          }
           $maintenanceGrants = @(& $mysql "--defaults-extra-file=$maintenance" --batch --skip-column-names `
             -e 'SHOW GRANTS;' 2>$null)
           $maintenanceGrantText = $maintenanceGrants -join "`n"

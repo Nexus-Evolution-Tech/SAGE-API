@@ -65,7 +65,7 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(services).toContain('$fixtureTmp = Join-Path $mysqlSmokeDir');
     expect(services).toContain("$mysqlXml.service.arguments = '--defaults-file=\"' + $mysqlServiceIni");
     expect(services).toContain('Get-CimInstance Win32_Service -Filter "Name=\'SAGEMySQL\'"');
-    expect(services).toContain('Get-CimInstance Win32_Process -Filter "Name=\'mysqld.exe\'"');
+    expect(services).toContain('Get-Service SAGEMySQL -ErrorAction SilentlyContinue');
     expect(services).toContain('@@GLOBAL.datadir');
     expect(services).toContain('@@GLOBAL.tmpdir');
     expect(services).toContain('@@GLOBAL.log_bin = 1');
@@ -73,7 +73,8 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(services).toContain('@@GLOBAL.port');
     expect(services).toContain('@@GLOBAL.bind_address');
     expect(services).toContain('Variáveis efetivas do SAGEMySQL divergem do fixture');
-    expect(services).toContain('Processo efetivo do SAGEMySQL não usa o INI temporário');
+    expect(services).toContain('SAGEMySQL efetivo não está em execução');
+    expect(services).toContain('Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1');
   });
 
   it('prova grants da conta efetiva e nega privilégios amplos', () => {
