@@ -196,3 +196,61 @@ describe('fixture do smoke MySQL restrito no Windows', () => {
     expect(runbook).toContain('Não redirecione credenciais');
   });
 });
+describe('contrato KeepAlive da fixture MySQL Windows 11', () => {
+  const source = fs.readFileSync(WORKFLOW, 'utf8');
+  const fixture = fs.readFileSync(FIXTURE, 'utf8');
+  const runbook = fs.readFileSync(RUNBOOK, 'utf8');
+
+  it('mantem Run no workflow e adiciona KeepAlive sem mudar o bootstrap autenticado', () => {
+    const invocationStart = source.indexOf('& $fixture -MysqlRoot $mysqlRoot');
+    const invocationEnd = source.indexOf('if ($LASTEXITCODE -ne 0)', invocationStart);
+    const precondition = source.slice(invocationStart, invocationEnd);
+    expect(invocationStart).toBeGreaterThan(-1);
+    expect(invocationEnd).toBeGreaterThan(invocationStart);
+    expect(fixture).toContain("[ValidateSet('Run', 'KeepAlive', 'Cleanup')]");
+    expect(fixture).toContain("if ($Action -eq 'KeepAlive')");
+    expect(fixture).toContain('Start-Process -FilePath $mysqld');
+    expect(fixture).toContain('Write-FixtureState');
+    expect(fixture).toContain('SELECT 1');
+    expect(fixture).not.toContain('--skip-grant-tables');
+    expect(precondition).toContain('& $fixture -MysqlRoot $mysqlRoot');
+    expect(precondition).not.toContain('-Action KeepAlive');
+  });
+
+  it('reconstroi o runtime de Cleanup pelo estado antes da descoberta por PATH', () => {
+    const savedState = fixture.indexOf('$saved = Get-Content -LiteralPath $state -Raw | ConvertFrom-Json');
+    const pathLookup = fixture.indexOf('Get-Command mysqld.exe');
+    expect(savedState).toBeGreaterThan(-1);
+    expect(pathLookup).toBeGreaterThan(savedState);
+    expect(fixture).toContain('$MysqlRoot = [IO.Path]::GetFullPath([string]$saved.mysqlRoot)');
+    expect(fixture).toContain("$mysql = Join-Path $MysqlRoot 'bin\\mysql.exe'; $mysqladmin = Join-Path $MysqlRoot 'bin\\mysqladmin.exe'");
+    expect(runbook).toContain('-Action Cleanup -FixtureRoot $fixtureRoot');
+  });
+
+  it('publica somente conexao e persiste credencial/identidade dentro da fixture', () => {
+    expect(fixture).toContain("$maintenanceClient = Join-Path $FixtureRoot 'maintenance-client.cnf'");
+    expect(fixture).toContain('credentialFile = $CredentialFile');
+    expect(fixture).toContain('processId = $ProcessId');
+    expect(fixture).toContain('keepalive=ready connection=127.0.0.1:$port');
+    expect(fixture).toContain('credential-file=$maintenanceClient');
+    expect(fixture).not.toMatch(/Write-Host[^\r\n]*maintenanceSecret/);
+    expect(runbook).toContain('-Action KeepAlive');
+    expect(runbook).toContain('npm start');
+    expect(runbook).toContain('Playwright');
+    expect(runbook).toContain('DB_PASSWORD');
+  });
+
+  it('limpa todos os processos pai/filho pela identidade exata e prova ausencia de listener e artefatos', () => {
+    expect(fixture).toContain('$matchingBeforeShutdown = @(Get-FixtureProcesses $MysqlPath $ini $Root)');
+    expect(fixture).toContain('$allProcs = @(Get-FixtureProcesses $MysqlPath $ini $Root)');
+    expect(fixture).not.toContain('ExpectedProcessId');
+    expect(fixture).not.toContain('-ProcessId $ExpectedProcessId');
+    expect(fixture).toContain('Assert-FixtureListenerAbsent -Port $Port');
+    expect(fixture).toContain('$pathsToRemove');
+    expect(fixture).toContain('fixture-state.json');
+    expect(fixture).toContain('MySQL morreu prematuramente antes do KeepAlive');
+    expect(fixture).toContain('$primaryError = $_');
+    expect(fixture).toContain('Write-Warning "Falha na limpeza da fixture; erro original preservado:');
+    expect(runbook).toContain('-Action Cleanup');
+  });
+});

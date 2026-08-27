@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('Run', 'Cleanup')][string]$Action = 'Run',
+  [ValidateSet('Run', 'KeepAlive', 'Cleanup')][string]$Action = 'Run',
   [string]$MysqlRoot,
   [string]$ApiRepository,
   [string]$NodeExecutable,
@@ -85,6 +85,27 @@ function Get-FixtureListeners {
   @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $processIds -contains $_.OwningProcess })
 }
 
+function Assert-FixtureListenerAbsent {
+  param([int]$Port)
+  $listeners = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 -LocalPort $Port -ErrorAction SilentlyContinue)
+  if ($listeners.Count -ne 0) { throw "Listener residual na porta da fixture MySQL: $Port" }
+}
+
+function Write-FixtureState {
+  param(
+    [string]$Root, [string]$MysqlRoot, [int]$Port, [string]$Ini,
+    [string]$CredentialFile, [int]$ProcessId
+  )
+  $state = Join-Path $Root 'fixture-state.json'
+  $data = Join-Path $Root 'data'; $tmp = Join-Path $Root 'tmp'; $binlog = Join-Path $Root 'binlog'
+  $errorLog = Join-Path $Root 'mysql-error.log'; $consoleLog = Join-Path $Root 'mysql-console.log'
+  [IO.File]::WriteAllText($state, ([ordered]@{
+    mysqlRoot = $MysqlRoot; executablePath = (Join-Path $MysqlRoot 'bin\mysqld.exe'); port = $Port
+    processId = $ProcessId; iniPath = $Ini; credentialFile = $CredentialFile
+    dataDir = $data; tmpDir = $tmp; binlogDir = $binlog; errorLog = $errorLog; consoleLog = $consoleLog
+  } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+}
+
 function Invoke-AuthenticatedShutdown {
   param([string]$ClientFile)
   $shutdownClient = $ClientFile; $temporaryClient = $null
@@ -101,6 +122,15 @@ function Invoke-AuthenticatedShutdown {
   }
 }
 
+function Assert-FixtureProcessAlive {
+  param([string]$MysqlPath, [string]$Ini, [string]$Root, [Diagnostics.Process]$Process)
+  if (-not $Process -or $Process.HasExited) { throw 'MySQL morreu prematuramente antes do KeepAlive' }
+  $procs = @(Get-FixtureProcesses $MysqlPath $Ini $Root)
+  if (@($procs | Where-Object { $_.ProcessId -eq $Process.Id }).Count -ne 1) {
+    throw 'Processo exato do fixture MySQL nao esta vivo'
+  }
+}
+
 function Stop-FixtureServer {
   param([string]$Root, [string]$MysqlPath, [Diagnostics.Process]$Parent)
   $ini = Join-Path $Root 'mysql-fixture.ini'
@@ -109,6 +139,11 @@ function Stop-FixtureServer {
     $procs = @(Get-FixtureProcesses $MysqlPath $ini $Root)
     $parentAlive = $Parent -and -not $Parent.HasExited
     if ($procs.Count -eq 0 -and -not $parentAlive) { return }
+    if ($procs.Count -eq 0) {
+      if ($Parent -and -not $Parent.HasExited) { [void]$Parent.WaitForExit(500) }
+      Start-Sleep -Milliseconds 500
+      continue
+    }
     foreach ($client in $clients) {
       if (Test-Path -LiteralPath $client) {
         try { Invoke-AuthenticatedShutdown $client; break } catch { $lastShutdownError = $_.Exception.Message }
@@ -121,16 +156,27 @@ function Stop-FixtureServer {
 }
 
 function Cleanup-Fixture {
-  param([string]$Root, [string]$MysqlPath, [Diagnostics.Process]$Parent)
+  param([string]$Root, [string]$MysqlPath, [Diagnostics.Process]$Parent, [int]$Port = 0)
   $ini = Join-Path $Root 'mysql-fixture.ini'
+  $matchingBeforeShutdown = @(Get-FixtureProcesses $MysqlPath $ini $Root)
+  $fixturePids = @($matchingBeforeShutdown | ForEach-Object { [int]$_.ProcessId })
   Stop-FixtureServer $Root $MysqlPath $Parent
-  $procs = @(Get-FixtureProcesses $MysqlPath $ini $Root)
-  if ($procs.Count -ne 0) { throw 'Processo residual do fixture MySQL não encerrou' }
-  $procs = @(Get-FixtureProcesses $MysqlPath $ini $Root)
-  $fixturePids = @($procs | ForEach-Object { [int]$_.ProcessId })
+  $allProcs = @(Get-FixtureProcesses $MysqlPath $ini $Root)
+  if ($allProcs.Count -ne 0) { throw 'Processo residual do fixture MySQL nao encerrou' }
   if ((@(Get-FixtureListeners -ProcessIds $fixturePids)).Count -ne 0) { throw 'Listener do fixture MySQL permaneceu aberto' }
+  if ($Port -le 0) { throw 'Estado do fixture sem porta para provar ausencia de listener' }
+  Assert-FixtureListenerAbsent -Port $Port
+  $pathsToRemove = @(
+    (Join-Path $Root 'root-client.cnf'), (Join-Path $Root 'maintenance-client.cnf'),
+    (Join-Path $Root 'mysql-init.sql'), (Join-Path $Root 'data'), (Join-Path $Root 'tmp'),
+    (Join-Path $Root 'binlog'), (Join-Path $Root 'mysql-fixture.ini'),
+    (Join-Path $Root 'mysql-error.log'), (Join-Path $Root 'mysql-console.log'),
+    (Join-Path $Root 'fixture-state.json')
+  )
   if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
   if (Test-Path -LiteralPath $Root) { throw 'Datadir/tmp/logs do fixture não foram removidos' }
+  $residual = @($pathsToRemove | Where-Object { Test-Path -LiteralPath $_ })
+  if ($residual.Count -ne 0) { throw 'Credencial/datadir/tmp/logs do fixture nao foram removidos' }
 }
 
 function New-AvailablePort {
@@ -163,20 +209,24 @@ function Assert-PortAvailable {
   if (-not (Test-PortAvailable $Port)) { throw "Porta temporaria $Port ja esta ocupada; fixture recusada" }
 }
 
-if (-not $MysqlRoot) { $MysqlRoot = Split-Path -Parent ((Get-Command mysqld.exe -ErrorAction Stop).Source) }
-if (-not $NodeExecutable) { $NodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source }
-$MysqlRoot = [IO.Path]::GetFullPath($MysqlRoot).TrimEnd('\')
-$mysqld = Join-Path $MysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $MysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $MysqlRoot 'bin\mysqladmin.exe'
-foreach ($file in @($mysqld, $mysql, $mysqladmin)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Runtime MySQL incompleto: $file" } }
+if ($Action -eq 'Cleanup' -and -not $FixtureRoot) { throw 'Cleanup requer FixtureRoot para localizar o estado' }
 if (-not $FixtureRoot) { $FixtureRoot = Join-Path ($(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP })) ('sage-r2-02-mysql-' + [guid]::NewGuid().ToString('N')) }
 $FixtureRoot = Assert-TemporaryPath $FixtureRoot
 $state = Join-Path $FixtureRoot 'fixture-state.json'
 if ($Action -eq 'Cleanup') {
   if (-not (Test-Path -LiteralPath $state)) { throw 'Estado do fixture ausente; limpeza recusada' }
   $saved = Get-Content -LiteralPath $state -Raw | ConvertFrom-Json
-  $MysqlRoot = $saved.mysqlRoot; $mysqld = Join-Path $MysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $MysqlRoot 'bin\mysql.exe'
-  Cleanup-Fixture $FixtureRoot $mysqld; exit 0
+  if (-not $saved.mysqlRoot -or [int]$saved.port -le 0) { throw 'Estado do fixture sem runtime/porta; limpeza recusada' }
+  $MysqlRoot = [IO.Path]::GetFullPath([string]$saved.mysqlRoot).TrimEnd('\')
+  $mysqld = Join-Path $MysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $MysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $MysqlRoot 'bin\mysqladmin.exe'
+  foreach ($file in @($mysqld, $mysql, $mysqladmin)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Runtime MySQL incompleto: $file" } }
+  Cleanup-Fixture $FixtureRoot $mysqld $null -Port ([int]$saved.port); exit 0
 }
+if (-not $MysqlRoot) { $MysqlRoot = Split-Path -Parent ((Get-Command mysqld.exe -ErrorAction Stop).Source) }
+if (-not $NodeExecutable) { $NodeExecutable = (Get-Command node.exe -ErrorAction Stop).Source }
+$MysqlRoot = [IO.Path]::GetFullPath($MysqlRoot).TrimEnd('\')
+$mysqld = Join-Path $MysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $MysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $MysqlRoot 'bin\mysqladmin.exe'
+foreach ($file in @($mysqld, $mysql, $mysqladmin)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Runtime MySQL incompleto: $file" } }
 if (Test-Path -LiteralPath $FixtureRoot) { throw 'Diretório do fixture já existe; não reutilizar estado' }
 New-Item -ItemType Directory -Path $FixtureRoot, (Join-Path $FixtureRoot 'data'), (Join-Path $FixtureRoot 'tmp'), (Join-Path $FixtureRoot 'binlog') | Out-Null
 $data = Join-Path $FixtureRoot 'data'; $tmp = Join-Path $FixtureRoot 'tmp'; $binlog = Join-Path $FixtureRoot 'binlog\sage-r2-02-bin'; $errorLog = Join-Path $FixtureRoot 'mysql-error.log'; $consoleLog = Join-Path $FixtureRoot 'mysql-console.log'; $ini = Join-Path $FixtureRoot 'mysql-fixture.ini'
@@ -184,8 +234,7 @@ $port = New-AvailablePort
 Assert-PortAvailable $port
 $toIni = { param($p) $p.Replace('\', '/') }
 [IO.File]::WriteAllLines($ini, @('[mysqld]', "basedir=$(& $toIni $MysqlRoot)", "datadir=$(& $toIni $data)", "tmpdir=$(& $toIni $tmp)", "port=$port", "log-bin=$(& $toIni $binlog)", 'log-bin-trust-function-creators=1', 'server-id=20260827', 'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve', 'local-infile=OFF', 'innodb-flush-log-at-trx-commit=1', "log-error=$(& $toIni $errorLog)"), [Text.UTF8Encoding]::new($false))
-[IO.File]::WriteAllText($state, ([ordered]@{ mysqlRoot = $MysqlRoot; port = $port } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
-$server = $null; $envNames = @('DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_NAME','SAGE_ALLOW_FIRST_RUN_ONBOARDING','SAGE_INITIAL_ADMIN_LOGIN','SAGE_INITIAL_ADMIN_PASSWORD','SAGE_INITIAL_SCHOOL_NAME'); $oldEnv = @{}
+$server = $null; $keepAliveReady = $false; $primaryError = $null; $envNames = @('DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_NAME','SAGE_ALLOW_FIRST_RUN_ONBOARDING','SAGE_INITIAL_ADMIN_LOGIN','SAGE_INITIAL_ADMIN_PASSWORD','SAGE_INITIAL_SCHOOL_NAME'); $oldEnv = @{}
 try {
   $version = (Invoke-Native $mysqld @('--version')).Trim(); if ($version -notmatch '\b8\.4\.') { throw 'Runtime não é MySQL 8.4' }
   [void](Invoke-Native $mysqld @('--no-defaults', "--basedir=$MysqlRoot", "--datadir=$data", '--initialize-insecure'))
@@ -193,6 +242,7 @@ try {
   $rootClient = Join-Path $FixtureRoot 'root-client.cnf'; $maintenanceClient = Join-Path $FixtureRoot 'maintenance-client.cnf'; $initSql = Join-Path $FixtureRoot 'mysql-init.sql'
   [IO.File]::WriteAllText($rootClient, "[client]`nprotocol=MEMORY`nshared-memory-base-name=$sharedMemory`nuser=root`npassword=$rootSecret`n", [Text.UTF8Encoding]::new($false))
   [IO.File]::WriteAllText($maintenanceClient, "[client]`nprotocol=TCP`nhost=127.0.0.1`nport=$port`nuser=sage_maintenance`npassword=$maintenanceSecret`n", [Text.UTF8Encoding]::new($false))
+  Write-FixtureState $FixtureRoot $MysqlRoot $port $ini $maintenanceClient 0
   [IO.File]::WriteAllText($initSql, @"
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootSecret';
 CREATE DATABASE IF NOT EXISTS sage CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -206,6 +256,7 @@ GRANT ALL PRIVILEGES ON sage.* TO 'sage_maintenance'@'127.0.0.1';
   $bootstrapArgs = @('--defaults-file="' + $ini + '"', '--skip-networking', '--shared-memory', "--shared-memory-base-name=$sharedMemory", '--init-file="' + $initSql + '"')
   Assert-PortAvailable $port
   $server = Start-Process -FilePath $mysqld -ArgumentList $bootstrapArgs -RedirectStandardError $errorLog -RedirectStandardOutput $consoleLog -PassThru -WindowStyle Hidden
+  Write-FixtureState $FixtureRoot $MysqlRoot $port $ini $maintenanceClient $server.Id
   Wait-Ready $rootClient $server
   Write-Host 'readiness=bootstrap-authenticated-shared-memory'
   Stop-FixtureServer $FixtureRoot $mysqld $server
@@ -213,8 +264,10 @@ GRANT ALL PRIVILEGES ON sage.* TO 'sage_maintenance'@'127.0.0.1';
   if ($server) { $server.Dispose() }
   $server = $null
   [IO.File]::Delete($initSql)
+  [IO.File]::Delete($rootClient)
   Assert-PortAvailable $port
   $server = Start-Process -FilePath $mysqld -ArgumentList @('--defaults-file="' + $ini + '"') -RedirectStandardError $errorLog -RedirectStandardOutput $consoleLog -PassThru -WindowStyle Hidden
+  Write-FixtureState $FixtureRoot $MysqlRoot $port $ini $maintenanceClient $server.Id
   Wait-Ready $maintenanceClient $server
   Write-Host 'readiness=final-authenticated-tcp'
   foreach ($name in $envNames) { $oldEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
@@ -230,11 +283,33 @@ GRANT ALL PRIVILEGES ON sage.* TO 'sage_maintenance'@'127.0.0.1';
   $tables = @(Invoke-Sql $maintenanceClient "SELECT LOWER(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sage';"); foreach ($required in @('unidadeescolar','pessoa','dispositivo','acesso','turma')) { if ($tables -notcontains $required) { throw "Schema incompleto: $required" } }
   $counts = @(Invoke-Sql $maintenanceClient "SELECT COUNT(*) FROM sage.UnidadeEscolar UNION ALL SELECT COUNT(*) FROM sage.Pessoa UNION ALL SELECT COUNT(*) FROM sage.Dispositivo UNION ALL SELECT COUNT(*) FROM sage.Acesso UNION ALL SELECT COUNT(*) FROM sage.Turma;"); if (@($counts | Where-Object { $_.Trim() -ne '0' }).Count -ne 0) { throw 'Fixture criou entidade de domínio' }
   $grants = (Invoke-Sql $maintenanceClient 'SHOW GRANTS;') -join "`n"; if ($grants -notmatch 'sage_maintenance' -or $grants -match '(?i)SUPER|GRANT OPTION|GRANT ALL PRIVILEGES ON \*\.\*') { throw 'sage_maintenance possui privilégio amplo' }
-  Write-Host "evidence=R2-02-precond commit=$Commit platform=$((Get-CimInstance Win32_OperatingSystem).Caption) x64 mysql=$version port=$port bind=127.0.0.1 datadir=fixture tmpdir=fixture log_bin=$($parts[5]) trust_function_creators=$($parts[6]) schema=ready privileges=sage_maintenance-restricted entities=0"
-} finally {
+  Assert-FixtureProcessAlive $mysqld $ini $FixtureRoot $server
+  if ($Action -eq 'KeepAlive') {
+    Write-FixtureState $FixtureRoot $MysqlRoot $port $ini $maintenanceClient $server.Id
+    $keepAliveReady = $true
+    Write-Host "keepalive=ready connection=127.0.0.1:$port database=sage user=sage_maintenance credential-file=$maintenanceClient"
+  } else {
+    Write-Host "evidence=R2-02-precond commit=$Commit platform=$((Get-CimInstance Win32_OperatingSystem).Caption) x64 mysql=$version port=$port bind=127.0.0.1 datadir=fixture tmpdir=fixture log_bin=$($parts[5]) trust_function_creators=$($parts[6]) schema=ready privileges=sage_maintenance-restricted entities=0"
+  }
+}
+catch {
+  $primaryError = $_
+  throw
+}
+finally {
   foreach ($name in $envNames) { if ($null -eq $oldEnv[$name]) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue } else { Set-Item "Env:$name" $oldEnv[$name] } }
-  Cleanup-Fixture $FixtureRoot $mysqld $server
-  if ($server) { $server.Dispose() }
-  Write-Host 'cleanup=service-absent process=0 listener=0 datadir=0 tmpdir=0 logs=0'
+  try {
+    if (-not ($Action -eq 'KeepAlive' -and $keepAliveReady)) {
+      Cleanup-Fixture $FixtureRoot $mysqld $server -Port $port
+      Write-Host 'cleanup=service-absent process=0 listener=0 datadir=0 tmpdir=0 logs=0'
+    } else {
+      Write-Host 'cleanup=deferred action=Cleanup'
+    }
+  } catch {
+    if ($null -eq $primaryError) { throw }
+    Write-Warning "Falha na limpeza da fixture; erro original preservado: $($_.Exception.Message)"
+  } finally {
+    if ($server) { $server.Dispose() }
+  }
 }
 $global:LASTEXITCODE = 0
