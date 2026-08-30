@@ -62,7 +62,11 @@ const obterCartaoPorTipo = async (userId, tipo, session, deviceIp) => {
 
     return valoresFiltrados.at(0) || null;
   } catch (err) {
-    return null;
+    logger.error('[CATRACA] codigo=CATRACA_CARTAO_CONSULTA_FALHOU', {
+      operacao: 'obterCartaoPorTipo',
+      pessoa_id: userId
+    });
+    throw err;
   }
 };
 
