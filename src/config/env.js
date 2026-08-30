@@ -31,9 +31,15 @@ function assertSecurityConfiguration() {
       || process.env.MONITOR_IP_WHITELIST.split(',').map((ip) => ip.trim()).filter(Boolean).length === 0)) {
     throw new Error('Configuração inválida para MONITOR_IP_WHITELIST quando MONITOR_USE_PUSH=true. Consulte .env.example.');
   }
+  const chaveCredencialValida = (valor) => {
+    if (typeof valor !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(valor)) return false;
+    const base64 = valor.replace(/-/g, '+').replace(/_/g, '/') + '=';
+    return Buffer.from(base64, 'base64').length === 32;
+  };
   if (process.env.NODE_ENV === 'production'
-    && (typeof process.env.SAGE_DEVICE_CREDENTIAL_KEY !== 'string'
-      || !/^[A-Za-z0-9_-]+$/.test(process.env.SAGE_DEVICE_CREDENTIAL_KEY))) {
+    && (!chaveCredencialValida(process.env.SAGE_DEVICE_CREDENTIAL_KEY)
+      || (process.env.SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS !== undefined
+        && !chaveCredencialValida(process.env.SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS)))) {
     throw new Error('Configuração inválida para SAGE_DEVICE_CREDENTIAL_KEY. Consulte .env.example.');
   }
 }

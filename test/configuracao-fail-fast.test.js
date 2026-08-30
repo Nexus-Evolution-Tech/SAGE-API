@@ -26,6 +26,15 @@ async function executar(modulo, env) {
   }
 }
 
+async function executarValidacaoDeSeguranca(env) {
+  try {
+    await execFileAsync(process.execPath, ['-e', `require(${JSON.stringify(ENV)}).assertSecurityConfiguration()`], { cwd: RAIZ, env });
+    return { code: 0, output: '' };
+  } catch (erro) {
+    return { code: erro.code, output: `${erro.stdout || ''}${erro.stderr || ''}` };
+  }
+}
+
 async function lerJobs(env) {
   const script = `process.stdout.write(JSON.stringify(require(${JSON.stringify(ENV)}).config.jobs))`;
   const { stdout } = await execFileAsync(process.execPath, ['-e', script], { cwd: RAIZ, env });
@@ -98,5 +107,29 @@ describe('R0-03 — configuração fail-fast', () => {
 
     expect(resultado.code).not.toBe(0);
     expect(resultado.output).toContain('SAGE_DATA_DIR');
+  });
+
+  it.each([
+    ['curta', 'A'.repeat(42)],
+    ['com caractere inválido', `${'A'.repeat(42)}!`]
+  ])('recusa chave de credencial de catraca %s em produção', async (_descricao, valor) => {
+    const resultado = await executarValidacaoDeSeguranca(ambiente({
+      SAGE_DATA_DIR: dataDir,
+      SAGE_DEVICE_CREDENTIAL_KEY: valor
+    }));
+
+    expect(resultado.code).not.toBe(0);
+    expect(resultado.output).toContain('SAGE_DEVICE_CREDENTIAL_KEY');
+  });
+
+  it('recusa chave anterior de credencial inválida durante rotação', async () => {
+    const resultado = await executarValidacaoDeSeguranca(ambiente({
+      SAGE_DATA_DIR: dataDir,
+      SAGE_DEVICE_CREDENTIAL_KEY: 'A'.repeat(43),
+      SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS: 'B'.repeat(42)
+    }));
+
+    expect(resultado.code).not.toBe(0);
+    expect(resultado.output).toContain('SAGE_DEVICE_CREDENTIAL_KEY');
   });
 });
