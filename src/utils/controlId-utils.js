@@ -79,7 +79,7 @@ const criarUsuario = async (catracaUserId, novaPessoa, link, session, dispositiv
   let userId;
   try {
     const response = await axios.post(
-      `http://${link}/create_objects.fcgi?session=${session}`,
+      `http://${link}/create_or_update_objects.fcgi?session=${session}`,
       userPayload,
       { headers: { "Content-Type": "application/json" } }
     );
@@ -168,7 +168,7 @@ const criarCartao = async (id, value, link, session, dispositivo, resultados) =>
     }]
   };
   try {
-    await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, cardPayload, { headers: { "Content-Type": "application/json" } });
+    await axios.post(`http://${link}/create_or_update_objects.fcgi?session=${session}`, cardPayload, { headers: { "Content-Type": "application/json" } });
   } catch (error) {
     throw new Error(
       `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
@@ -232,7 +232,7 @@ const criarGrupo = async (id, link, session, dispositivo, resultados) => {
       }]
     };
     try {
-      await axios.post(`http://${link}/create_objects.fcgi?session=${session}`, groupPayload, { headers: { "Content-Type": "application/json" } });
+      await axios.post(`http://${link}/create_or_update_objects.fcgi?session=${session}`, groupPayload, { headers: { "Content-Type": "application/json" } });
     } catch (err) {
       throw new Error(
         `Erro ao criar usuário na catraca ${dispositivo.nome}: ${
