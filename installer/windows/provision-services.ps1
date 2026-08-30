@@ -199,11 +199,11 @@ Assert-ServiceRecord 'SAGEAPI' @("`"$winsw`"", $winsw)
 foreach ($name in @('SAGEMySQL', 'SAGEAPI')) {
   Invoke-NativeChecked $sc @('sidtype', $name, 'unrestricted')
 }
-Invoke-NativeChecked $sc @(
-  'failure', 'SAGEMySQL', 'reset=', '3600',
-  'actions=', 'restart/5000/restart/30000/restart/120000'
-)
-Invoke-NativeChecked $sc @('failureflag', 'SAGEMySQL', '1')
+$failureActions = 'restart/5000/restart/30000/restart/120000'
+foreach ($name in @('SAGEMySQL', 'SAGEAPI')) {
+  Invoke-NativeChecked $sc @('failure', $name, 'reset=', '3600', 'actions=', $failureActions)
+  Invoke-NativeChecked $sc @('failureflag', $name, '1')
+}
 if ((Get-Service SAGEAPI).RequiredServices.Name -notcontains 'SAGEMySQL') {
   throw 'SAGEAPI não depende de SAGEMySQL'
 }

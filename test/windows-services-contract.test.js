@@ -47,6 +47,10 @@ describe('serviços Windows privados do SAGE', () => {
   it('aplica backoff, rotação limitada e readiness real', () => {
     expect(xml).toContain('<onfailure action="restart" delay="5 sec"/>');
     expect(xml).toContain('<onfailure action="restart" delay="120 sec"/>');
+    expect(script).toContain("$failureActions = 'restart/5000/restart/30000/restart/120000'");
+    expect(script).toContain("foreach ($name in @('SAGEMySQL', 'SAGEAPI'))");
+    expect(script).toContain("'failure', $name, 'reset=', '3600'");
+    expect(script).toContain("'failureflag', $name, '1'");
     expect(xml).toContain('<log mode="roll-by-size">');
     expect(xml).toContain('<sizeThreshold>10240</sizeThreshold>');
     expect(xml).toContain('<keepFiles>8</keepFiles>');
