@@ -173,6 +173,54 @@ function Write-PrivateTextOnce {
   if ([IO.File]::ReadAllText($Path) -cne $ExpectedContent) { throw "Arquivo privado divergente: $Path" }
 }
 
+function Ensure-DeviceCredentialKeys {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return }
+  Assert-RegularLocalPath $Path
+  Assert-PrivateAcl $Path
+  $lines = [Collections.Generic.List[string]]::new()
+  $found = @{}
+  foreach ($line in [IO.File]::ReadAllLines($Path)) {
+    $lines.Add($line)
+    if ($line -match '^([A-Z][A-Z0-9_]*)=(.+)$') { $found[$Matches[1]] = $true }
+  }
+  $missing = @('SAGE_DEVICE_CREDENTIAL_KEY', 'SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS') |
+    Where-Object { -not $found.ContainsKey($_) }
+  if (@($missing).Count -eq 0) { return }
+  foreach ($key in $missing) { $lines.Add("$key=$(New-Secret)") }
+
+  $partial = "$Path.partial-$PID-$([guid]::NewGuid().ToString('N'))"
+  $writer = $null
+  try {
+    $stream = [IO.FileStream]::new($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write,
+      [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough)
+    try {
+      $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false))
+      foreach ($line in $lines) { $writer.WriteLine($line) }
+      $writer.Flush(); $stream.Flush($true)
+    } finally {
+      if ($null -ne $writer) { $writer.Dispose() } else { $stream.Dispose() }
+    }
+    New-PrivateAcl $partial $false
+    [IO.File]::Move($partial, $Path, $true)
+  } finally {
+    if (Test-Path -LiteralPath $partial) { [IO.File]::Delete($partial) }
+  }
+  Assert-Config $Path ([ordered]@{
+    NODE_ENV='production'; PORT='3000'; SAGE_DATA_DIR=$dataRoot; SAGE_REQUIRE_WEB='true'
+    DB_HOST='127.0.0.1'; DB_PORT='3307'; DB_USER='sage_runtime'; DB_PASSWORD=$secretMarker
+    DB_NAME='sage'; REDIS_ENABLED='false'; JWT_SECRET=$secretMarker
+    SAGE_DEVICE_CREDENTIAL_KEY=$secretMarker; SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS=$secretMarker
+    MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=$secretMarker
+    SYNC_CHECK_INTERVAL='*/5 * * * *'; SYNC_BATCH_SIZE='50'; HEALTH_CHECK_INTERVAL='60000'; PROMOCAO_CRON='false'; BACKUP_CRON='0 3 * * *'
+    MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
+    MYSQL_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysql.exe')
+    SAGE_REQUIRE_MAINTENANCE_DB='true'
+    SAGE_MAINTENANCE_CONFIG_FILE=(Join-Path $configDir 'maintenance.env')
+    MYSQL_DEFAULTS_EXTRA_FILE=(Join-Path $configDir 'maintenance-client.cnf')
+  })
+}
+
 $mutex = [Threading.Mutex]::new($false, 'Global\SAGE-State-Initialization')
 $lockTaken = $false
 try {
@@ -196,10 +244,13 @@ foreach ($name in $directories) {
 }
 
 $configDir = Join-Path $dataRoot 'config'
+Ensure-DeviceCredentialKeys (Join-Path $configDir 'sage.env')
 Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   NODE_ENV='production'; PORT='3000'; SAGE_DATA_DIR=$dataRoot; SAGE_REQUIRE_WEB='true'
   DB_HOST='127.0.0.1'; DB_PORT='3307'; DB_USER='sage_runtime'; DB_PASSWORD=$secretMarker
   DB_NAME='sage'; REDIS_ENABLED='false'; JWT_SECRET=$secretMarker
+  SAGE_DEVICE_CREDENTIAL_KEY=$secretMarker
+  SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS=$secretMarker
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=$secretMarker
   SYNC_CHECK_INTERVAL='*/5 * * * *'; SYNC_BATCH_SIZE='50'; HEALTH_CHECK_INTERVAL='60000'; PROMOCAO_CRON='false'; BACKUP_CRON='0 3 * * *'
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')
@@ -212,6 +263,8 @@ Write-ConfigOnce (Join-Path $configDir 'sage.env') ([ordered]@{
   NODE_ENV='production'; PORT='3000'; SAGE_DATA_DIR=$dataRoot; SAGE_REQUIRE_WEB='true'
   DB_HOST='127.0.0.1'; DB_PORT='3307'; DB_USER='sage_runtime'; DB_PASSWORD=(New-Secret)
   DB_NAME='sage'; REDIS_ENABLED='false'; JWT_SECRET=(New-Secret 48)
+  SAGE_DEVICE_CREDENTIAL_KEY=(New-Secret)
+  SAGE_DEVICE_CREDENTIAL_KEY_PREVIOUS=(New-Secret)
   MONITOR_USE_PUSH='false'; MONITOR_POLLING_INTERVAL_MS='20000'; MONITOR_CALLBACK_TOKEN=(New-Secret)
   SYNC_CHECK_INTERVAL='*/5 * * * *'; SYNC_BATCH_SIZE='50'; HEALTH_CHECK_INTERVAL='60000'; PROMOCAO_CRON='false'; BACKUP_CRON='0 3 * * *'
   MYSQLDUMP_PATH=(Join-Path $programRoot 'runtime\mysql\bin\mysqldump.exe')

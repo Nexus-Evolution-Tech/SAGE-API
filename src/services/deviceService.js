@@ -7,6 +7,7 @@ const ErroDispositivo = require('../errors/ErroDispositivo');
 const saudeDispositivos = require('./saudeDispositivos');
 const { ORDEM_ZERAR_CATRACA } = require('../config/syncOrder');
 const { paths } = require('../config/paths');
+const { prepararDispositivoParaOperacao } = require('../utils/credenciaisDispositivo');
 
 const CHUNK_SIZE = parseInt(process.env.CATRACA_BACKUP_CHUNK_SIZE || '2000', 10);
 
@@ -88,11 +89,12 @@ function linkCatraca(dispositivo) {
 
 async function obterSessao(linkCatraca, dispositivo, forceNew = false) {
   try {
+    const dispositivoOperacional = prepararDispositivoParaOperacao(dispositivo);
     const session = await withRetryOnUnavailable(async () => {
       logger.debug(` Criando nova sessão: ${dispositivo.nome}`);
       const response = await axiosInstance.post(`http://${linkCatraca}/login.fcgi`, {
-        login: dispositivo.usuario,
-        password: dispositivo.senha
+        login: dispositivoOperacional.usuario,
+        password: dispositivoOperacional.senha
       });
       const s = response.data?.session;
       if (!s) throw new Error('Sessão não retornada pela catraca');

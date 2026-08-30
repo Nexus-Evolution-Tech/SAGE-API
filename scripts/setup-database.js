@@ -8,6 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { ensureLegacyBaseline } = require('./legacy-baseline');
 const { runMigrations } = require('./migration-runner');
+const { migrarCredenciaisDispositivos } = require('../src/utils/credenciaisDispositivo');
 const APP_VERSION = process.env.SAGE_APP_VERSION || require('../package.json').version;
 
 // Configuração do banco (agora com variáveis do .env carregadas)
@@ -417,6 +418,10 @@ async function setupBancoDados() {
       appVersion: APP_VERSION,
       migrationsDir: path.join(migrationsDir, 'migrations')
     });
+    const credenciais = await migrarCredenciaisDispositivos(migrationConnection);
+    if (credenciais.migrados > 0) {
+      logger.info(` Credenciais de dispositivos protegidas: ${credenciais.migrados} registro(s), ${credenciais.rotacionados} rotacionado(s)`);
+    }
   } finally {
     await migrationConnection.end().catch(() => {});
   }

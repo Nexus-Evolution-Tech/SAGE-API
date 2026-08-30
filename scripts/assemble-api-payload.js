@@ -47,7 +47,7 @@ const SOURCE_FILES = Object.freeze(Object.entries({
     'promocaoAlunosService.js', 'protecaoLogs.js', 'readinessService.js', 'sanitizador.js',
     'saudeDispositivos.js', 'sync.js', 'assistentePrimeiraExecucaoService.js'],
   state: ['globalState.js'],
-  utils: ['ajustaFusoHorario.js', 'controlId-utils.js', 'converterPngBase64.js', 'criptografia.js',
+  utils: ['ajustaFusoHorario.js', 'controlId-utils.js', 'converterPngBase64.js', 'credenciaisDispositivo.js', 'criptografia.js',
     'generic-db-utils.js', 'gerarCardValue.js', 'gerarNumero8Digitos.js', 'jwt.js',
     'people-db-utils.js', 'photo-user-utils.js', 'responderErroInterno.js', 'syncFlags.js', 'sync_catracas.js'],
   websocket: ['wsServer.js']

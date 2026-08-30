@@ -17,6 +17,7 @@ const { paths, isInside } = require('../config/paths');
 const { projetarRegistro } = require('../config/projecoes');
 const backupBanco = require('../services/backupBanco');
 const { responderErroInterno } = require('../utils/responderErroInterno');
+const { protegerDadosDispositivo } = require('../utils/credenciaisDispositivo');
 const {
   ACOES,
   validarAutor,
@@ -814,7 +815,7 @@ const controllerGenerico = gerarController(tabela, campos, 'dispositivo');
 /** Criar dispositivo e já configurar o Monitor na catraca para monitoramento em tempo real */
 async function criar(req, res) {
   try {
-    const dados = { ...req.body };
+    const dados = protegerDadosDispositivo({ ...req.body });
     const cols = camposInsert.filter((c) => dados[c] !== undefined);
     const values = cols.map((c) => dados[c]);
     const placeholders = cols.map(() => '?').join(', ');

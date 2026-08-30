@@ -48,6 +48,7 @@ describe('contrato do estado privado no Windows', () => {
     expect(source).toContain("'sage.env'");
     expect(source).toContain("'maintenance.env'");
     expect(source).toContain("'maintenance-client.cnf'");
+    expect(source).toContain('SAGE_DEVICE_CREDENTIAL_KEY');
     expect(source).toContain("'shutdown-client.cnf'");
     expect(source).toContain("'user=sage_maintenance'");
     expect(source).toContain("'user=sage_shutdown'");

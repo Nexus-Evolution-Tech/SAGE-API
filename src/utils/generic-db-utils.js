@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const projecoes = require('../config/projecoes');
+const { protegerDadosDispositivo } = require('./credenciaisDispositivo');
 
 const ERROS_ESCRITA = new Set(['ESCRITA_CHAVE_NAO_DECLARADA', 'ESCRITA_NENHUM_CAMPO_APLICAVEL']);
 
@@ -50,8 +51,11 @@ async function buscarPorId(id, tabela, campos = ['*']) {
 
 async function criarRegistro(tabela, dados, connection = db) {
   const filtrado = filtrarDadosDeEscrita(tabela, dados);
-  const campos = Object.keys(filtrado.dados);
-  const valores = Object.values(filtrado.dados);
+  const dadosProtegidos = tabela === 'Dispositivo'
+    ? protegerDadosDispositivo(filtrado.dados)
+    : filtrado.dados;
+  const campos = Object.keys(dadosProtegidos);
+  const valores = Object.values(dadosProtegidos);
 
   const placeholders = campos.map(() => '?').join(', ');
 
@@ -62,14 +66,17 @@ async function criarRegistro(tabela, dados, connection = db) {
   projecoes.exigirProjecao(tabela);
   const colunas = projecoes.colunasDeLeitura(tabela);
   const [rows] = await connection.query(`SELECT ${colunas.join(', ')} FROM ${tabela} WHERE id = ?`, [insertId]);
-  const registro = rows[0] || { id: insertId, ...filtrado.dados };
+  const registro = rows[0] || { id: insertId, ...dadosProtegidos };
   return anexarIgnorados(projecoes.projetarRegistro(tabela, registro), filtrado.ignorados);
 }
 
 async function atualizarRegistro(tabela, id, updates, connection = db) {
   const filtrado = filtrarDadosDeEscrita(tabela, updates);
-  const campos = Object.keys(filtrado.dados);
-  const valores = Object.values(filtrado.dados);
+  const dadosProtegidos = tabela === 'Dispositivo'
+    ? protegerDadosDispositivo(filtrado.dados)
+    : filtrado.dados;
+  const campos = Object.keys(dadosProtegidos);
+  const valores = Object.values(dadosProtegidos);
 
   const setClauses = campos.map(campo => `${campo} = ?`).join(', ');
   const query = `UPDATE ${tabela} SET ${setClauses} WHERE id = ?`;

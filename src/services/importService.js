@@ -3,6 +3,7 @@ const fs = require('fs');
 const peopleService = require('./peopleService');
 const db = require('../config/database');
 const { hashSenha } = require('../utils/criptografia');
+const { protegerDadosDispositivo } = require('../utils/credenciaisDispositivo');
 const { registrarSyncPendente, registrarSyncPendentesEmLote } = require('./sync');
 const { listarTodos: listarDispositivos } = require('./deviceService');
 const logger = require('../config/logger');
@@ -214,6 +215,10 @@ async function upsertCatracas(sheet, summary) {
       continue;
     }
 
+    const credenciaisProtegidas = protegerDadosDispositivo({
+      usuario: cleanValue(row['Usuário'] || row.Usuario),
+      senha: cleanValue(row.Senha)
+    });
     await db.query(
       'INSERT INTO Dispositivo (nome, modelo, endereco, porta, usuario, senha, area_id, numero_serial, sync_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -221,8 +226,8 @@ async function upsertCatracas(sheet, summary) {
         cleanValue(row.Modelo),
         cleanValue(row['Endereço'] || row.Endereco),
         cleanValue(row.Porta),
-        cleanValue(row['Usuário'] || row.Usuario),
-        cleanValue(row.Senha),
+        credenciaisProtegidas.usuario,
+        credenciaisProtegidas.senha,
         null,
         cleanValue(row['Número Serial'] || row['Numero Serial']),
         0
