@@ -1,6 +1,8 @@
 const http = require('http');
 const bcrypt = require('bcrypt');
-const { criarBancoDeTeste } = require('./helpers/banco');
+const { criarBancoDeTeste, temBancoDisponivel } = require('./helpers/banco');
+
+const describeDatabase = (await temBancoDisponivel()) ? describe : describe.skip;
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'teste-r2-02a-segredo-sintetico-32';
 process.env.NODE_ENV = 'test';
@@ -32,6 +34,7 @@ const secretaria = () => ({ Authorization: `Bearer ${secretariaToken}` });
 const versao = (n) => ({ ...admin(), 'If-Match': `"${n}"` });
 const retomar = (step, n, body, headers = {}) => requisitar('POST', `/onboarding/steps/${step}/resume`, body, { ...versao(n), ...headers });
 
+describeDatabase('R2-02A — estado do assistente de primeira execução', () => {
 beforeAll(async () => {
   banco = await criarBancoDeTeste('r2_02a_estado_assistente');
   process.env.DB_NAME = banco.nome;
@@ -147,4 +150,5 @@ it('10. banco, resposta e logs não contêm campos proibidos nem PII', async () 
   expect(JSON.stringify({ resposta, leitura, estado, logs: log.mock.calls })).not.toContain(segredo);
   expect(Object.keys(leitura.body)).toEqual(['status', 'current_step', 'completed_steps', 'next_step', 'version']);
   log.mockRestore();
+});
 });

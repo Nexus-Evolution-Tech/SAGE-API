@@ -13,6 +13,13 @@ if (explicitConfigFile && !path.isAbsolute(explicitConfigFile)) {
   throw new Error('SAGE_CONFIG_FILE deve ser um caminho absoluto');
 }
 
+// Em produção, a configuração precisa apontar explicitamente para o diretório
+// persistente. Não carregue o .env do release para tentar preencher essa lacuna:
+// isso permitiria que o processo gravasse estado ao lado do código.
+if (process.env.NODE_ENV === 'production' && !dataDir) {
+  throw new Error('SAGE_DATA_DIR deve ser configurado em produção para guardar estado fora do release');
+}
+
 const configFile = explicitConfigFile
   ? explicitConfigFile
   : dataDir
@@ -43,10 +50,6 @@ function assertSecurityConfiguration() {
     throw new Error('Configuração inválida para SAGE_DEVICE_CREDENTIAL_KEY. Consulte .env.example.');
   }
 }
-if (process.env.NODE_ENV === 'production' && !process.env.SAGE_DATA_DIR) {
-  throw new Error('SAGE_DATA_DIR deve ser configurado em produção para guardar estado fora do release');
-}
-
 const numericEnvironment = Object.freeze({
   PORT: [3000, 1, 65535], DB_PORT: [3306, 1, 65535], DB_CONNECTION_LIMIT: [10, 1, 100], DB_QUEUE_LIMIT: [100, 0, 10000],
   REDIS_PORT: [6379, 1, 65535], REDIS_DB: [0, 0, 15], SMTP_PORT: [587, 1, 65535],
