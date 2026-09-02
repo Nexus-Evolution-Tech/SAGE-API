@@ -17,6 +17,9 @@ const REQUIRED_COLUMNS = Object.freeze([
   'HorarioAula.divisao',
   'HorarioAula.horario',
   'Presenca.horario_previsto',
+  'CalendarioEscolar.data',
+  'ExpectativaPresencaSlot.pessoa_id',
+  'Excecao.id',
   'ConfigSistema.chave',
   'sync_pendente.id'
 ]);
