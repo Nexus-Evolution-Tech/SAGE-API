@@ -16,6 +16,8 @@
  * de sincronização, que é estado **de trabalho** e precisa sobreviver a desligamento (Fase 5).
  */
 
+const { sanitizarTexto } = require('./sanitizador');
+
 /** @type {Map<number, object>} */
 const registro = new Map();
 
@@ -95,7 +97,7 @@ function descreverParaOperador(saude, referencia = new Date()) {
     };
   }
 
-  const nome = saude.nome || 'Catraca';
+  const nome = sanitizarTexto(saude.nome || 'Catraca');
 
   if (saude.falhasConsecutivas === 0 && saude.ultimoSucessoEm) {
     return { nivel: 'ok', texto: `${nome}: funcionando normalmente.` };
@@ -116,7 +118,7 @@ function descreverParaOperador(saude, referencia = new Date()) {
       nivel: 'atencao',
       texto:
         `${nome}: respondeu, mas recusou a operação desde ${desde}. ` +
-        `Motivo informado: ${saude.ultimoMotivo}. ` +
+        `Motivo técnico informado: ${sanitizarTexto(saude.ultimoMotivo)}. ` +
         'Normalmente isso é usuário ou senha da catraca incorretos no cadastro do dispositivo.'
     };
   }

@@ -9,8 +9,10 @@ describe('R1-04D — erro interno e boot de rotas', () => {
     const spy = vi.spyOn(logger, 'error').mockImplementation(() => logger);
     responderErroInterno(response, new Error('falha CPF 123.456.789-09'), 'Falha pública');
     const body = response.json.mock.calls[0][0];
-    expect(Object.keys(body)).toEqual(['error', 'traceId']);
+    expect(Object.keys(body)).toEqual(['error', 'codigo', 'ocorrencia', 'traceId']);
     expect(body.error).toBe('Falha pública');
+    expect(body.codigo).toBe('SAGE-HTTP-500');
+    expect(body.ocorrencia).toMatch(/^[A-Z0-9_-]{8}$/);
     expect(spy.mock.calls[0][1].traceId).toBe(body.traceId);
     expect(spy.mock.calls[0][1].detalhe).not.toBeInstanceOf(Error);
     expect(JSON.stringify(spy.mock.calls[0][1])).not.toContain('123.456.789-09');

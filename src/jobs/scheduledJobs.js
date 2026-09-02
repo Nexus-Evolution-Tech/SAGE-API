@@ -6,6 +6,8 @@ const promocaoAlunosService = require('../services/promocaoAlunosService');
 const { emitNotification } = require('../services/notificationService');
 const db = require('../config/database');
 const { isSyncEnabled } = require('../utils/syncFlags');
+const heartbeat = require('../services/heartbeat');
+const saudeDispositivos = require('../services/saudeDispositivos');
 
 const listarTodos = async () => {
   const [result] = await db.query('SELECT * FROM Dispositivo');
@@ -13,6 +15,13 @@ const listarTodos = async () => {
 };
 
 const CATRACA_SYNC_ENABLED = config.jobs.catracaSyncEnabled;
+
+const heartbeatJob = () => heartbeat.iniciarHeartbeat({
+  db,
+  saude: saudeDispositivos,
+  intervalMs: config.jobs.heartbeatIntervalMs,
+  maxCatracaAgeSeconds: config.jobs.heartbeatMaxCatracaAgeSeconds
+});
 
 // Job de sincronização de acessos (a cada 10 min — backup)
 const sincronizarAcessosJob = () => {
@@ -309,7 +318,8 @@ const iniciarJobs = () => {
     syncAcessos: sincronizarAcessosJob(),
     monitorPolling: pollingMonitoramentoJob(),
     promocaoAlunos: promocaoAlunosJob(),
-    backupBanco: backupBancoJob()
+    backupBanco: backupBancoJob(),
+    heartbeat: heartbeatJob()
   };
   if (jobs.monitorPolling) {
     logger.info(`[MONITOR] Polling de acessos a cada ${MONITOR_POLLING_INTERVAL_MS / 1000}s (tempo quase real)`);
@@ -328,6 +338,7 @@ const pararJobs = (jobs) => {
   if (jobs.monitorPolling) clearInterval(jobs.monitorPolling);
   if (jobs.promocaoAlunos) jobs.promocaoAlunos.stop();
   if (jobs.backupBanco) jobs.backupBanco.stop();
+  if (jobs.heartbeat) clearInterval(jobs.heartbeat);
 };
 
 module.exports = {
@@ -339,5 +350,6 @@ module.exports = {
   healthCheckCatracasJob,
   sincronizarAcessosJob,
   pollingMonitoramentoJob,
-  promocaoAlunosJob
+  promocaoAlunosJob,
+  heartbeatJob
 };

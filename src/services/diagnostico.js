@@ -15,6 +15,7 @@
 const os = require('os');
 const path = require('path');
 const fs = require('fs').promises;
+const { randomUUID } = require('crypto');
 const { sanitizar, sanitizarConfiguracao } = require('./sanitizador');
 const saudeDispositivos = require('./saudeDispositivos');
 const logger = require('../config/logger');
@@ -127,6 +128,12 @@ async function gerarBundle({ db, backupBanco } = {}) {
   }
 
   const bruto = {
+    manifesto: {
+      schemaVersion: 1,
+      tipo: 'diagnostico-sage',
+      id: randomUUID(),
+      secoes: ['manifesto', 'aplicacao', 'ambiente', 'disco', 'autoDiagnostico', 'dispositivos', 'backups', 'configuracao']
+    },
     geradoEm: new Date().toISOString(),
     aplicacao: pacote,
     ambiente: {

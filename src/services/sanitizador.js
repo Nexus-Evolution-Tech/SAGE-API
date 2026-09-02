@@ -28,7 +28,7 @@ const CAMPOS_PESSOAIS = new Set([
 
 /** Campos técnicos seguros: ids, contadores, códigos, estados. */
 const CAMPOS_TECNICOS_PERMITIDOS = new Set([
-  'id', 'pessoa_id', 'dispositivo_id', 'unidade_id', 'turma_id', 'curso_id', 'area_id',
+  'id', 'pessoa_id', 'dispositivo_id', 'unidade_id', 'turma_id', 'curso_id', 'area_id', 'schemaVersion',
   'aluno_id', 'professor_id', 'materia_id', 'sala_id', 'aula_id', 'control_id_device_id',
   'status', 'nivel', 'tipo', 'operacao', 'operation', 'metodo_auth', 'permitido',
   'total', 'count', 'n', 'quantidade', 'acessos', 'processados', 'ignorados',
@@ -60,8 +60,13 @@ const REDIGIDO = '[REDIGIDO]';
 /** Padrões que denunciam dado pessoal dentro de texto livre (mensagem de erro, stack, log). */
 const PADROES = [
   { nome: 'cpf', re: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g },
+  // RG varia entre estados; só redigimos quando o texto identifica explicitamente o campo.
+  { nome: 'rg', re: /\b(?:rg|registro\s+geral)\s*[:#-]?\s*[A-Z0-9.-]{5,14}\b/gi },
   { nome: 'email', re: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g },
   { nome: 'telefone', re: /\b\(?\d{2}\)?\s?9?\d{4}-?\d{4}\b/g },
+  // JWT aparece com frequência em mensagens de cliente HTTP e stack traces.
+  { nome: 'jwt', re: /\bBearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/gi },
+  { nome: 'jwt', re: /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
   // Caminhos de foto guardam o id da pessoa e às vezes o nome do arquivo original
   { nome: 'caminho_foto', re: /uploads[\/\\][\w\/\\.-]+/gi }
 ];

@@ -82,7 +82,9 @@ describe('R0-03 — configuração fail-fast', () => {
       syncCheckInterval: '*/5 * * * *',
       catracaSyncEnabled: true,
       promocaoCron: 'false',
-      backupCron: '0 3 * * *'
+      backupCron: '0 3 * * *',
+      heartbeatIntervalMs: 300000,
+      heartbeatMaxCatracaAgeSeconds: 1800
     });
   });
 

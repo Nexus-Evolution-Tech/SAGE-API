@@ -65,6 +65,7 @@ const numericEnvironment = Object.freeze({
   HEALTH_CHECK_INTERVAL: [60000, 1000, 3600000], SYNC_BATCH_SIZE: [50, 1, 1000], SYNC_PARALLEL_LIMIT: [3, 1, 100],
   SYNC_PASSO_PONTEIRO: [25, 1, 100000], REQUEST_TIMEOUT: [30000, 1, 3600000], IMPORT_TIMEOUT_MS: [300000, 1, 3600000],
   UPLOAD_MAX_SIZE_MB: [25, 1, 1024], WS_PING_INTERVAL: [30000, 1, 3600000], WS_PING_TIMEOUT: [60000, 1, 3600000],
+  HEARTBEAT_INTERVAL_MS: [300000, 1000, 3600000], HEARTBEAT_MAX_CATARACA_AGE_SECONDS: [1800, 1, 86400],
   BACKUP_MAX_HORAS: [24, 1, 8760], BACKUP_RETER_DIAS: [14, 1, 3650], BACKUP_RETER_MINIMO: [3, 1, 1000],
   SAGE_RUNTIME_SCHEMA_RETRY_ATTEMPTS: [10, 1, 10], SAGE_RUNTIME_SCHEMA_RETRY_DELAY_MS: [3000, 1, 10000]
 });
@@ -93,6 +94,8 @@ const config = Object.freeze({
     healthCheckIntervalMs: numericConfig.HEALTH_CHECK_INTERVAL,
     syncBatchSize: numericConfig.SYNC_BATCH_SIZE,
     syncCheckInterval: process.env.SYNC_CHECK_INTERVAL || '*/5 * * * *',
+    heartbeatIntervalMs: numericConfig.HEARTBEAT_INTERVAL_MS,
+    heartbeatMaxCatracaAgeSeconds: numericConfig.HEARTBEAT_MAX_CATARACA_AGE_SECONDS,
     promocaoCron: (process.env.PROMOCAO_CRON || 'false').trim(),
     backupCron: (process.env.BACKUP_CRON || '0 3 * * *').trim()
   })

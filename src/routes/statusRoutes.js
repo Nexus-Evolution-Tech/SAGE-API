@@ -23,8 +23,17 @@ const backupBanco = require('../services/backupBanco');
 const diagnostico = require('../services/diagnostico');
 const { publica } = require('../middlewares/autorizacao');
 const { responderErroInterno } = require('../utils/responderErroInterno');
+const { sanitizarTexto } = require('../services/sanitizador');
 
 const router = express.Router();
+
+function codigoStatus({ banco, dispositivos, pendencias, ultimoBackup }) {
+  if (!banco?.ok) return 'DB';
+  if (dispositivos.some(({ nivel }) => nivel === 'erro')) return 'CT';
+  if ((pendencias || 0) > 0) return 'SY';
+  if (!ultimoBackup) return 'BK';
+  return 'OK';
+}
 
 router.get('/status', publica(), async (req, res) => {
   const inicio = Date.now();
@@ -52,7 +61,7 @@ router.get('/status', publica(), async (req, res) => {
     if (descricao.nivel === 'erro' || descricao.nivel === 'atencao') problemas.push(descricao.texto);
     return {
       dispositivo_id: d.dispositivo_id,
-      nome: d.nome,
+      nome: sanitizarTexto(d.nome),
       nivel: descricao.nivel,
       texto: descricao.texto,
       falhasConsecutivas: d.falhasConsecutivas,
@@ -106,8 +115,10 @@ router.get('/status', publica(), async (req, res) => {
 
   const tudoBem = problemas.length === 0 && banco.ok;
 
+  const status = { banco, dispositivos, pendencias, ultimoBackup };
   res.json({
     tudoBem,
+    codigoStatus: codigoStatus(status),
     // A frase que a pessoa lê primeiro. Se estiver tudo bem, ela não precisa ler mais nada.
     resumo: tudoBem
       ? 'Tudo funcionando normalmente.'
@@ -150,3 +161,4 @@ router.get('/diagnostico', publica(), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.codigoStatus = codigoStatus;
