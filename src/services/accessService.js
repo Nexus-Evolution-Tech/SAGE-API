@@ -126,6 +126,7 @@ async function inserirAcessoComPresenca(dados, dataHoraAcesso) {
     await conexao.beginTransaction();
     const inserido = await inserirAcessoDaCatraca({ ...dados, executor: conexao });
     if (inserido) {
+      await verificarEAtribuirPresenca(dados.pessoa_id, dataHoraAcesso, conexao);
       await registrarFato({
         pessoa_id: dados.pessoa_id,
         dispositivo_id: dados.dispositivo_id,
@@ -134,7 +135,6 @@ async function inserirAcessoComPresenca(dados, dataHoraAcesso) {
         origem: 'CATRACA',
         log_catraca_id: dados.catraca_log_id
       }, conexao);
-      await verificarEAtribuirPresenca(dados.pessoa_id, dataHoraAcesso, conexao);
     }
     await conexao.commit();
     return inserido;
@@ -558,6 +558,8 @@ async function criarAcesso(dados, conexaoExterna = null) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [pessoa_id, dispositivo_id, status, permitido, metodo_auth, agora, agora]
     );
+    const [acessoResult] = await conexao.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
+    await verificarEAtribuirPresenca(pessoa_id, agora, conexao);
     await registrarFato({
       pessoa_id,
       dispositivo_id,
@@ -565,8 +567,6 @@ async function criarAcesso(dados, conexaoExterna = null) {
       sentido: status,
       origem: 'MANUAL'
     }, conexao);
-    const [acessoResult] = await conexao.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
-    await verificarEAtribuirPresenca(pessoa_id, agora, conexao);
     if (controlaTransacao) await conexao.commit();
     return { message: mensagem, acesso: acessoResult[0] };
   } catch (erro) {

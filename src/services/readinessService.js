@@ -20,6 +20,7 @@ const REQUIRED_COLUMNS = Object.freeze([
   'CalendarioEscolar.data',
   'ExpectativaPresencaSlot.pessoa_id',
   'Excecao.id',
+  'RegistroPresenca.id',
   'ConfigSistema.chave',
   'sync_pendente.id'
 ]);
