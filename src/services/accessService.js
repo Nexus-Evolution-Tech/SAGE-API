@@ -1,5 +1,6 @@
 const deviceService = require('./deviceService');
 const verificarEAtribuirPresenca = require('./presenceService');
+const { registrarFato } = require('./registroPresencaService');
 const db = require('../config/database');
 const { isSyncEnabled } = require('../utils/syncFlags');
 const globalState = require('../state/globalState');
@@ -124,7 +125,17 @@ async function inserirAcessoComPresenca(dados, dataHoraAcesso) {
   try {
     await conexao.beginTransaction();
     const inserido = await inserirAcessoDaCatraca({ ...dados, executor: conexao });
-    if (inserido) await verificarEAtribuirPresenca(dados.pessoa_id, dataHoraAcesso, conexao);
+    if (inserido) {
+      await registrarFato({
+        pessoa_id: dados.pessoa_id,
+        dispositivo_id: dados.dispositivo_id,
+        momento: dataHoraAcesso,
+        sentido: dados.status,
+        origem: 'CATRACA',
+        log_catraca_id: dados.catraca_log_id
+      }, conexao);
+      await verificarEAtribuirPresenca(dados.pessoa_id, dataHoraAcesso, conexao);
+    }
     await conexao.commit();
     return inserido;
   } catch (erro) {
@@ -547,6 +558,13 @@ async function criarAcesso(dados, conexaoExterna = null) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [pessoa_id, dispositivo_id, status, permitido, metodo_auth, agora, agora]
     );
+    await registrarFato({
+      pessoa_id,
+      dispositivo_id,
+      momento: agora,
+      sentido: status,
+      origem: 'MANUAL'
+    }, conexao);
     const [acessoResult] = await conexao.query('SELECT * FROM Acesso WHERE id = LAST_INSERT_ID() LIMIT 1');
     await verificarEAtribuirPresenca(pessoa_id, agora, conexao);
     if (controlaTransacao) await conexao.commit();
