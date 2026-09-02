@@ -115,6 +115,7 @@ it('7. concorrência com a mesma versão aceita no máximo uma escrita', async (
   const respostas = await Promise.all([
     retomar('escola-conta-administrador', 0), retomar('escola-conta-administrador', 0)
   ]);
+  expect(respostas.map(({ status }) => status).sort()).toEqual([200, 412]);
   expect(respostas.filter(({ status }) => status === 200)).toHaveLength(1);
   const [[estado]] = await banco.pool.query('SELECT COUNT(*) AS linhas, MAX(version) AS version FROM onboarding_state');
   expect(estado).toEqual({ linhas: 1, version: 1 });

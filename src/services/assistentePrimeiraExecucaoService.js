@@ -50,7 +50,14 @@ async function retomarPasso(step, expectedVersion) {
       if (expectedVersion !== 0) throw erro('ONBOARDING_VERSION_OBSOLETA');
       if (index !== 0) throw erro('ONBOARDING_PRE_CONDICAO_AUSENTE');
       const row = { id: 1, status: 'EM_ANDAMENTO', current_step: VALORES_PASSOS[0], completed_steps: [], version: 1 };
-      await connection.query(`INSERT INTO onboarding_state (id, status, current_step, completed_steps, version) VALUES (?, ?, ?, ?, ?)`, [1, row.status, row.current_step, '[]', 1]);
+      try {
+        await connection.query(`INSERT INTO onboarding_state (id, status, current_step, completed_steps, version) VALUES (?, ?, ?, ?, ?)`, [1, row.status, row.current_step, '[]', 1]);
+      } catch (error) {
+        // Duas primeiras retomadas podem observar a ausência da linha antes de qualquer commit.
+        // A colisão da chave significa que esta versão já foi consumida pela outra requisição.
+        if (error.code === 'ER_DUP_ENTRY') throw erro('ONBOARDING_VERSION_OBSOLETA');
+        throw error;
+      }
       await connection.commit();
       return projetar(row);
     }
@@ -73,7 +80,7 @@ async function retomarPasso(step, expectedVersion) {
     const conhecido = error instanceof ErroOnboarding;
     logger.error(`[ONBOARDING] codigo=${conhecido ? error.code : 'TRANSICAO_FALHOU'}`, { operacao: 'retomar', passo: step });
     if (conhecido) throw error;
-    if (error.code === 'ER_DUP_ENTRY' || error.code === 'ER_LOCK_DEADLOCK') throw erro('ONBOARDING_CONCORRENCIA');
+    if (error.code === 'ER_DUP_ENTRY' || error.code === 'ER_LOCK_DEADLOCK') throw erro('ONBOARDING_VERSION_OBSOLETA');
     throw erro('ONBOARDING_ESTADO_INDISPONIVEL');
   } finally { if (connection) connection.release(); }
 }
