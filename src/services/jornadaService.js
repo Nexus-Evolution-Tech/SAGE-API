@@ -1,7 +1,7 @@
 const MAX_INTERVALO_PADRAO_MS = 18 * 60 * 60 * 1000;
 
 function horaDoEvento(evento) {
-  const valor = evento?.dataHora ?? evento?.data_hora ?? evento?.timestamp;
+  const valor = evento?.dataHora ?? evento?.data_hora ?? evento?.momento ?? evento?.timestamp;
   const data = valor instanceof Date ? valor : new Date(valor);
   return Number.isNaN(data.getTime()) ? null : data;
 }
