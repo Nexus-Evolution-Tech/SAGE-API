@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
+const { verificarDiaLetivo, obterConfiguracaoTempo, calcularAtraso } = require('./calendarioEscolar');
 
 // Converte "HH:mm" para minutos
 function horaParaMinutos(horaStr) {
@@ -57,9 +58,18 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso, executor = 
   if (!pessoa) return;
 
   const { dataStr: dataAcesso, diaSemana } = dataEDiaBrasil(dataHoraAcesso instanceof Date ? dataHoraAcesso : new Date(dataHoraAcesso));
+  const calendario = await verificarDiaLetivo(dataHoraAcesso, executor);
+  if (!calendario.letivo) {
+    return {
+      pessoa_id,
+      ignorado: 'DIA_NAO_LETIVO',
+      data: calendario.data,
+      tipoCalendario: calendario.tipo
+    };
+  }
   // HorarioAula no banco usa 'TERÇA' (com cedilha); Presenca usa 'TERCA'
   const diaSemanaHorarioAula = diaSemana === 'TERCA' ? 'TERÇA' : diaSemana;
-  const toleranciaMinutos = 15;
+  const configuracaoTempo = await obterConfiguracaoTempo(executor);
 
   let aulasHoje = [];
 
@@ -141,8 +151,11 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso, executor = 
 
   if (aulasHoje.length > 0) {
     entradaPrevista = definirHorario(aulasHoje[0].inicio);
-    const tolerancia = new Date(entradaPrevista.getTime() + toleranciaMinutos * 60000);
-    atrasado = dataHoraAcesso > tolerancia;
+    atrasado = calcularAtraso({
+      horarioPrevisto: entradaStrFromDate(entradaPrevista),
+      horarioChegada: formatarHoraCurta(dataHoraAcesso),
+      toleranciaAtrasoMinutos: configuracaoTempo.toleranciaAtrasoMinutos
+    });
     aulasPerdidas = calcularAulasPerdidas(aulasHoje, dataHoraAcesso);
   }
 
@@ -189,6 +202,14 @@ async function verificarEAtribuirPresenca(pessoa_id, dataHoraAcesso, executor = 
     horario_entrada_real: formatarHora(horarioChegada),
     atrasado: atrasado,
   };
+}
+
+function formatarHoraCurta(date) {
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function entradaStrFromDate(date) {
+  return formatarHoraCurta(date);
 }
 
 module.exports = verificarEAtribuirPresenca;
